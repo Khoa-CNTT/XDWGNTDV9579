@@ -11,23 +11,23 @@ const Contacts = () => {
 
   const columns = [
     { field: "id", headerName: "ID", flex: 0.5 },
-    { field: "registrarId", headerName: "Registrar ID" },
+    { field: "registrarId", headerName: "Id khách hàng" },
     {
       field: "name",
-      headerName: "Name",
+      headerName: "Tên",
       flex: 1,
       cellClassName: "name-column--cell",
     },
     {
       field: "age",
-      headerName: "Age",
+      headerName: "Tuổi",
       type: "number",
       headerAlign: "left",
       align: "left",
     },
     {
       field: "phone",
-      headerName: "Phone Number",
+      headerName: "Số điện thoại",
       flex: 1,
     },
     {
@@ -37,17 +37,12 @@ const Contacts = () => {
     },
     {
       field: "address",
-      headerName: "Address",
-      flex: 1,
-    },
-    {
-      field: "city",
-      headerName: "City",
+      headerName: "Địa chỉ",
       flex: 1,
     },
     {
       field: "zipCode",
-      headerName: "Zip Code",
+      headerName: "Mã giảm giá",
       flex: 1,
     },
   ];
@@ -55,8 +50,8 @@ const Contacts = () => {
   return (
     <Box m="20px">
       <Header
-        title="CONTACTS"
-        subtitle="List of Contacts for Future Reference"
+        title="Khách Hàng"
+        subtitle="Danh sách khách hàng"
       />
       <Box
         m="40px 0 0 0"
