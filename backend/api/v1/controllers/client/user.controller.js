@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
 const User = require("../../models/user.model");
+const ForgotPassword = require("../../models/forgot-password.model");
 const generateHelper = require("../../helpers/generate");
 const sendMailHelper = require("../../helpers/sendMail");
 const Cart = require('../../models/cart.model');
