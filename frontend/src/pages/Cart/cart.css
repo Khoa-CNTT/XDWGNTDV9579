@@ -1,0 +1,128 @@
+/* Header giống trang liên hệ */
+.cart-header {
+    background-color: #f8f9fa;
+    text-align: center;
+    padding: 40px 0;
+  }
+  
+  .cart-header h1 {
+    font-size: 2rem;
+    font-weight: bold;
+  }
+  
+  .cart-header p {
+    font-size: 1.1rem;
+    color: #6c757d;
+  }
+  
+  /* Tổng thể */
+  .cart-container {
+    width: 80%;
+    margin: 20px auto;
+    text-align: center;
+  }
+  
+  /* Bảng giỏ hàng */
+  .cart-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 30px;
+  }
+  
+  .cart-table th, .cart-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+  }
+  
+  .cart-table th {
+    background: #f5f5f5;
+  }
+  
+  .cart-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  /* Ảnh sản phẩm */
+  .cart-item-image {
+    width: 80px; /* 👈 Đặt kích thước cố định */
+    height: 80px;
+    object-fit: cover; /* 👈 Đảm bảo ảnh không bị méo */
+    border-radius: 5px; /* 👈 Bo góc nhẹ */
+    display: block;
+    margin: auto;
+  }
+  
+  .cart-placeholder {
+    width: 80px;
+    height: 80px;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+  
+  /* Nút bấm */
+  button {
+    cursor: pointer;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    transition: 0.3s;
+  }
+  
+  button:hover {
+    opacity: 0.8;
+  }
+  
+  .remove-btn {
+    background: red;
+    color: white;
+  }
+  
+  .remove-btn:hover {
+    background-color: darkred;
+  }
+  
+  /* Form khách hàng */
+  .cart-form {
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    align-items: center; 
+    text-align: center; 
+}
+
+.cart-form input, 
+.cart-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.cart-form .cart-submit-btn {
+    background: #28a745;
+    color: white;
+    padding: 12px;
+    font-size: 16px;
+    width: 50%; 
+    text-align: center; 
+    display: flex;
+    justify-content: center; 
+    align-items: center; 
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.cart-form .cart-submit-btn:hover {
+    background: #218838;
+}

@@ -1,0 +1,320 @@
+/* src/components/Common/Header/header.css */
+
+/* Sticky menu */
+.is-sticky {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  animation: smothScroll 1s forwards;
+  background: var(--white);
+  z-index: 999;
+  box-shadow: var(--bs-box-shadow-sm) !important;
+}
+
+@keyframes smothScroll {
+  0% { transform: translateY(-40px); }
+  100% { transform: translateY(0px); }
+}
+
+.is-sticky .navbar .navbar-brand a,
+.is-sticky .navbar .offcanvas-body a {
+  color: var(--black) !important;
+}
+
+.is-sticky .toggle_btn {
+  color: var(--primaryClr) !important;
+}
+
+/* Header */
+header {
+  position: absolute;
+  top: 0;
+  z-index: 999;
+  padding: 12px 0px;
+  width: 100%;
+}
+
+header .navbar .navbar-brand a {
+  font-size: 22px;
+  color: var(--white);
+  font-weight: bold;
+  text-transform: capitalize;
+  text-decoration: none;
+}
+
+header .navbar .offcanvas-body a {
+  font-size: 14px;
+  color: var(--white) !important;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+header .navbar .offcanvas-body .dropdown-menu a {
+  color: black !important;
+}
+
+header .navbar .offcanvas-body a:hover {
+  color: var(--primaryClr) !important;
+}
+
+/* Giỏ hàng & Đăng nhập */
+.nav-icons {
+  display: flex;
+  align-items: center;
+}
+
+/* Icon giỏ hàng và đăng nhập */
+.cart-icon,
+.login-icon,
+.user-icon {
+  position: relative;
+  font-size: 20px;
+  color: var(--white);
+  margin-left: 15px;
+  text-decoration: none;
+  transition: color 0.3s ease-in-out;
+}
+
+.cart-icon:hover,
+.login-icon:hover,
+.user-icon:hover {
+  color: var(--primaryClr);
+}
+
+/* Badge số lượng sản phẩm */
+.cart-badge {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+/* Khi header ở chế độ sticky */
+.is-sticky .cart-icon,
+.is-sticky .login-icon,
+.is-sticky .user-icon {
+  color: var(--black) !important;
+}
+
+/* Chữ đăng nhập */
+.login-icon {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.login-icon i {
+  font-size: 20px;
+}
+
+.login-icon .login-text {
+  margin-left: 5px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* User section (khi đã đăng nhập) */
+.user-section {
+  display: flex;
+  align-items: center;
+  margin-left: 15px;
+}
+
+.user-icon {
+  display: flex;
+  align-items: center;
+}
+
+.user-name {
+  margin-left: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--white);
+  transition: color 0.3s ease-in-out;
+}
+
+.is-sticky .user-name {
+  color: var(--black) !important;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: var(--white);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: color 0.3s ease-in-out;
+}
+
+.logout-btn:hover {
+  color: var(--primaryClr);
+}
+
+.is-sticky .logout-btn {
+  color: var(--black) !important;
+}
+
+.is-sticky .logout-btn:hover {
+  color: var(--primaryClr) !important;
+}
+
+/* Nút Đặt vé ngay */
+.primaryBtn {
+  background-color: var(--primaryClr);
+  color: var(--white);
+  padding: 8px 15px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.primaryBtn:hover {
+  background-color: #0056b3;
+  color: var(--white);
+}
+
+.is-sticky .primaryBtn {
+  background-color: var(--primaryClr);
+  color: var(--white);
+}
+
+/* Mobile Menu */
+@media only screen and (max-width: 991px) {
+  header .navbar .toggle_btn {
+    font-size: var(--bodyText);
+    color: var(--white);
+    border: 2px solid var(--white);
+    padding: 7px 10px;
+  }
+
+  .is-sticky .navbar .toggle_btn {
+    border: 2px solid var(--primaryClr);
+  }
+
+  .offcanvas-header {
+    border: 1px solid gainsboro;
+  }
+
+  .offcanvas-header .logo {
+    font-size: 26px;
+    color: var(--black) !important;
+    font-weight: bold;
+    text-decoration: none;
+  }
+
+  .offcanvas-body .nav-link {
+    padding: 12px 0px;
+    color: var(--black);
+  }
+
+  .offcanvas-body .dropdown-item {
+    padding: 12px 10px;
+    color: var(--black);
+  }
+
+  /* Điều chỉnh user section trên mobile */
+  .user-section {
+    margin-left: 0;
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .user-name {
+    font-size: 16px;
+  }
+
+  .logout-btn {
+    font-size: 16px;
+  }
+}
+
+/* Hiệu ứng dropdown cho user */
+.user-section {
+  position: relative;
+  cursor: pointer;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  min-width: 180px;
+  display: none; /* Dropdown ẩn mặc định */
+  flex-direction: column;
+  text-align: left;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease; /* Thêm hiệu ứng mượt */
+}
+
+/* Khi dropdown được hiển thị */
+.user-section:hover .user-dropdown {
+  display: flex;
+  opacity: 1;
+  transform: translateY(10px); /* Hiệu ứng xuất hiện mượt */
+}
+
+.user-dropdown p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  padding: 5px 0;
+}
+
+.user-dropdown button {
+  background: red;
+  color: white;
+  padding: 5px;
+  border: none;
+  cursor: pointer;
+  margin-top: 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.3s ease; /* Thêm hiệu ứng chuyển màu */
+}
+
+.user-dropdown button:hover {
+  background: darkred;
+}
+
+
+
+
+@media only screen and (max-width: 576px) {
+  .cart-icon,
+  .login-icon,
+  .user-icon {
+    font-size: 18px;
+  }
+
+  .login-text,
+  .user-name,
+  .logout-btn {
+    font-size: 12px;
+  }
+
+  .primaryBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .user-dropdown {
+    min-width: 150px; /* Giảm chiều rộng dropdown trên màn hình nhỏ */
+  }
+}
