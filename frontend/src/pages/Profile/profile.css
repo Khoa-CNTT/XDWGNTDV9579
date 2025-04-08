@@ -1,0 +1,103 @@
+.profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .profile-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .profile-view {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  .profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  
+  .profile-info p {
+    margin: 10px 0;
+    font-size: 16px;
+  }
+  
+  .edit-btn {
+    padding: 8px 16px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .edit-btn:hover {
+    background: #0056b3;
+  }
+  
+  .profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .form-group label {
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  .form-group input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+  }
+  
+  .avatar-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin-top: 10px;
+  }
+  
+  .form-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .save-btn, .cancel-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .save-btn {
+    background: #28a745;
+    color: #fff;
+  }
+  
+  .save-btn:hover {
+    background: #218838;
+  }
+  
+  .cancel-btn {
+    background: #dc3545;
+    color: #fff;
+  }
+  
+  .cancel-btn:hover {
+    background: #c82333;
+  }

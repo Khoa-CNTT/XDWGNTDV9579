@@ -2,84 +2,59 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Container, Navbar, Offcanvas, Nav, NavDropdown } from "react-bootstrap";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 import api from "../../../utils/api";
-import { toast } from "react-toastify";
 import "../Header/header.css";
 
 const Header = () => {
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [cartCount, setCartCount] = useState(0);
-  const navigate = useNavigate();
   const dropdownRef = useRef(null);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-  // Lấy thông tin người dùng từ localStorage
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  // Lấy số lượng tour trong giỏ hàng
   useEffect(() => {
     const fetchCartCount = async () => {
       try {
-        const token = localStorage.getItem("token");
         const cartId = localStorage.getItem("cartId");
-        if (!token || !cartId) return;
-
-        const response = await api.get(`/cart/${cartId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        if (!cartId || !user) {
+          setCartCount(0);
+          return;
+        }
+        const response = await api.get(`/cart/${cartId}`);
         const cart = response.data.data;
         setCartCount(cart.tours ? cart.tours.length : 0);
       } catch (error) {
         console.error("Không thể lấy số lượng giỏ hàng:", error);
+        setCartCount(0);
       }
     };
-
     fetchCartCount();
-  }, []);
+  }, [user]);
 
-  // Xử lý sticky header
   useEffect(() => {
     const handleScroll = () => {
       const header = document.querySelector(".header-section");
       header.classList.toggle("is-sticky", window.scrollY >= 120);
     };
-
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Đóng dropdown khi nhấp ra ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Xử lý đăng xuất
   const handleLogout = async () => {
-    try {
-      await api.post("/users/logout", {}, { withCredentials: true });
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("cartId");
-      setUser(null);
-      toast.success("Đăng xuất thành công!");
-      navigate("/login");
-    } catch (error) {
-      toast.error("Đăng xuất thất bại!");
-    }
+    await logout();
+    setShowDropdown(false);
   };
 
   const toggleMenu = () => setOpen(!open);
@@ -109,39 +84,87 @@ const Header = () => {
 
             <Offcanvas.Body>
               <Nav className="justify-content-end flex-grow-1 pe-3">
-                <NavLink className="nav-link" to="/" onClick={() => setOpen(false)}>
+                <NavLink
+                  className="nav-link"
+                  to="/"
+                  onClick={() => {
+                    console.log("Navigating to /");
+                    setOpen(false);
+                  }}
+                >
                   Trang chủ
                 </NavLink>
-                <NavLink className="nav-link" to="/about-us" onClick={() => setOpen(false)}>
+                <NavLink
+                  className="nav-link"
+                  to="/about-us"
+                  onClick={() => {
+                    console.log("Navigating to /about-us");
+                    setOpen(false);
+                  }}
+                >
                   Về chúng tôi
                 </NavLink>
-                <NavLink className="nav-link" to="/tours" onClick={() => setOpen(false)}>
-                  TOURS
+                <NavLink
+                  className="nav-link"
+                  to="/tours"
+                  onClick={() => {
+                    console.log("Navigating to /tours");
+                    setOpen(false);
+                  }}
+                >
+                  Tours
                 </NavLink>
                 <NavDropdown title="Điểm đến" id="offcanvasNavbarDropdown-expand-lg">
                   <NavLink
                     className="nav-link text-dark"
                     to="/destinations"
-                    onClick={() => setOpen(false)}
+                    onClick={() => {
+                      console.log("Navigating to /destinations");
+                      setOpen(false);
+                    }}
                   >
                     Tất cả điểm đến
                   </NavLink>
                   <NavLink
                     className="nav-link text-dark"
                     to="/destinations/hue"
-                    onClick={() => setOpen(false)}
+                    onClick={() => {
+                      console.log("Navigating to /destinations/hue");
+                      setOpen(false);
+                    }}
                   >
                     Huế
                   </NavLink>
                 </NavDropdown>
-                <NavLink className="nav-link" to="/gallery" onClick={() => setOpen(false)}>
-                  Thư Viện
+                <NavLink
+                  className="nav-link"
+                  to="/gallery"
+                  onClick={() => {
+                    console.log("Navigating to /gallery");
+                    setOpen(false);
+                  }}
+                >
+                  Thư viện
                 </NavLink>
-                <NavLink className="nav-link" to="/contact-us" onClick={() => setOpen(false)}>
-                  Liên Hệ
+                <NavLink
+                  className="nav-link"
+                  to="/contact-us"
+                  onClick={() => {
+                    console.log("Navigating to /contact-us");
+                    setOpen(false);
+                  }}
+                >
+                  Liên hệ
                 </NavLink>
-                {user && (
-                  <NavLink className="nav-link" to="/dashboard" onClick={() => setOpen(false)}>
+                {user?.role === "admin" && (
+                  <NavLink
+                    className="nav-link"
+                    to="/dashboard"
+                    onClick={() => {
+                      console.log("Navigating to /dashboard");
+                      setOpen(false);
+                    }}
+                  >
                     Dashboard
                   </NavLink>
                 )}
@@ -150,34 +173,73 @@ const Header = () => {
           </Navbar.Offcanvas>
 
           <div className="ms-md-4 ms-2 d-flex align-items-center">
-            {/* Giỏ hàng */}
-            <NavLink className="cart-icon me-3 position-relative" to="/cart">
+            <NavLink
+              className="cart-icon me-3 position-relative"
+              to="/cart"
+              onClick={() => console.log("Navigating to /cart")}
+            >
               <i className="bi bi-cart fs-5"></i>
               {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
             </NavLink>
 
-            {/* Hiển thị thông tin User */}
             {user ? (
-              <div className="user-section" ref={dropdownRef}>
-                <div className="user-icon" onClick={toggleDropdown}>
-                  <i className="bi bi-person-circle fs-5"></i>
-                  <span className="user-name">{user.fullName}</span>
+              <div className={`user-section ${showDropdown ? "show-dropdown" : ""}`} ref={dropdownRef}>
+                <div className="user-info" onClick={toggleDropdown}>
+                  <img
+                    src={
+                      user.avatar ||
+                      "https://chiemtaimobile.vn/images/companies/1/%E1%BA%A2nh%20Blog/avatar-facebook-dep/Hinh-dai-dien-hai-huoc-cam-dep-duoi-ai-do.jpg?1704789789335"
+                    }
+                    alt="Avatar"
+                    className="user-avatar rounded-circle"
+                  />
+                  <span className="user-name ms-2">{user.fullName}</span>
+                  <i className={`bi bi-chevron-${showDropdown ? "up" : "down"} ms-1`}></i>
                 </div>
                 {showDropdown && (
                   <div className="user-dropdown">
-                    <p>{user.email}</p>
-                    <button onClick={handleLogout}>Đăng xuất</button>
+                    <div
+                      className="dropdown-item"
+                      onClick={() => {
+                        navigate("/profile");
+                        console.log("Navigating to /profile");
+                        setShowDropdown(false);
+                      }}
+                    >
+                      Thông tin cá nhân
+                    </div>
+                    <div
+                      className="dropdown-item"
+                      onClick={() => {
+                        navigate("/invoices");
+                        console.log("Navigating to /invoices");
+                        setShowDropdown(false);
+                      }}
+                    >
+                      Hóa đơn
+                    </div>
+                    <div className="dropdown-item" onClick={handleLogout}>
+                      Đăng xuất
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <NavLink className="login-icon me-3" to="/login">
+              <NavLink
+                className="login-icon me-3"
+                to="/login"
+                onClick={() => console.log("Navigating to /login")}
+              >
                 <i className="bi bi-person-circle fs-5"></i>
                 <span className="login-text">Đăng nhập</span>
               </NavLink>
             )}
 
-            <NavLink className="primaryBtn d-none d-sm-inline-block" to="/booking">
+            <NavLink
+              className="primaryBtn d-none d-sm-inline-block"
+              to="/booking"
+              onClick={() => console.log("Navigating to /booking")}
+            >
               Đặt vé ngay
             </NavLink>
             <li className="d-inline-block d-lg-none ms-3 toggle_btn">

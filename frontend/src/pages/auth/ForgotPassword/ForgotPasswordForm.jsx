@@ -17,42 +17,51 @@ const ForgotPasswordForm = () => {
     return emailRegex.test(email);
   };
 
-  const validateForm = () => {
-    let newErrors = {};
-
-    if (!email.trim()) {
-      newErrors.email = "Email không được để trống";
-    } else if (!isValidEmail(email)) {
-      newErrors.email = "Email không hợp lệ";
+  const validateField = (field, value) => {
+    let newErrors = { ...errors };
+    if (field === "email") {
+      if (!value.trim()) newErrors.email = "Email không được để trống";
+      else if (!isValidEmail(value)) newErrors.email = "Email không hợp lệ";
+      else delete newErrors.email;
     }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
+  const handleInputChange = (field, value) => {
+    setTouched({ ...touched, [field]: true });
+    setEmail(value);
+    validateField(field, value);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!email.trim()) newErrors.email = "Email không được để trống";
+    else if (!isValidEmail(email)) newErrors.email = "Email không hợp lệ";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      toast.error("Vui lòng kiểm tra lại email!");
+      return;
+    }
 
     setLoading(true);
 
     try {
-      await forgotPassword(email);
-      toast.success("Yêu cầu đã được gửi! Vui lòng kiểm tra email của bạn.");
-      setTimeout(() => navigate("/login"), 2000);
+      const result = await forgotPassword(email);
+      toast.success(result.message || "Đã gửi mã OTP qua email! Vui lòng kiểm tra hộp thư.");
+      // Chuyển hướng sang trang xác thực OTP với email
+      setTimeout(() => navigate(`/reset-password?email=${encodeURIComponent(email)}`), 2000);
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
+      const errorMessage = error.message || "Có lỗi xảy ra. Vui lòng thử lại.";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleInputChange = (field, value) => {
-    setTouched({ ...touched, [field]: true });
-    setErrors({ ...errors, [field]: "" });
-    if (field === "email") setEmail(value);
   };
 
   return (

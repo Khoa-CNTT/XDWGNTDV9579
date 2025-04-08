@@ -6,6 +6,31 @@ import { NavLink } from "react-router-dom";
 const Footer = () => {
   const [visible, setVisible] = useState(false);
   const [user, setUser] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+    setCurrentTime(new Date());
+    }, 1000); // cập nhật mỗi giây
+
+     return () => clearInterval(interval); // cleanup
+  }, []);
+  const getFormattedDateTime = (date) => {
+    return date.toLocaleString("vi-VN", {
+      weekday: "long",    // Thứ Hai
+      day: "2-digit",     // 08
+      month: "2-digit",   // 04
+      year: "numeric",    // 2025
+      hour: "2-digit",    // 14
+      minute: "2-digit",  // 45
+      second: "2-digit",  // 33
+      hour12: false
+    });
+  };
+  
+  const formattedDateTime = getFormattedDateTime(currentTime);
+  
+  
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -70,13 +95,14 @@ const Footer = () => {
               <div className="social-links mt-3">
                 <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-facebook"></i></a>
                 <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-instagram"></i></a>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-twitter"></i></a>
+                <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-tiktok"></i></a>
                 <a href="https://youtube.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-youtube"></i></a>
               </div>
             </Col>
           </Row>
 
           <Row className="text-center copyright">
+          <p>🕒 Hiện tại: <strong>{formattedDateTime}</strong></p>
             <Col><p>© 2025 Nhóm 66. All Rights Reserved.</p></Col>
           </Row>
         </Container>
