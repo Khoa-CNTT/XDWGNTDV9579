@@ -19,11 +19,14 @@ import PhotoGallery from "./pages/PhotoGallery/PhotoGallery";
 import Login from "./pages/auth/Login/Login";
 import Register from "./pages/auth/Register/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword/ForgotPassword";
+import ResetPasswordForm from "./pages/auth/ForgotPassword/ResetPasswordForm";
 import CartPage from "./pages/Cart/CartPage";
 import Chatbox from "./components/Chatbox/ChatBox";
 import PrivateRoute from "./components/Common/PrivateRoute";
-import HotelServices from "./pages/HotelService/HotelServices"; // Sửa tên file: HotelServices.jsx
-import HotelDetails from "./pages/HotelService/HotelDetails"; // Sửa tên file: HotelDetails.jsx
+import HotelServices from "./pages/HotelService/HotelServices";
+import HotelDetails from "./pages/HotelService/HotelDetails";
+import Profile from "./pages/Profile/Profile";
+import Invoicess from "./pages/Invoices/Invoicess";
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -38,9 +41,12 @@ import Line from "./Admin/line";
 import Pie from "./Admin/pie";
 import FAQ from "./Admin/faq";
 import Geography from "./Admin/geography";
-import Profile from "./pages/Profile/Profile";
-import Invoicess from "./pages/Invoices/Invoicess";
-import ResetPasswordForm from "./pages/auth/ForgotPassword/ResetPasswordForm";
+import TourControl from "./Admin/TourControl";
+import LoginAdmin from "./Admin/Loginadmin";
+import Category from "./Admin/category";
+import Voucher from "./Admin/voucher";
+import Rightsgroup from "./Admin/rightsgroup";
+import Delegation from "./Admin/delegation";
 
 function App() {
   const { loading, user } = useAuth();
@@ -49,23 +55,33 @@ function App() {
   const [isSidebar, setIsSidebar] = useState(true);
 
   const isAdminPath = location.pathname.startsWith("/admin");
+  const isLoginAdmin = location.pathname === "/loginadmin";
 
   if (loading) {
     return <div className="loading-spinner">Đang tải...</div>;
   }
 
   if (user) {
-    if (user.role === "admin" && !isAdminPath) {
+    if (user.role === "admin" && !isAdminPath && !isLoginAdmin) {
       return <Navigate to="/admin" replace />;
     }
-    if (user.role !== "admin" && isAdminPath) {
+    if (user.role !== "admin" && (isAdminPath || isLoginAdmin)) {
       return <Navigate to="/" replace />;
     }
   }
 
   return (
     <>
-      {isAdminPath ? (
+      {isLoginAdmin ? (
+        // Giao diện đăng nhập Admin
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Routes>
+            <Route path="/loginadmin" element={<LoginAdmin />} />
+          </Routes>
+        </ThemeProvider>
+      ) : isAdminPath ? (
+        // Giao diện Admin
         <ColorModeContext.Provider value={colorMode}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -74,7 +90,7 @@ function App() {
               <main className="content">
                 <Topbar setIsSidebar={setIsSidebar} />
                 <Routes>
-                  <Route path="/admin" element={<Dashboard />} />
+                  <Route path="/admin/dashboard" element={<Dashboard />} />
                   <Route path="/admin/team" element={<Team />} />
                   <Route path="/admin/contacts" element={<Contacts />} />
                   <Route path="/admin/invoices" element={<Invoices />} />
@@ -83,6 +99,11 @@ function App() {
                   <Route path="/admin/pie" element={<Pie />} />
                   <Route path="/admin/line" element={<Line />} />
                   <Route path="/admin/faq" element={<FAQ />} />
+                  <Route path="/admin/tourcontrol" element={<TourControl />} />
+                  <Route path="/admin/category" element={<Category />} />
+                  <Route path="/admin/voucher" element={<Voucher />} />
+                  <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
+                  <Route path="/admin/delegation" element={<Delegation />} />
                   <Route path="/admin/geography" element={<Geography />} />
                 </Routes>
               </main>
@@ -90,6 +111,7 @@ function App() {
           </ThemeProvider>
         </ColorModeContext.Provider>
       ) : (
+        // Giao diện Client
         <AuthProvider>
           <Header />
           <Routes>
@@ -136,8 +158,8 @@ function App() {
                 </PrivateRoute>
               }
             />
-            <Route path="hotel-services" element={<HotelServices />} /> {/* Route cho danh sách khách sạn */}
-            <Route path="hotel-details/:hotelId" element={<HotelDetails />} /> {/* Route cho chi tiết khách sạn */}
+            <Route path="hotel-services" element={<HotelServices />} />
+            <Route path="hotel-details/:hotelId" element={<HotelDetails />} />
           </Routes>
           <Chatbox />
           <Footer />

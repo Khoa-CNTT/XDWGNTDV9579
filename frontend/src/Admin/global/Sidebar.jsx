@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -15,6 +15,13 @@ import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutl
 import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import TourIcon from '@mui/icons-material/Tour';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
+import AppsOutageIcon from '@mui/icons-material/AppsOutage';
+
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
@@ -31,7 +38,9 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
       <Typography>{title}</Typography>
       <Link to={to} />
     </MenuItem>
+
   );
+
 };
 
 const Sidebar = () => {
@@ -115,11 +124,12 @@ const Sidebar = () => {
             </Box>
           )}
 
+
           <Box paddingLeft={isCollapsed ? undefined : "10%"}>
             <Item
-              title="Dashboard"
-              to="/admin"
-              icon={<HomeOutlinedIcon />}
+              title="Bảng Điều Khiển"
+              to="/admin/dashboard"
+              icon={<DashboardIcon />}
               selected={selected}
               setSelected={setSelected}
             />
@@ -129,44 +139,73 @@ const Sidebar = () => {
               color={colors.grey[300]}
               sx={{ m: "15px 0 5px 20px" }}
             >
-              Data
+              Quản lý
             </Typography>
             <Item
-              title="Đội Ngũ"
-              to="/admin/team"
-              icon={<PeopleOutlinedIcon />}
+              title="Quản lý danh mục"
+              to="/admin/category"
+              icon={<FormatListBulletedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
+
             <Item
-              title="Khách Hàng"
-              to="/admin/contacts"
-              icon={<ContactsOutlinedIcon />}
+              title="Quản lý tour"
+              to="/admin/tourcontrol"
+              icon={<TourIcon />}
               selected={selected}
               setSelected={setSelected}
             />
+
             <Item
-              title="Hoá Đơn"
+              title="Quản lý đơn hàng"
               to="/admin/invoices"
               icon={<ReceiptOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
 
+            <Item
+              title="Quản lý voucher"
+              to="/admin/voucher"
+              icon={<ConfirmationNumberIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Item
+              title="Quản lý khách hàng"
+              to="/admin/contacts"
+              icon={<ContactsOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+
             <Typography
               variant="h6"
               color={colors.grey[300]}
               sx={{ m: "15px 0 5px 20px" }}
             >
-              Pages
+              Quyền
             </Typography>
+
             <Item
-              title="Tài khoản"
-              to="/admin/form"
-              icon={<PersonOutlinedIcon />}
+              title="Nhóm quyền"
+              to="/admin/rightsgroup"
+              icon={<AppsOutageIcon />}
               selected={selected}
               setSelected={setSelected}
             />
+
+            <Item
+              title="Phân quyền"
+              to="/admin/delegation"
+              icon={<AppRegistrationIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
             {/* <Item
               title="FAQ Page"
               to="/admin/faq"
@@ -182,8 +221,9 @@ const Sidebar = () => {
             >
               Charts
             </Typography>
+
             <Item
-              title="Bar Chart"
+              title="Báo cáo doanh thu"
               to="/admin/bar"
               icon={<BarChartOutlinedIcon />}
               selected={selected}
@@ -203,17 +243,42 @@ const Sidebar = () => {
               selected={selected}
               setSelected={setSelected}
             /> */}
-            <Item
+            {/* <Item
               title="Geography Chart"
               to="/admin/geography"
               icon={<MapOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
+            /> */}
+            <Typography
+              variant="h6"
+              color={colors.grey[300]}
+              sx={{ m: "15px 0 5px 20px" }}
+            >
+              Pages
+            </Typography>
+
+            <Item
+              title="Đội Ngũ"
+              to="/admin/team"
+              icon={<PeopleOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
             />
+
+            <Item
+              title="Tài khoản Admin"
+              to="/admin/form"
+              icon={<PersonOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
           </Box>
         </Menu>
       </ProSidebar>
     </Box>
+
   );
 };
 
