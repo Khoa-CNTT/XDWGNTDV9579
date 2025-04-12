@@ -1,8 +1,8 @@
 const Account = require("../../models/account.model");
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
-const generate = require("../../helper/generate");
-const paginationHelper = require("../../helper/pagination");
+const generate = require("../../helpers/generate");
+const paginationHelper = require("../../helpers/pagination");
 
 // [GET]/api/v1/admin/accounts
 module.exports.index = async (req, res) => {
