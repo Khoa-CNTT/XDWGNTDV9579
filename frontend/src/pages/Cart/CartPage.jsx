@@ -36,10 +36,10 @@ const CartPage = () => {
 
   return (
     <>
-      <Header cartCount={totalQuantity} /> {/* ✅ Truyền số lượng vào giỏ hàng */}
-      <Breadcrumbs title="Giỏ Hàng" pagename="Giỏ Hàng" /> {/* ✅ Thêm Breadcrumbs */}
+      <Header cartCount={totalQuantity} /> {/* Truyền số lượng vào giỏ hàng */}
+      <Breadcrumbs title="Giỏ Hàng" pagename="Giỏ Hàng" /> {/* Thêm Breadcrumbs */}
 
-      <section className="cart-section py-5"> {/* ✅ Thêm class giống Booking */}
+      <section className="cart-section py-5"> {/* Thêm class giống Booking */}
         <Container>
           <Row>
             <Col md={8}>
@@ -63,7 +63,7 @@ const CartPage = () => {
                     ))}
                   </tbody>
                 </Table>
-                <h3 className="text-end">💰 Tổng thanh toán: {calculateTotal().toLocaleString()}đ</h3>
+                <h3 className="text-end">Tổng thanh toán: {calculateTotal().toLocaleString()}VNĐ</h3>
               </Card>
             </Col>
 

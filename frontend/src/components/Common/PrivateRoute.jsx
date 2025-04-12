@@ -5,8 +5,13 @@ import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
 
 const PrivateRoute = ({ children, roles = [] }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  // Nếu đang tải dữ liệu, hiển thị spinner hoặc chờ
+  if (loading) {
+    return <div className="loading-spinner">Đang tải...</div>;
+  }
 
   // Kiểm tra đăng nhập
   if (!user) {

@@ -1,62 +1,68 @@
 // src/components/AdvanceSearch/AdvanceSearch.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import "../AdvanceSearch/search.css";
-import { Container, Row, Col, Button } from "react-bootstrap";
-import CustomDropdown from "../CustomDropdown/CustomDropdown";
-import api from "../../utils/api"; // Đảm bảo đường dẫn chính xác
+import { Container, Row, Col, Button, Form } from "react-bootstrap";
+import api from "../../utils/api";
 import { toast } from "react-toastify";
 
 const AdvanceSearch = () => {
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [location, setLocation] = useState("");
-  const [guests, setGuests] = useState("");
+  const [searchTab, setSearchTab] = useState("tour");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [relatedKeywords, setRelatedKeywords] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Xử lý chọn vị trí
-  const selectedLocation = (value) => {
-    setLocation(value);
-    console.log("Vị trí:", value);
-  };
+  // Gọi API để lấy gợi ý và từ khóa liên quan khi người dùng nhập
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!searchQuery) {
+        setRelatedKeywords([]);
+        setSuggestions([]);
+        return;
+      }
 
-  // Xử lý chọn số lượng khách
-  const selectedGuest = (value) => {
-    setGuests(value);
-    console.log("Khách:", value);
-  };
+      try {
+        const endpoint = searchTab === "tour" ? "/tours/search" : "/hotels/search";
+        const response = await api.get(endpoint, {
+          params: { query: searchQuery },
+        });
+        // Giả định API trả về cả từ khóa liên quan và kết quả
+        setRelatedKeywords(response.data.relatedKeywords || []);
+        setSuggestions(response.data.results || []);
+      } catch (error) {
+        console.error("Lỗi khi lấy gợi ý:", error);
+        setRelatedKeywords([]);
+        setSuggestions([]);
+      }
+    };
 
-  // Xử lý tìm kiếm
+    const debounce = setTimeout(fetchSuggestions, 300); // Debounce để tránh gọi API quá nhiều
+    return () => clearTimeout(debounce);
+  }, [searchQuery, searchTab]);
+
+  // Xử lý tìm kiếm khi nhấn nút
   const handleSearch = async () => {
-    // Validation cơ bản
-    if (!location || !guests) {
-      toast.error("Vui lòng chọn vị trí và số lượng khách!");
-      return;
-    }
-
-    if (endDate < startDate) {
-      toast.error("Ngày về phải lớn hơn hoặc bằng ngày đi!");
+    if (!searchQuery) {
+      toast.error("Vui lòng nhập từ khóa tìm kiếm!");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Gửi yêu cầu đến backend để lấy danh sách tour
-      const response = await api.get("/tours", {
-        params: {
-          location,
-          guests,
-          start_date: startDate.toISOString().split("T")[0], // Định dạng YYYY-MM-DD
-          end_date: endDate.toISOString().split("T")[0],
-        },
-      });
-
-      // Điều hướng đến trang Tours với dữ liệu từ backend
-      navigate("/tours", { state: { tours: response.data } });
+      if (searchTab === "tour") {
+        const response = await api.get("/tours", {
+          params: { query: searchQuery },
+        });
+        navigate("/tours", { state: { tours: response.data } });
+      } else {
+        const response = await api.get("/hotels", {
+          params: { query: searchQuery },
+        });
+        navigate("/hotel-services", { state: { hotels: response.data } });
+      }
       toast.success("Tìm kiếm thành công!");
     } catch (error) {
       const errorMessage =
@@ -67,75 +73,136 @@ const AdvanceSearch = () => {
     }
   };
 
+  // Xử lý khi chọn một từ khóa liên quan
+  const handleSelectKeyword = (keyword) => {
+    setSearchQuery(keyword);
+  };
+
+  // Xử lý khi chọn một gợi ý
+  const handleSelectSuggestion = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    setRelatedKeywords([]);
+    setSuggestions([]);
+    if (searchTab === "tour") {
+      navigate("/tours", { state: { tours: [suggestion] } });
+    } else {
+      navigate("/hotel-services", { state: { hotels: [suggestion] } });
+    }
+  };
+
   return (
     <section className="box-search-advance">
       <Container>
         <Row>
           <Col md={12} xs={12}>
             <div className="box-search shadow-sm">
-              <div className="item-search">
-                <CustomDropdown
-                  label="Vị trí"
-                  onSelect={selectedLocation}
-                  options={[
-                    "Cố Đô Huế, TP. Huế",
-                    "Tràng An, Ninh Bình",
-                    "SaPa, Lào Cai",
-                    "Động Phong Nha, Quảng Bình",
-                    "Phố Cổ Hội An, Quảng Nam",
-                  ]}
-                />
-              </div>
-              <div className="item-search item-search-2">
-                <label className="item-search-label">Ngày đi</label>
-                <DatePicker
-                  selected={startDate}
-                  onChange={(date) => setStartDate(date)}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={new Date()} // Không cho phép chọn ngày trong quá khứ
-                  dateFormat="dd, MMMM, yyyy"
-                />
-              </div>
-              <div className="item-search item-search-2">
-                <label className="item-search-label">Ngày về</label>
-                <DatePicker
-                  selected={endDate}
-                  onChange={(date) => setEndDate(date)}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={startDate} // Ngày về không được nhỏ hơn ngày đi
-                  dateFormat="dd, MMMM, yyyy"
-                />
-              </div>
-              <div className="item-search bd-none">
-                <CustomDropdown
-                  label="Khách"
-                  onSelect={selectedGuest}
-                  options={[
-                    "1 người lớn",
-                    "2 người lớn",
-                    "2 người lớn, 1 trẻ em",
-                    "2 người lớn, 2 trẻ em",
-                    "2 người lớn, 3 trẻ em",
-                  ]}
-                />
-              </div>
-              <div className="item-search bd-none">
-                <Button
-                  className="primaryBtn flex-even d-flex justify-content-center"
-                  onClick={handleSearch}
-                  disabled={loading}
+              {/* Tab Tour và Khách sạn */}
+              <div className="search-tabs">
+                <button
+                  className={`tab-btn ${searchTab === "tour" ? "active" : ""}`}
+                  onClick={() => {
+                    setSearchTab("tour");
+                    setSearchQuery("");
+                    setRelatedKeywords([]);
+                    setSuggestions([]);
+                  }}
                 >
-                  {loading ? (
-                    <i className="bi bi-arrow-repeat spinning me-2"></i>
-                  ) : (
-                    <i className="bi bi-search me-2"></i>
+                  <i className="bi bi-bus-front me-2"></i>
+                  Tour
+                </button>
+                <button
+                  className={`tab-btn ${searchTab === "hotel" ? "active" : ""}`}
+                  onClick={() => {
+                    setSearchTab("hotel");
+                    setSearchQuery("");
+                    setRelatedKeywords([]);
+                    setSuggestions([]);
+                  }}
+                >
+                  <i className="bi bi-building me-2"></i>
+                  Hotel
+                </button>
+              </div>
+
+              {/* Ô tìm kiếm */}
+              <div className="search-container">
+                <div className="item-search">
+                  <Form.Control
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={
+                      searchTab === "tour" ? "Nhập tên tour" : "Nhập địa điểm"
+                    }
+                    className="search-input"
+                  />
+                  {/* Danh sách gợi ý */}
+                  {(relatedKeywords.length > 0 || suggestions.length > 0) && (
+                    <div className="suggestions-container">
+                      {/* Từ khóa liên quan */}
+                      {relatedKeywords.length > 0 && (
+                        <div className="related-keywords">
+                          <h6>Từ khóa liên quan</h6>
+                          <ul className="keywords-list">
+                            {relatedKeywords.map((keyword, index) => (
+                              <li
+                                key={index}
+                                onClick={() => handleSelectKeyword(keyword)}
+                                className="keyword-item"
+                              >
+                                <i className="bi bi-search me-2"></i>
+                                {keyword}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Gợi ý kết quả */}
+                      {suggestions.length > 0 && (
+                        <div className="suggestions-list">
+                          <h6>Gợi ý kết quả</h6>
+                          <ul className="results-list">
+                            {suggestions.map((suggestion, index) => (
+                              <li
+                                key={index}
+                                onClick={() => handleSelectSuggestion(suggestion)}
+                                className="result-item"
+                              >
+                                <img
+                                  src={suggestion.image || "/default-image.jpg"}
+                                  alt={suggestion.name}
+                                  className="result-image"
+                                />
+                                <div className="result-info">
+                                  <p className="result-name">{suggestion.name}</p>
+                                  <p className="result-description">
+                                    {suggestion.description || "Không có mô tả"}
+                                  </p>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {loading ? "Đang tìm..." : "Tìm kiếm"}
-                </Button>
+                </div>
+
+                {/* Nút tìm kiếm */}
+                <div className="search-btn-container">
+                  <Button
+                    className="search-btn"
+                    onClick={handleSearch}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <i className="bi bi-arrow-repeat spinning"></i>
+                    ) : (
+                      <i className="bi bi-search"></i>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </Col>

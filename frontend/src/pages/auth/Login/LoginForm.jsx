@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { login } from "../../../services/authService";
+import { login as loginService } from "../../../services/authService";
 import { useAuth } from "../../../context/AuthContext";
 import "./login.css";
 
@@ -13,8 +13,7 @@ const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login: loginContext } = useAuth();
+  const { login } = useAuth();
 
   const isValidEmail = (email) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -23,27 +22,16 @@ const LoginForm = () => {
 
   const validateField = (field, value) => {
     let newErrors = { ...errors };
-
     if (field === "email") {
-      if (!value.trim()) {
-        newErrors.email = "Email không được để trống";
-      } else if (!isValidEmail(value)) {
-        newErrors.email = "Email không hợp lệ";
-      } else {
-        delete newErrors.email;
-      }
+      if (!value.trim()) newErrors.email = "Email không được để trống";
+      else if (!isValidEmail(value)) newErrors.email = "Email không hợp lệ";
+      else delete newErrors.email;
     }
-
     if (field === "password") {
-      if (!value.trim()) {
-        newErrors.password = "Mật khẩu không được để trống";
-      } else if (value.length < 6) {
-        newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-      } else {
-        delete newErrors.password;
-      }
+      if (!value.trim()) newErrors.password = "Mật khẩu không được để trống";
+      else if (value.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+      else delete newErrors.password;
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -61,21 +49,23 @@ const LoginForm = () => {
     validateField("email", email);
     validateField("password", password);
 
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      toast.error("Vui lòng kiểm tra lại thông tin!");
+      return;
+    }
 
     setLoading(true);
-
     try {
-      const result = await login({ email, password });
+      const result = await loginService({ email, password });
+      console.log("Login result:", result);
       if (result.success && result.code === 200) {
-        loginContext(result.user, result.token);
-        const from = location.state?.from?.pathname || "/";
-        navigate(from, { replace: true });
+        login(result.user, result.token, result.cartId);
       } else {
         toast.error(result.message);
       }
     } catch (error) {
-      toast.error("Đã có lỗi xảy ra. Vui lòng thử lại!");
+      console.error("Login error:", error);
+      toast.error("Đăng nhập thất bại. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }
@@ -94,9 +84,7 @@ const LoginForm = () => {
           disabled={loading}
         />
         <div className="error-container">
-          {touched.email && errors.email && (
-            <p className="error-message">{errors.email}</p>
-          )}
+          {touched.email && errors.email && <p className="error-message">{errors.email}</p>}
         </div>
       </div>
 
@@ -121,9 +109,7 @@ const LoginForm = () => {
           </button>
         </div>
         <div className="error-container">
-          {touched.password && errors.password && (
-            <p className="error-message">{errors.password}</p>
-          )}
+          {touched.password && errors.password && <p className="error-message">{errors.password}</p>}
         </div>
       </div>
 

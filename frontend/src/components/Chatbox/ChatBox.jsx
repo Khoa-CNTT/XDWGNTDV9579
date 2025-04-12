@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { FaComments, FaTimes } from "react-icons/fa"; // Import icon
+import { FaComments, FaTimes } from "react-icons/fa";
 import "./chatbox.css";
 
-const BoxChat = () => {
-  const [isOpen, setIsOpen] = useState(false); // Trạng thái mở/đóng chatbox
+const ChatBox = () => {
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" }
+    { text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" },
   ]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
@@ -27,6 +27,7 @@ const BoxChat = () => {
     setInput("");
 
     try {
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Delay 2 giây
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -43,29 +44,36 @@ const BoxChat = () => {
 
       const botMessage = {
         text: response.data.choices[0]?.message?.content || "Xin lỗi, tôi không hiểu!",
-        sender: "bot"
+        sender: "bot",
       };
       setMessages((prevMessages) => [...prevMessages, botMessage]);
     } catch (error) {
       console.error("Lỗi khi gọi API:", error);
+      let errorMessage = "Xin lỗi, có lỗi xảy ra!";
+      if (error.response?.status === 429) {
+        errorMessage = "Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau vài phút!";
+      }
       setMessages((prevMessages) => [
         ...prevMessages,
-        { text: "Xin lỗi, có lỗi xảy ra!", sender: "bot" }
+        { text: errorMessage, sender: "bot" },
       ]);
     }
   };
-  console.log("API Key:", process.env.REACT_APP_OPENAI_API_KEY);
+
+  // Hỗ trợ gửi tin nhắn bằng phím Enter
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  };
 
   return (
     <div className="chat-container">
-      {/* Nút mở chatbox (ẩn khi chatbox mở) */}
       {!isOpen && (
         <button className="chatbox-icon" onClick={toggleChatbox}>
           <FaComments />
         </button>
       )}
-
-      {/* Chatbox hiển thị khi mở */}
       {isOpen && (
         <div className="chatbox">
           <div className="chat-header">
@@ -83,10 +91,11 @@ const BoxChat = () => {
             <div ref={messagesEndRef} />
           </div>
           <div className="chatbox-input">
-            <input
+            <input  
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress} // Thêm sự kiện Enter
               placeholder="Nhập tin nhắn..."
             />
             <button onClick={sendMessage}>Gửi</button>
@@ -97,4 +106,4 @@ const BoxChat = () => {
   );
 };
 
-export default BoxChat;
+export default ChatBox;

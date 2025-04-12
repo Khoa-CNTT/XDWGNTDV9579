@@ -1,9 +1,10 @@
 // src/App.js
 import { useState } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+
 import "./App.css";
 import Home from "./pages/Home/Home";
 import Header from "./components/Common/Header/Header";
@@ -21,6 +22,8 @@ import ForgotPassword from "./pages/auth/ForgotPassword/ForgotPassword";
 import CartPage from "./pages/Cart/CartPage";
 import Chatbox from "./components/Chatbox/ChatBox";
 import PrivateRoute from "./components/Common/PrivateRoute";
+import HotelServices from "./pages/HotelService/HotelServices"; // Sửa tên file: HotelServices.jsx
+import HotelDetails from "./pages/HotelService/HotelDetails"; // Sửa tên file: HotelDetails.jsx
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -35,22 +38,34 @@ import Line from "./Admin/line";
 import Pie from "./Admin/pie";
 import FAQ from "./Admin/faq";
 import Geography from "./Admin/geography";
+import Profile from "./pages/Profile/Profile";
+import Invoicess from "./pages/Invoices/Invoicess";
+import ResetPasswordForm from "./pages/auth/ForgotPassword/ResetPasswordForm";
 
 function App() {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
   const location = useLocation();
-  const isAdmin = location.pathname.startsWith("/admin");
-
   const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(true);
+
+  const isAdminPath = location.pathname.startsWith("/admin");
 
   if (loading) {
     return <div className="loading-spinner">Đang tải...</div>;
   }
+
+  if (user) {
+    if (user.role === "admin" && !isAdminPath) {
+      return <Navigate to="/admin" replace />;
+    }
+    if (user.role !== "admin" && isAdminPath) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
   return (
     <>
-      {isAdmin ? (
-        // Giao diện Admin
+      {isAdminPath ? (
         <ColorModeContext.Provider value={colorMode}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -75,97 +90,61 @@ function App() {
           </ThemeProvider>
         </ColorModeContext.Provider>
       ) : (
-        // Giao diện Client
-        <>
-            <AuthProvider>
-              <Header />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="about-us" element={<About />} />
-                <Route path="contact-us" element={<Contact />} />
-                <Route path="tours" element={<Tours />} />
-                <Route path="tour-details" element={<TourDetails />} />
-                <Route
-                  path="booking"
-                  element={
-                    <PrivateRoute>
-                      <Booking />
-                    </PrivateRoute>
-                  }
-                />
-                <Route path="destinations" element={<Destinations />} />
-                <Route path="gallery" element={<PhotoGallery />} />
-                <Route path="login" element={<Login />} />
-                <Route path="register" element={<Register />} />
-                <Route path="forgot-password" element={<ForgotPassword />} />
-                <Route
-                  path="cart"
-                  element={
-                    <PrivateRoute>
-                      <CartPage />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="dashboard"
-                  element={
-                    <PrivateRoute>
-                      <div>Dashboard</div>
-                    </PrivateRoute>
-                  }
-                />
-              </Routes>
-              <Chatbox />
-              <Footer />
-            </AuthProvider>
-         
-        </>
+        <AuthProvider>
+          <Header />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="about-us" element={<About />} />
+            <Route path="contact-us" element={<Contact />} />
+            <Route path="tours" element={<Tours />} />
+            <Route path="tour-details" element={<TourDetails />} />
+            <Route
+              path="booking"
+              element={
+                <PrivateRoute>
+                  <Booking />
+                </PrivateRoute>
+              }
+            />
+            <Route path="destinations" element={<Destinations />} />
+            <Route path="gallery" element={<PhotoGallery />} />
+            <Route path="login" element={<Login />} />
+            <Route path="register" element={<Register />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="reset-password" element={<ResetPasswordForm />} />
+            <Route
+              path="cart"
+              element={
+                <PrivateRoute>
+                  <CartPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <PrivateRoute>
+                  <Profile />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="invoices"
+              element={
+                <PrivateRoute>
+                  <Invoicess />
+                </PrivateRoute>
+              }
+            />
+            <Route path="hotel-services" element={<HotelServices />} /> {/* Route cho danh sách khách sạn */}
+            <Route path="hotel-details/:hotelId" element={<HotelDetails />} /> {/* Route cho chi tiết khách sạn */}
+          </Routes>
+          <Chatbox />
+          <Footer />
+        </AuthProvider>
       )}
     </>
   );
-  // return (
-  //   <AuthProvider>
-  //     <Header />
-  //     <Routes>
-  //       <Route path="/" element={<Home />} />
-  //       <Route path="about-us" element={<About />} />
-  //       <Route path="contact-us" element={<Contact />} />
-  //       <Route path="tours" element={<Tours />} />
-  //       <Route path="tour-details" element={<TourDetails />} />
-  //       <Route
-  //         path="booking"
-  //         element={
-  //           <PrivateRoute>
-  //             <Booking />
-  //           </PrivateRoute>
-  //         }
-  //       />
-  //       <Route path="destinations" element={<Destinations />} />
-  //       <Route path="gallery" element={<PhotoGallery />} />
-  //       <Route path="login" element={<Login />} />
-  //       <Route path="register" element={<Register />} />
-  //       <Route path="forgot-password" element={<ForgotPassword />} />
-  //       <Route
-  //         path="cart"
-  //         element={
-  //           <PrivateRoute>
-  //             <CartPage />
-  //           </PrivateRoute>
-  //         }
-  //       />
-  //       <Route
-  //         path="dashboard"
-  //         element={
-  //           <PrivateRoute>
-  //             <div>Dashboard</div>
-  //           </PrivateRoute>
-  //         }
-  //       />
-  //     </Routes>
-  //     <Chatbox />
-  //     <Footer />
-  //   </AuthProvider>
-  // );
 }
 
 export default App;

@@ -296,25 +296,25 @@ exclusion: [
 };
 
 export const location = [
-  "Bali",
-  "Tokyo",
-  "Bangkok",
-  "Cancun",
+  "Huế",
+  "Hội An",
+  "Đà Nẵng",
+  "SaPa",
   "Nha Trang",
-  "Phuket",
-  "Malaysia",
-  "Paris",
+  "Phú Quốc",
+  "Hạ Long",
+  "Tràng An",
 ];
 
 export const Categories = [
-  "History",
-  "Calture",
-  "Netural",
-  "Urban Tour",
-  "Relax",
+  "Lịch sử",
+  "Văn hóa",
+  "Thiên nhiên",
+  "Khám phá",
+  "Thư giãn",
 ];
 
-export const Duration = ["1-3 Days", "3-5 Days", "5-7 Days", "7-10 Day"];
+export const Duration = ["1-3 ngày", "3-5 ngày", "5-7 ngày", "7-10 ngày"];
 export const PriceRange = [
   "$ 0 - $50",
   "$ 50 - $ 100",

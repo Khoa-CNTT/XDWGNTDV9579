@@ -1,8 +1,9 @@
+// src/pages/auth/Register/Register.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { register, login } from "../../../services/authService";
-import { useAuth } from "../../../context/AuthContext";
+import { register } from "../../../services/authService";
+import { useAuth } from "../../../context/AuthContext"; // Thêm useAuth
 import "./register.css";
 
 const RegisterForm = () => {
@@ -16,7 +17,7 @@ const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
-  const { login: loginContext } = useAuth();
+  const { login } = useAuth(); // Lấy hàm login từ AuthContext
 
   const isValidEmail = (email) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -25,45 +26,25 @@ const RegisterForm = () => {
 
   const validateField = (field, value) => {
     let newErrors = { ...errors };
-
     if (field === "fullName") {
-      if (!value.trim()) {
-        newErrors.fullName = "Họ tên không được để trống";
-      } else {
-        delete newErrors.fullName;
-      }
+      if (!value.trim()) newErrors.fullName = "Họ tên không được để trống";
+      else delete newErrors.fullName;
     }
-
     if (field === "email") {
-      if (!value.trim()) {
-        newErrors.email = "Email không được để trống";
-      } else if (!isValidEmail(value)) {
-        newErrors.email = "Email không hợp lệ";
-      } else {
-        delete newErrors.email;
-      }
+      if (!value.trim()) newErrors.email = "Email không được để trống";
+      else if (!isValidEmail(value)) newErrors.email = "Email không hợp lệ";
+      else delete newErrors.email;
     }
-
     if (field === "password") {
-      if (!value.trim()) {
-        newErrors.password = "Mật khẩu không được để trống";
-      } else if (value.length < 6) {
-        newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-      } else {
-        delete newErrors.password;
-      }
+      if (!value.trim()) newErrors.password = "Mật khẩu không được để trống";
+      else if (value.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+      else delete newErrors.password;
     }
-
     if (field === "confirmPassword") {
-      if (!value.trim()) {
-        newErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
-      } else if (value !== password) {
-        newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
-      } else {
-        delete newErrors.confirmPassword;
-      }
+      if (!value.trim()) newErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
+      else if (value !== password) newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+      else delete newErrors.confirmPassword;
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -77,35 +58,64 @@ const RegisterForm = () => {
     validateField(field, value);
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+    if (!fullName.trim()) newErrors.fullName = "Họ tên không được để trống";
+    if (!email.trim()) newErrors.email = "Email không được để trống";
+    else if (!isValidEmail(email)) newErrors.email = "Email không hợp lệ";
+    if (!password.trim()) newErrors.password = "Mật khẩu không được để trống";
+    else if (password.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+    if (!confirmPassword.trim()) newErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
+    else if (confirmPassword !== password) newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setTouched({ fullName: true, email: true, password: true, confirmPassword: true });
-    validateField("fullName", fullName);
-    validateField("email", email);
-    validateField("password", password);
-    validateField("confirmPassword", confirmPassword);
-
-    if (Object.keys(errors).length > 0) return;
-
     setLoading(true);
 
-    try {
-      const registerResult = await register({ fullName, email, password });
-      if (!registerResult.success || registerResult.code !== 200) {
-        toast.error(registerResult.message);
-        setLoading(false);
-        return;
-      }
+    if (!validateForm()) {
+      setLoading(false);
+      toast.error("Vui lòng kiểm tra lại thông tin!");
+      return;
+    }
 
-      const loginResult = await login({ email, password });
-      if (loginResult.success && loginResult.code === 200) {
-        loginContext(loginResult.user, loginResult.token);
-        navigate("/");
+    const userData = {
+      fullName,
+      email,
+      password,
+      confirmPassword, // Gửi confirmPassword vì backend yêu cầu
+      phone: "",
+      avatar: "",
+    };
+
+    try {
+      const result = await register(userData);
+      console.log("Register result:", JSON.stringify(result, null, 2));
+      if (result.code === 200) {
+        toast.success(result.message);
+
+        // Tạo object userData cho hàm login
+        const user = {
+          fullName,
+          email,
+          role: "user", // Giả định role mặc định, nếu backend trả role thì dùng từ result
+        };
+
+        // Gọi hàm login từ AuthContext để tự động đăng nhập
+        login(user, result.token, null); // cartId là null vì đăng ký không tạo cart
+        navigate("/"); // Chuyển hướng đến trang chính
       } else {
-        toast.error(loginResult.message);
+        toast.error(result.message);
+        if (result.errors) {
+          result.errors.forEach((err) => toast.error(err));
+        }
       }
     } catch (error) {
-      toast.error("Đã có lỗi xảy ra. Vui lòng thử lại!");
+      toast.error("Đã xảy ra lỗi khi đăng ký!");
+      console.error("Register error:", error);
     } finally {
       setLoading(false);
     }
@@ -124,9 +134,7 @@ const RegisterForm = () => {
           disabled={loading}
         />
         <div className="error-container">
-          {touched.fullName && errors.fullName && (
-            <p className="error-message">{errors.fullName}</p>
-          )}
+          {touched.fullName && errors.fullName && <p className="error-message">{errors.fullName}</p>}
         </div>
       </div>
 
@@ -141,9 +149,7 @@ const RegisterForm = () => {
           disabled={loading}
         />
         <div className="error-container">
-          {touched.email && errors.email && (
-            <p className="error-message">{errors.email}</p>
-          )}
+          {touched.email && errors.email && <p className="error-message">{errors.email}</p>}
         </div>
       </div>
 
@@ -168,9 +174,7 @@ const RegisterForm = () => {
           </button>
         </div>
         <div className="error-container">
-          {touched.password && errors.password && (
-            <p className="error-message">{errors.password}</p>
-          )}
+          {touched.password && errors.password && <p className="error-message">{errors.password}</p>}
         </div>
       </div>
 

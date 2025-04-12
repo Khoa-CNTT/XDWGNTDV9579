@@ -2,8 +2,8 @@ import React, { useState, useEffect, memo } from "react";
 import { Carousel } from "react-bootstrap";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
-import sliderImg from "../../assets/images/slider/1.png";
-import sliderImg2 from "../../assets/images/slider/2.png";
+import sliderImg from "../../assets/images/slider/4.png";
+import sliderImg2 from "../../assets/images/slider/5.png";
 import "../Banner/banner.css";
 
 const fallbackSlides = [
