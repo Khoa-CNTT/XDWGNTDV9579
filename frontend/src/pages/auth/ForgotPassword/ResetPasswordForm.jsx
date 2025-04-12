@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { verifyOtp, resetPassword } from "../../../services/authService";
-import "./resetPassword.css"; // Tạo file CSS tương tự forgotPassword.css
+import { verifyOtp, resetPassword, forgotPassword } from "../../../services/authService";
+import "./resetPassword.css";
 
 const ResetPasswordForm = () => {
   const [email, setEmail] = useState("");
@@ -14,6 +14,8 @@ const ResetPasswordForm = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [otpExpiry, setOtpExpiry] = useState(null); // Thời gian hết hạn OTP
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,14 +23,39 @@ const ResetPasswordForm = () => {
     // Lấy email từ query parameter
     const params = new URLSearchParams(location.search);
     const emailFromQuery = params.get("email");
-    if (emailFromQuery) setEmail(decodeURIComponent(emailFromQuery));
-  }, [location]);
+    if (emailFromQuery) {
+      setEmail(decodeURIComponent(emailFromQuery));
+      // Giả định OTP có thời hạn 5 phút (300 giây)
+      const expiryTime = new Date().getTime() + 300000; // 5 phút
+      setOtpExpiry(expiryTime);
+    } else {
+      toast.error("Không tìm thấy email. Vui lòng quay lại trang quên mật khẩu!");
+      navigate("/forgot-password");
+    }
+  }, [location, navigate]);
+
+  // Đếm ngược thời gian hết hạn OTP
+  useEffect(() => {
+    if (!otpExpiry) return;
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      if (now >= otpExpiry) {
+        setOtpExpiry(null);
+        toast.warn("Mã OTP đã hết hạn. Vui lòng gửi lại mã mới!");
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [otpExpiry]);
 
   const validateField = (field, value) => {
     let newErrors = { ...errors };
     if (field === "otp") {
       if (!value.trim()) newErrors.otp = "OTP không được để trống";
       else if (value.length !== 6) newErrors.otp = "OTP phải có 6 chữ số";
+      else if (!/^\d{6}$/.test(value)) newErrors.otp = "OTP chỉ được chứa số";
       else delete newErrors.otp;
     }
     if (field === "password") {
@@ -57,7 +84,8 @@ const ResetPasswordForm = () => {
     const newErrors = {};
     if (!otp.trim()) newErrors.otp = "OTP không được để trống";
     else if (otp.length !== 6) newErrors.otp = "OTP phải có 6 chữ số";
-    if (!token) {
+    else if (!/^\d{6}$/.test(otp)) newErrors.otp = "OTP chỉ được chứa số";
+    if (token) {
       if (!password.trim()) newErrors.password = "Mật khẩu không được để trống";
       else if (password.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
       if (!confirmPassword.trim()) newErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
@@ -71,6 +99,12 @@ const ResetPasswordForm = () => {
     e.preventDefault();
     if (!validateForm()) {
       toast.error("Vui lòng kiểm tra lại thông tin!");
+      return;
+    }
+
+    // Kiểm tra nếu OTP đã hết hạn
+    if (otpExpiry && new Date().getTime() >= otpExpiry) {
+      toast.error("Mã OTP đã hết hạn. Vui lòng gửi lại mã mới!");
       return;
     }
 
@@ -96,6 +130,35 @@ const ResetPasswordForm = () => {
     }
   };
 
+  const handleResendOtp = async () => {
+    setResendLoading(true);
+    try {
+      const result = await forgotPassword(email);
+      toast.success(result.message || "Đã gửi lại mã OTP qua email!");
+      // Cập nhật thời gian hết hạn mới
+      const expiryTime = new Date().getTime() + 300000; // 5 phút
+      setOtpExpiry(expiryTime);
+      setOtp(""); // Xóa OTP cũ
+      setTouched({ ...touched, otp: false });
+      setErrors({ ...errors, otp: null });
+    } catch (error) {
+      const errorMessage = error.message || "Gửi lại OTP thất bại!";
+      toast.error(errorMessage);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // Tính thời gian còn lại của OTP
+  const getRemainingTime = () => {
+    if (!otpExpiry) return "Hết hạn";
+    const now = new Date().getTime();
+    const remaining = Math.max(0, Math.floor((otpExpiry - now) / 1000));
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="reset-password-form">
       <div className={`input-group ${errors.email ? "input-error" : ""}`}>
@@ -103,12 +166,18 @@ const ResetPasswordForm = () => {
         <input
           type="email"
           value={email}
-          disabled={true} // Email không thay đổi được
+          disabled={true}
         />
       </div>
 
       <div className={`input-group ${errors.otp ? "input-error" : ""}`}>
-        <label>Mã OTP:</label>
+        <label>
+          Mã OTP: {otpExpiry && (
+            <span className="otp-timer">
+              (Hết hạn sau: {getRemainingTime()})
+            </span>
+          )}
+        </label>
         <input
           type="text"
           value={otp}
@@ -122,6 +191,19 @@ const ResetPasswordForm = () => {
             <p className="error-message">{errors.otp}</p>
           )}
         </div>
+      </div>
+
+      <div className="resend-otp">
+        <p onClick={handleResendOtp} disabled={resendLoading}>
+          {resendLoading ? (
+            <span>
+              <i className="bi bi-arrow-repeat spinning me-2"></i>
+              Đang gửi...
+            </span>
+          ) : (
+            "Gửi lại OTP"
+          )}
+        </p>
       </div>
 
       {token && (
@@ -167,7 +249,16 @@ const ResetPasswordForm = () => {
         className="reset-password-button"
         disabled={loading}
       >
-        {loading ? "Đang xử lý..." : token ? "Đặt lại mật khẩu" : "Xác thực OTP"}
+        {loading ? (
+          <span>
+            <i className="bi bi-arrow-repeat spinning me-2"></i>
+            Đang xử lý...
+          </span>
+        ) : token ? (
+          "Đặt lại mật khẩu"
+        ) : (
+          "Xác thực OTP"
+        )}
       </button>
 
       <div className="reset-password-links">

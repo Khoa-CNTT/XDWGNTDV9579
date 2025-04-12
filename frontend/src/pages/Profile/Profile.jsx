@@ -80,7 +80,6 @@ const Profile = () => {
     <>
       <Breadcrumbs title="Hồ sơ cá nhân" pagename="Hồ sơ" />
       <div className="profile-container">
-        <h1>Hồ sơ cá nhân</h1>
         <div className="profile-content">
           {!editMode ? (
             <div className="profile-view">

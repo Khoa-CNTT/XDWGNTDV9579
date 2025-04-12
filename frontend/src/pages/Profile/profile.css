@@ -1,103 +1,238 @@
+/* src/pages/Profile/profile.css */
+
+/* Container chính */
 .profile-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  background: #f5f5f5;
+  min-height: calc(100vh - 200px); /* Đảm bảo chiều cao tối thiểu */
+}
+
+/* Nội dung hồ sơ */
+.profile-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+/* Chế độ xem hồ sơ */
+.profile-view {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+/* Ảnh đại diện */
+.profile-avatar {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #e9ecef;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
+}
+
+/* Thông tin hồ sơ */
+.profile-info {
+  flex: 1;
+}
+
+.profile-info p {
+  margin: 12px 0;
+  font-size: 1.1rem;
+  color: #333;
+  line-height: 1.6;
+}
+
+.profile-info p strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Nút chỉnh sửa */
+.edit-btn {
+  padding: 10px 24px;
+  background: var(--primaryClr, #3498db);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.edit-btn:hover {
+  background: #2980b9;
+}
+
+/* Form chỉnh sửa */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Nhóm input */
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 1rem;
+}
+
+.form-group input {
+  padding: 10px 14px;
+  border: 1px solid #e7e6e6;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #333;
+  background: #f8f9fa;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-group input:focus {
+  border-color: var(--primaryClr, #3498db);
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+  outline: none;
+}
+
+/* Ảnh đại diện preview */
+.avatar-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  margin-top: 12px;
+  border: 2px solid #e9ecef;
+  object-fit: cover;
+}
+
+/* Nút trong form */
+.form-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.save-btn,
+.cancel-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.save-btn {
+  background: #28a745;
+  color: #fff;
+}
+
+.save-btn:hover {
+  background: #218838;
+  transform: translateY(-2px);
+}
+
+.save-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: #dc3545;
+  color: #fff;
+}
+
+.cancel-btn:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+}
+
+.cancel-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 20px 10px;
   }
-  
+
   .profile-content {
-    background: #fff;
     padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
-  
+
   .profile-view {
-    display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 20px;
   }
-  
+
   .profile-avatar {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    object-fit: cover;
+    width: 120px;
+    height: 120px;
   }
-  
+
   .profile-info p {
-    margin: 10px 0;
-    font-size: 16px;
+    font-size: 1rem;
   }
-  
+
   .edit-btn {
-    padding: 8px 16px;
-    background: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+    width: 100%;
+    text-align: center;
   }
-  
-  .edit-btn:hover {
-    background: #0056b3;
-  }
-  
+
   .profile-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+    max-width: 100%;
   }
-  
-  .form-group {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .form-group label {
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
+
   .form-group input {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 16px;
+    font-size: 0.9rem;
   }
-  
+
   .avatar-preview {
     width: 100px;
     height: 100px;
-    border-radius: 50%;
-    margin-top: 10px;
   }
-  
-  .form-buttons {
-    display: flex;
-    gap: 10px;
-  }
-  
-  .save-btn, .cancel-btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-  
-  .save-btn {
-    background: #28a745;
-    color: #fff;
-  }
-  
-  .save-btn:hover {
-    background: #218838;
-  }
-  
+
+  .save-btn,
   .cancel-btn {
-    background: #dc3545;
-    color: #fff;
+    padding: 8px 20px;
+    font-size: 0.9rem;
   }
-  
-  .cancel-btn:hover {
-    background: #c82333;
+}
+
+@media (max-width: 480px) {
+  .profile-avatar {
+    width: 100px;
+    height: 100px;
   }
+
+  .profile-info p {
+    font-size: 0.9rem;
+  }
+
+  .form-group label {
+    font-size: 0.9rem;
+  }
+}

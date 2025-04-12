@@ -1,3 +1,4 @@
+// src/App.js
 import { useState } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
@@ -21,6 +22,8 @@ import ForgotPassword from "./pages/auth/ForgotPassword/ForgotPassword";
 import CartPage from "./pages/Cart/CartPage";
 import Chatbox from "./components/Chatbox/ChatBox";
 import PrivateRoute from "./components/Common/PrivateRoute";
+import HotelServices from "./pages/HotelService/HotelServices"; // Sửa tên file: HotelServices.jsx
+import HotelDetails from "./pages/HotelService/HotelDetails"; // Sửa tên file: HotelDetails.jsx
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -40,19 +43,17 @@ import Invoicess from "./pages/Invoices/Invoicess";
 import ResetPasswordForm from "./pages/auth/ForgotPassword/ResetPasswordForm";
 
 function App() {
-  const { loading, user } = useAuth(); // Lấy user từ AuthContext
+  const { loading, user } = useAuth();
   const location = useLocation();
   const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(true);
 
-  // Kiểm tra đường dẫn có phải là admin không
   const isAdminPath = location.pathname.startsWith("/admin");
 
   if (loading) {
     return <div className="loading-spinner">Đang tải...</div>;
   }
 
-  // Nếu đã đăng nhập và vai trò không khớp với giao diện, chuyển hướng
   if (user) {
     if (user.role === "admin" && !isAdminPath) {
       return <Navigate to="/admin" replace />;
@@ -65,7 +66,6 @@ function App() {
   return (
     <>
       {isAdminPath ? (
-        // Giao diện Admin
         <ColorModeContext.Provider value={colorMode}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -90,7 +90,6 @@ function App() {
           </ThemeProvider>
         </ColorModeContext.Provider>
       ) : (
-        // Giao diện Client
         <AuthProvider>
           <Header />
           <Routes>
@@ -112,7 +111,7 @@ function App() {
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="forgot-password" element={<ForgotPassword />} />
-            <Route path="reset-password" element={<ResetPasswordForm/>}/>
+            <Route path="reset-password" element={<ResetPasswordForm />} />
             <Route
               path="cart"
               element={
@@ -121,9 +120,24 @@ function App() {
                 </PrivateRoute>
               }
             />
-            <Route path="profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-            <Route path="invoices" element={<PrivateRoute><Invoicess/></PrivateRoute>} />
-            
+            <Route
+              path="profile"
+              element={
+                <PrivateRoute>
+                  <Profile />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="invoices"
+              element={
+                <PrivateRoute>
+                  <Invoicess />
+                </PrivateRoute>
+              }
+            />
+            <Route path="hotel-services" element={<HotelServices />} /> {/* Route cho danh sách khách sạn */}
+            <Route path="hotel-details/:hotelId" element={<HotelDetails />} /> {/* Route cho chi tiết khách sạn */}
           </Routes>
           <Chatbox />
           <Footer />

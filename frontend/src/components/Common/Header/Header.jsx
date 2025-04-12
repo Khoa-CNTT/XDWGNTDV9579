@@ -114,7 +114,31 @@ const Header = () => {
                 >
                   Tours
                 </NavLink>
-                <NavDropdown title="Điểm đến" id="offcanvasNavbarDropdown-expand-lg">
+                {/* Thêm mục Dịch vụ với Dropdown */}
+                <NavDropdown title="Dịch vụ" id="services-dropdown">
+                  <NavLink
+                    className="nav-link text-dark"
+                    to="/hotel-services"
+                    onClick={() => {
+                      console.log("Navigating to /hotel-services");
+                      setOpen(false);
+                    }}
+                  >
+                    Dịch vụ khách sạn
+                  </NavLink>
+                  {/* Có thể thêm các dịch vụ khác sau này */}
+                  {/* <NavLink
+                    className="nav-link text-dark"
+                    to="/other-services"
+                    onClick={() => {
+                      console.log("Navigating to /other-services");
+                      setOpen(false);
+                    }}
+                  >
+                    Dịch vụ khác
+                  </NavLink> */}
+                </NavDropdown>
+                <NavDropdown title="Danh mục" id="offcanvasNavbarDropdown-expand-lg">
                   <NavLink
                     className="nav-link text-dark"
                     to="/destinations"
@@ -123,7 +147,7 @@ const Header = () => {
                       setOpen(false);
                     }}
                   >
-                    Tất cả điểm đến
+                    Tất cả địa điểm
                   </NavLink>
                   <NavLink
                     className="nav-link text-dark"
@@ -134,6 +158,16 @@ const Header = () => {
                     }}
                   >
                     Huế
+                  </NavLink>
+                  <NavLink
+                    className="nav-link text-dark"
+                    to="/destinations/hue"
+                    onClick={() => {
+                      console.log("Navigating to /destinations/hue");
+                      setOpen(false);
+                    }}
+                  >
+                    Đà Nẵng
                   </NavLink>
                 </NavDropdown>
                 <NavLink
