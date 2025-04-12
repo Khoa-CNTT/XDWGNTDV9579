@@ -34,7 +34,7 @@ module.exports.index = async (req, res) => {
         );
         // end pagination
 
-        const categories = await Category.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
+        const categories = await Category.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
 
         res.json(categories);
     }

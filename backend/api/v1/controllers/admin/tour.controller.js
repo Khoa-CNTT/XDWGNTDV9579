@@ -36,7 +36,7 @@ module.exports.index = async (req, res) => {
         );
         // end pagination
 
-        const tours = await Tour.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
+        const tours = await Tour.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
         let toursObject = tours.map(item => item.toObject());
 
         toursObject.forEach(item => {
