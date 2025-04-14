@@ -358,2254 +358,2254 @@
 // export default App;
 
 
-bây giờ tôi sẽ gửi hết các file còn lại cho bạn sửa.
-* Phía backend(bạn chỉ cần gọi api chứ không cần sửa gì thêm):
-- File category.controller.js:
-const Category = require("../../models/category.model");
-const paginationHelper = require("../../helpers/pagination");
-
-// [GET]/api/v1/admin/categories
-module.exports.index = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem danh sách danh mục tour"
-        });
-    } else {
-        let find = { deleted: false };
-
-        if (req.query.status) {
-            find.status = req.query.status;
-        };
-
-        // sort
-        const sort = {};
-        if (req.query.sortKey && req.query.sortValue) {
-            sort[req.query.sortKey] = req.query.sortValue;
-        }
-
-        // pagination
-        const countRecords = await Category.countDocuments(find);
-        let objPagination = paginationHelper(
-            {
-                currentPage: 1,
-                limitItems: 5
-            },
-            req.query,
-            countRecords
-        );
-        // end pagination
-
-        const categories = await Category.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
-
-        res.json(categories);
-    }
-};
-
-// [POST]/api/v1/admin/categories/create
-module.exports.create = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_create")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền tạo danh mục tour"
-        });
-    } else {
-        try {
-            const category = new Category({
-                title: req.body.title,
-                image: req.body.image,
-                description: req.body.description,
-                status: req.body.status,
-            });
-            const data = await category.save();
-            res.json({
-                code: 200,
-                message: "Tạo thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!"
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/categories/changeStatus/:status/:id
-module.exports.changeStatus = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái danh mục tour"
-        });
-    } else {
-        try {
-            const status = req.params.status;
-            const id = req.params.id;
-            await Category.updateOne({
-                _id: id
-            }, {
-                status: status
-            });
-            res.json({
-                code: 200,
-                message: "Cập nhật trạng thái danh mục thành công",
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!"
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/categories/edit/:id
-module.exports.edit = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa danh mục tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            await Category.updateOne({
-                _id: id,
-                deleted: false
-            }, req.body);
-            res.json({
-                code: 200,
-                message: "Cập nhật danh mục thành công",
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!"
-            });
-        }
-    }
-};
-
-// [GET]/api/v1/admin/categories/detail/:id
-module.exports.detail = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem chi tiết danh mục tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const data = await Category.findOne({
-                _id: id,
-                deleted: false
-            });
-            res.json({
-                code: 200,
-                message: "Thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!"
-            });
-        }
-    }
-};
-
-// [DELETE]/api/v1/admin/categories/delete/:id
-module.exports.delete = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("category_delete")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xóa danh mục tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            await Category.deleteOne({
-                _id: id
-            });
-            res.json({
-                code: 200,
-                message: "Xóa thành công",
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!"
-            });
-        }
-    }
-};
--File hotel.controller.js:
-const Hotel = require("../../models/hotel.model");
-const Room = require("../../models/room.model");
-
-// [GET]/api/v1/admin/hotels
-module.exports.index = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem danh sách khách sạn"
-        });
-    } else {
-        try {
-            const hotels = await Hotel.find({ deleted: false });
-            res.json({
-                code: 200,
-                message: "Danh sách khách sạn",
-                data: hotels
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error: " + error
-            });
-        }
-    }
-}
-
-// [GET]/api/v1/admin/hotels/:hotelId
-module.exports.indexRoom = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem danh sách room của khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const room = await Room.find({
-                hotel_id: hotelId
-            });
-            res.json({
-                code: 200,
-                message: "Danh sách room của khách sạn",
-                data: room
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error: " + error
-            });
-        }
-    }
-}
-
-// [POST]/api/v1/admin/hotels/create
-module.exports.createPost = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_create")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền tạo khách sạn"
-        });
-    } else {
-        try {
-            const hotel = new Hotel(req.body);
-            const data = await hotel.save();
-            res.json({
-                code: 200,
-                message: "Tạo thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [POST]/api/v1/admin/hotels/create/:hotelId
-module.exports.createPostRoom = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền tạo phòng khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const room = new Room({
-                hotel_id: hotelId,
-                name: req.body.name,
-                price: req.body.price,
-                amenities: req.body.amenities,
-                availableRooms: parseInt(req.body.availableRooms),
-                images: req.body.images
-            });
-            const data = await room.save();
-            res.json({
-                code: 200,
-                message: "Tạo thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/hotels/edit/:hotelId
-module.exports.editHotel = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const updatedHotel = await Hotel.findOneAndUpdate(
-                { _id: hotelId, deleted: false },
-                req.body,
-                { new: true }
-            );
-            if (!updatedHotel) {
-                return res.json({
-                    code: 404,
-                    message: "Khách sạn không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Cập nhật thành công",
-                data: updatedHotel
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/hotels/edit/:hotelId/:roomId
-module.exports.editRoom = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa phòng khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const roomId = req.params.roomId;
-            const updatedRoom = await Room.findOneAndUpdate(
-                {
-                    _id: roomId,
-                    hotel_id: hotelId
-                }
-                ,
-                req.body,
-                { new: true }
-            );
-            if (!updatedRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Cập nhật thành công",
-                data: updatedRoom
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/hotels/changeStatus/:status/:hotelId
-module.exports.changeStatus = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền cập nhật trạng thái khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const status = req.params.status;
-            const statusHotel = await Hotel.findOneAndUpdate(
-                {
-                    _id: hotelId,
-                    deleted: false
-                }
-                ,
-                {
-                    status: status
-                },
-                { new: true }
-            );
-
-            const statusRoom = await Room.updateMany(
-                {
-                    hotel_id: hotelId
-                }
-                ,
-                {
-                    status: status
-                },
-                { new: true }
-            );
-            if (!statusHotel) {
-                return res.json({
-                    code: 404,
-                    message: "Khách sạn không tồn tại hoặc đã bị xoá"
-                });
-            }
-
-            if (!statusRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Cập nhật thành công",
-                statusHotel: statusHotel,
-                statusRoom: statusRoom
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/hotels/changeStatus/:status/:hotelId/:roomId
-module.exports.changeStatusRoom = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền cập nhật trạng thái room khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const roomId = req.params.roomId;
-            const status = req.params.status;
-            const statusRoom = await Room.findOneAndUpdate(
-                {
-                    _id: roomId,
-                    hotel_id: hotelId
-                }
-                ,
-                {
-                    status: status
-                },
-                { new: true }
-            );
-
-            if (!statusRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Cập nhật thành công",
-                statusRoom: statusRoom
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [DELETE]/api/v1/admin/hotels/delete/:hotelId
-module.exports.deleteHotel = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_delete")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xóa khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const dataRoom = await Room.deleteMany(
-                {
-                    hotel_id: hotelId
-                });
-
-            const dataHotel = await Hotel.findOneAndDelete(
-                {
-                    _id: hotelId,
-                    deleted: false
-                });
-            if (!dataRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-
-            if (!dataHotel) {
-                return res.json({
-                    code: 404,
-                    message: "khách sạn không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Xóa thành công",
-                dataRoom: dataRoom,
-                dataHotel: dataHotel
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [DELETE]/api/v1/admin/hotels/delete/:hotelId/:roomId
-module.exports.deleteRoom = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_delete")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xóa room khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const roomId = req.params.roomId;
-            const dataRoom = await Room.findOneAndDelete(
-                {
-                    _id: roomId,
-                    hotel_id: hotelId
-                });
-
-
-            if (!dataRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-
-            res.json({
-                code: 200,
-                message: "Xóa thành công",
-                dataRoom: dataRoom,
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [GET]/api/v1/admin/hotels/detail/:hotelId
-module.exports.detail = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem chi tiết khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const dataHotel = await Hotel.findOne(
-                {
-                    _id: hotelId,
-                    deleted: false
-                });
-
-            const dataRoom = await Room.findOne(
-                {
-                    hotel_id: hotelId,
-                });
-            if (!dataHotel) {
-                return res.json({
-                    code: 404,
-                    message: "Khách sạn không tồn tại hoặc đã bị xoá"
-                });
-            }
-
-            if (!dataRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Xóa thành công",
-                dataHotel: dataHotel,
-                dataRoom: dataRoom
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/hotels/stockRoom/:stock/:hotelId/:roomId
-module.exports.stock = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("hotel_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền cập nhật trạng thái room khách sạn"
-        });
-    } else {
-        try {
-            const hotelId = req.params.hotelId;
-            const roomId = req.params.roomId;
-            const stock = parseInt(req.params.stock);
-            const stockRoom = await Room.findOneAndUpdate(
-                {
-                    _id: roomId,
-                    hotel_id: hotelId
-                }
-                ,
-                {
-                    availableRooms: stock
-                },
-                { new: true }
-            );
-
-            if (!stockRoom) {
-                return res.json({
-                    code: 404,
-                    message: "Room không tồn tại hoặc đã bị xoá"
-                });
-            }
-            res.json({
-                code: 200,
-                message: "Cập nhật thành công",
-                stockRoom: stockRoom
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Error:" + error
-            });
-        }
-    }
-};
--File tour.controller.js:
-const Tour = require("../../models/tour.model");
-const Category = require("../../models/category.model");
-const generate = require("../../helper/generate");
-const paginationHelper = require("../../helper/pagination");
-const tourHelper = require("../../helper/tours");
-
-// [GET]/api/v1/admin/tours
-module.exports.index = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem danh sách tour"
-        });
-    } else {
-        let find = { deleted: false };
-
-        if (req.query.status) {
-            find.status = req.query.status;
-        };
-
-        const sort = {};
-        if (req.query.sortKey && req.query.sortValue) {
-            sort[req.query.sortKey] = req.query.sortValue;
-        }
-
-        // pagination
-        const countRecords = await Tour.countDocuments(find);
-        let objPagination = paginationHelper(
-            {
-                currentPage: 1,
-                limitItems: 5
-            },
-            req.query,
-            countRecords
-        );
-        // end pagination
-
-        const tours = await Tour.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
-        let toursObject = tours.map(item => item.toObject());
-
-        toursObject.forEach(item => {
-            item.price_special = tourHelper.priceNewTour(item);
-        });
-        res.json(toursObject);
-    }
-};
-
-// [POST]/api/v1/admin/tours/create
-module.exports.createPost = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_create")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền tạo mới tour"
-        });
-    } else {
-        try {
-            const countTour = await Tour.countDocuments();
-            const code = generate.generateTourCode(countTour + 1);
-
-            const tour = new Tour({
-                title: req.body.title,
-                code: code,
-                price: parseInt(req.body.price),
-                discount: parseInt(req.body.discount),
-                stock: parseInt(req.body.stock),
-                category_id: req.body.category_id,
-                timeStart: req.body.timeStart,
-                status: req.body.status,
-                images: req.body.images,
-                information: req.body.information,
-                schedule: req.body.schedule,
-            });
-            const data = await tour.save();
-            res.json({
-                code: 200,
-                message: "Tạo thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/change-status/:status/:id
-module.exports.changeStatus = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const status = req.params.status;
-            await Tour.updateOne({
-                _id: id
-            }, {
-                status: status
-            });
-            res.json({
-                code: 200,
-                message: "Cập nhật trạng thái thành công"
-            })
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-
-// [DELETE]/api/v1/admin/delete/:id
-module.exports.deleteTour = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_delete")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xóa tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-
-            await Tour.deleteOne({
-                _id: id
-            });
-
-            res.json({
-                code: 200,
-                message: "Xóa tour thành công!"
-            })
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-
-// [GET]/api/v1/admin/detail/:id
-module.exports.detail = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem chi tiết tour"
-        });
-    } else {
-        const id = req.params.id;
-
-        const tour = await Tour.findOne({
-            _id: id,
-            deleted: false,
-        });
-
-        const category = await Category.findOne({
-            _id: tour.category_id,
-            deleted: false
-        });
-        res.json({
-            tour: tour,
-            category: category
-        });
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/edit/:id
-module.exports.editPatch = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            if (req.body.price) req.body.price = parseInt(req.body.price);
-            if (req.body.discount) req.body.discount = parseInt(req.body.discount);
-            if (req.body.stock) req.body.stock = parseInt(req.body.stock);
-            if (req.body.position) req.body.position = parseInt(req.body.position);
-
-            const data = await Tour.updateOne({
-                _id: id
-            }, {
-                ...req.body
-            });
-
-
-            res.json({
-                code: 200,
-                message: "Cập nhật tour thành công"
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Cập nhật tour thất bại" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/change-stock/:stock/:id
-module.exports.stock = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const stock = parseInt(req.params.stock);
-            const data = await Tour.findOneAndUpdate({
-                _id: id
-            }, {
-                stock: stock
-            }, { new: true });
-            res.json({
-                code: 200,
-                message: "Cập nhật số lượng thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-- file uploadCloud.middleware.js:
-const { uploadToCloudinary } = require("../../helper/uploadToCloudinary");
-
-module.exports.uploadSingle = async (req, res, next) => {
-    if (req["file"]) {
-        const link = await uploadToCloudinary(req["file"].buffer);
-        req.body[req["file"].fieldname] = link;
-        next();
-    } else {
-        next();
-    }
-}
-
-module.exports.uploadFields = async (req, res, next) => {
-    for (const key in req["files"]) {
-        const links = [];
-        for (const item of req["files"][key]) {
-            try {
-                const link = await uploadToCloudinary(item.buffer);
-                links.push(link);
-            } catch (error) {
-                console.log(error);
-            }
-        }
-        req.body[key] = links;
-    }
-    next();
-}
-- File cart.model.js:
-const mongoose = require('mongoose');
-
-const cartSchema = new mongoose.Schema({
-    user_id: String,
-    tours: [
-        {
-            tour_id: String,
-            quantity: Number
-        }
-    ]
-}, {
-    timestamps: true
-});
-const Cart = mongoose.model("Cart", cartSchema, "carts");
-
-module.exports = Cart;
-- file category.model.js :
-const mongoose = require('mongoose');
-const slug = require('mongoose-slug-updater');
-
-mongoose.plugin(slug);
-const CategorySchema = new mongoose.Schema({
-    title: String,
-    image: String,
-    description: String,
-    status: {
-        type: String,
-        default: "active"
-    },
-    slug: {
-        type: String,
-        slug: "title",
-        unique: true
-    },
-    deleted: {
-        type: Boolean,
-        default: false
-    },
-}, { timestamps: true });
-const Category = mongoose.model('Category', CategorySchema, "categories");
-module.exports = Category;
-
-- file forgot - password.model.js:
-const mongoose = require('mongoose');
-
-const ForgotPasswordSchema = new mongoose.Schema({
-    email: String,
-    otp: String,
-    "expireAt": { type: Date, expires: 180 }
-
-}, { timestamps: true });
-const ForgotPassword = mongoose.model('ForgotPassword', ForgotPasswordSchema, "forgot-passwords");
-module.exports = ForgotPassword;
-- file hotel.model.js:
-const mongoose = require('mongoose');
-const slug = require('mongoose-slug-updater');
-
-mongoose.plugin(slug);
-const HotelSchema = new mongoose.Schema({
-    name: String,
-    description: String,
-    images: Array,
-    location: {
-        city: String,
-        country: String,
-        address: String
-    },
-    sold: {
-        type: Number,
-        default: 0
-    },
-    status: {
-        type: String,
-        default: "active"
-    },
-    slug: {
-        type: String,
-        slug: "name",
-        unique: true
-    },
-    slug_city: {
-        type: String,
-        slug: "location.city"
-    },
-    deleted: {
-        type: Boolean,
-        default: false
-    },
-}, { timestamps: true });
-const Hotel = mongoose.model('Hotel', HotelSchema, "hotels");
-module.exports = Hotel;
--file hotelReview.model.js:
-const mongoose = require('mongoose');
-
-const reviewSchema = new mongoose.Schema({
-    hotel_id: String,
-    room_id: String,
-    user_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true
-    },
-    rating: {
-        type: Number,
-        required: true,
-        min: 1, max: 5
-    },
-    comment: String
-}, {
-    timestamps: true
-});
-const Review = mongoose.model("Review", reviewSchema, "reviews");
-
-module.exports = Review;
-
-- file room.model.js:
-const mongoose = require('mongoose');
-
-const RoomSchema = new mongoose.Schema({
-    hotel_id: String,
-    name: String,
-    price: Number,
-    amenities: String,
-    availableRooms: {
-        type: Number,
-        default: 0
-    },
-    sold: {
-        type: Number,
-        default: 0
-    },
-    images: Array,
-    status: {
-        type: String,
-        default: "active"
-    },
-});
-
-const Room = mongoose.model('Room', RoomSchema, "rooms");
-module.exports = Room;
-- file tour.model.js:
-const mongoose = require('mongoose');
-const slug = require('mongoose-slug-updater');
-
-mongoose.plugin(slug);
-const TourSchema = new mongoose.Schema({
-    title: String,
-    code: String,
-    images: Array,
-    price: Number,
-    discount: Number,
-    information: String,
-    schedule: String,
-    timeStart: Date,
-    stock: Number,
-    category_id: {
-        type: String,
-        default: ""
-    },
-    sold: {
-        type: Number,
-        default: 0
-    },
-    status: {
-        type: String,
-        default: "active"
-    },
-    slug: {
-        type: String,
-        slug: "title",
-        unique: true
-    },
-    deleted: {
-        type: Boolean,
-        default: false
-    },
-}, { timestamps: true });
-const Tour = mongoose.model('Tour', TourSchema, "tours");
-module.exports = Tour;
-- file user.model.js:
-const mongoose = require('mongoose');
-
-const UserSchema = new mongoose.Schema({
-    fullName: String,
-    email: String,
-    password: String,
-    token: String,
-    phone: String,
-    avatar: String,
-    status: {
-        type: String,
-        default: "active"
-    },
-    deleted: {
-        type: Boolean,
-        default: false
-    },
-    deletedAt: Date
-}, { timestamps: true });
-const User = mongoose.model('User', UserSchema, "users");
-module.exports = User;
--file category.validate.js:
-module.exports.categoryValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.title) {
-        errors.push('Vui lòng nhập tiêu đề!');
-    }
-    if (!req.body.description) {
-        errors.push('Vui lòng nhập mô tả!');
-    }
-    if (!req.body.status) {
-        errors.push('Vui lòng chọn status!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
--file hotel.validate.js:
-module.exports.hotelValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.name) {
-        errors.push('Vui lòng nhập tên khách sạn!');
-    }
-    if (!req.body.location || !req.body.location.city) {
-        errors.push('Vui lòng nhập thành phố!');
-    }
-    if (!req.body.location || !req.body.location.country) {
-        errors.push('Vui lòng nhập đất nước!');
-    }
-    if (!req.body.location || !req.body.location.address) {
-        errors.push('Vui lòng nhập địa chỉ!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
-
-module.exports.roomValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.name) {
-        errors.push('Vui lòng nhập tên phòng!');
-    }
-    if (parseInt(req.body.price) <= 0) {
-        errors.push('Vui lòng nhập giá lớn hơn 0!');
-    }
-    if (!req.body.amenities) {
-        errors.push('Vui lòng nhập tiện ích phòng!');
-    }
-    if (parseInt(req.body.availableRooms) <= 0) {
-        errors.push('Vui lòng nhập số lượng lớn hơn 0!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
--File role.validate.js:
-module.exports.roleValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.title) {
-        errors.push('Vui lòng nhập tiêu đề!');
-    }
-    if (!req.body.description) {
-        errors.push('Vui lòng nhập chi tiết nhóm quyền!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
--file setting.validate.js:
-module.exports.settingValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.websiteName) {
-        errors.push('Vui lòng nhập tên website!');
-    }
-    if (!req.body.logo) {
-        errors.push('Vui lòng nhập logo!');
-    }
-    if (!req.body.phone) {
-        errors.push('Vui lòng nhập số điện thoại!');
-    }
-    if (!req.body.email) {
-        errors.push('Vui lòng nhập email!');
-    }
-    if (!req.body.address) {
-        errors.push('Vui lòng nhập địa chỉ!');
-    }
-    if (!req.body.slogan) {
-        errors.push('Vui lòng nhập câu slogan!');
-    }
-    if (!req.body.copyright) {
-        errors.push('Vui lòng nhập copyright!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
-- file tour.validate.js:
-module.exports.tourValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.title) {
-        errors.push('Vui lòng nhập tiêu đề!');
-    }
-    if (!req.body.category_id) {
-        errors.push('Vui lòng chọn danh mục!');
-    }
-    if (parseInt(req.body.price) <= 0) {
-        errors.push('Vui lòng nhập giá lớn hơn 0!');
-    }
-    if (parseInt(req.body.discount) <= 0) {
-        errors.push('Vui lòng nhập % giảm giá lớn hơn 0!');
-    }
-    if (parseInt(req.body.stock) <= 0) {
-        errors.push('Vui lòng nhập số lượng lớn hơn 0!');
-    }
-    if (!req.body.timeStart) {
-        errors.push('Vui lòng nhập ngày khởi hành!');
-    }
-    if (!req.body.schedule) {
-        errors.push('Vui lòng nhập lịch trình tour!');
-    }
-    if (!req.body.status) {
-        errors.push('Vui lòng chọn status!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
-- File voucher.validate.js:
-module.exports.voucherValidate = (req, res, next) => {
-    const errors = [];
-    if (!req.body.title) {
-        errors.push('Vui lòng nhập tiêu đề!');
-    }
-    if (!req.body.description) {
-        errors.push('Vui lòng nhập mô tả!');
-    }
-    if (!req.body.code) {
-        errors.push('Vui lòng mã code!');
-    }
-    if (parseInt(req.body.quantity) <= 0) {
-        errors.push('Số lượng phải lớn hơn 0!');
-    }
-    if (parseInt(req.body.discount) <= 0) {
-        errors.push('Giảm giá phải lớn hơn 0!');
-    }
-    if (new Date(req.body.endDate).getTime() < Date.now()) {
-        errors.push('Ngày kết thúc phải lớn hơn ngày hiện tại!');
-    }
-    if (new Date(req.body.startDate).getTime() >= new Date(req.body.endDate).getTime()) {
-        errors.push('Ngày bắt đầu phải nhỏ hơn ngày kết thúc!');
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
-
-module.exports.editVoucher = (req, res, next) => {
-    const errors = [];
-    if (req.body.endDate) {
-        if (new Date(req.body.endDate).getTime() < Date.now()) {
-            errors.push('Ngày kết thúc phải lớn hơn ngày hiện tại!');
-        }
-    }
-    if (req.body.startDate) {
-        if (new Date(req.body.startDate).getTime() >= new Date(req.body.endDate).getTime()) {
-            errors.push('Ngày bắt đầu phải nhỏ hơn ngày kết thúc!');
-        }
-    }
-    if (errors.length > 0) {
-        return res.status(400).json({
-            success: false,
-            errors: errors
-        });
-    }
-    next();
-}
-
-* Ở phía frontend.Ở các trang này tôi bạn có thể chỉnh lại giao diện giúp tôi cho phù hợp với cá chứa năng cầ có mà bên api đã viết.Tôi muốn nếu trang đó là một danh sách thì nó sex có nút timf kiếm(VD: trang danh sách hoá đơn thì có tìm kiếm hoá đơn theo mà hoặc ngày, danh sách khách hàng thì có tìm kiếm theo tên hoặc mã khách hàng, ... )
-    - Đầu tiên là file global có chứa 2 file: Sidebar.jsx và Topbar.jsx.
-+ File Sidebar.jsx có các danh mục ở bên trái để khi bấm vào thì sẽ hiện ra trang đó.Ở đây tôi muốn khi đăng nhập thành công thì Avatar của admin sẽ hiện ở phần   "src={`../../assets/user.png`}" :
-import { useState, useEffect } from "react";
-import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import { Box, IconButton, Typography, useTheme } from "@mui/material";
-import { Link } from "react-router-dom";
-import "react-pro-sidebar/dist/css/styles.css";
-import { tokens } from "../../theme";
-import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
-import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
-import ReceiptOutlinedIcon from "@mui/icons-material/ReceiptOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
-import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import TourIcon from '@mui/icons-material/Tour';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
-import AppsOutageIcon from '@mui/icons-material/AppsOutage';
-
-
-const Item = ({ title, to, icon, selected, setSelected }) => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    return (
-        <MenuItem
-      active= { selected === title
-}
-style = {{
-    color: colors.grey[100],
-      }}
-onClick = {() => setSelected(title)}
-icon = { icon }
-    >
-    <Typography>{ title } </Typography>
-    < Link to = { to } />
-        </MenuItem>
-
-  );
-
-};
-
-const Sidebar = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    const [selected, setSelected] = useState("Dashboard");
-
-    return (
-        <Box
-      sx= {{
-        "& .pro-sidebar-inner": {
-            background: `${colors.primary[400]} !important`,
-        },
-        "& .pro-icon-wrapper": {
-            backgroundColor: "transparent !important",
-        },
-        "& .pro-inner-item": {
-            padding: "5px 35px 5px 20px !important",
-        },
-        "& .pro-inner-item:hover": {
-            color: "#868dfb !important",
-        },
-        "& .pro-menu-item.active": {
-            color: "#6870fa !important",
-        },
-    }
-}
-    >
-    <ProSidebar collapsed={ isCollapsed }>
-        <Menu iconShape="square" >
-            {/* LOGO AND MENU ICON */ }
-            < MenuItem
-onClick = {() => setIsCollapsed(!isCollapsed)}
-icon = { isCollapsed?<MenuOutlinedIcon /> : undefined}
-style = {{
-    margin: "10px 0 20px 0",
-        color: colors.grey[100],
-            }}
-          >
-    {!isCollapsed && (
-        <Box
-                display="flex"
-justifyContent = "space-between"
-alignItems = "center"
-ml = "15px"
-    >
-    <Typography variant="h3" color = { colors.grey[100] } >
-        ADMIN
-        </Typography>
-        < IconButton onClick = {() => setIsCollapsed(!isCollapsed)}>
-            <MenuOutlinedIcon />
-            </IconButton>
-            </Box>
-            )}
-</MenuItem>
-
-{
-    !isCollapsed && (
-        <Box mb="25px" >
-            <Box display="flex" justifyContent = "center" alignItems = "center" >
-                <img
-                  alt="profile-user"
-    width = "100px"
-    height = "100px"
-    src = {`../../assets/user.png`
-}
-style = {{ cursor: "pointer", borderRadius: "50%" }}
-                />
-    </Box>
-    < Box textAlign = "center" >
-        <Typography
-                  variant="h2"
-color = { colors.grey[100] }
-fontWeight = "bold"
-sx = {{ m: "10px 0 0 0" }}
-                >
-    Nguyên
-    </Typography>
-    < Typography variant = "h5" color = { colors.greenAccent[500] } >
-        Admin
-        </Typography>
-        </Box>
-        </Box>
-          )}
-
-
-<Box paddingLeft={ isCollapsed ? undefined : "10%" }>
-    <Item
-              title="Bảng Điều Khiển"
-to = "/admin/dashboard"
-icon = {< DashboardIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Typography
-              variant="h6"
-color = { colors.grey[300] }
-sx = {{ m: "15px 0 5px 20px" }}
-            >
-    Quản lý
-        </Typography>
-        < Item
-title = "Quản lý danh mục"
-to = "/admin/category"
-icon = {< FormatListBulletedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Quản lý tour"
-to = "/admin/tourcontrol"
-icon = {< TourIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Quản lý đơn hàng"
-to = "/admin/invoices"
-icon = {< ReceiptOutlinedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Quản lý voucher"
-to = "/admin/voucher"
-icon = {< ConfirmationNumberIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Quản lý khách hàng"
-to = "/admin/contacts"
-icon = {< ContactsOutlinedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-
-    <Typography
-              variant="h6"
-color = { colors.grey[300] }
-sx = {{ m: "15px 0 5px 20px" }}
-            >
-    Quyền
-    </Typography>
-
-    < Item
-title = "Nhóm quyền"
-to = "/admin/rightsgroup"
-icon = {< AppsOutageIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Phân quyền"
-to = "/admin/delegation"
-icon = {< AppRegistrationIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-{/* <Item
-              title="FAQ Page"
-              to="/admin/faq"
-              icon={<HelpOutlineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
-
-    < Typography
-variant = "h6"
-color = { colors.grey[300] }
-sx = {{ m: "15px 0 5px 20px" }}
-            >
-    Charts
-    </Typography>
-
-    < Item
-title = "Báo cáo doanh thu"
-to = "/admin/bar"
-icon = {< BarChartOutlinedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-{/* <Item
-              title="Pie Chart"
-              to="/admin/pie"
-              icon={<PieChartOutlineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Line Chart"
-              to="/admin/line"
-              icon={<TimelineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
-{/* <Item
-              title="Geography Chart"
-              to="/admin/geography"
-              icon={<MapOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
-<Typography
-              variant="h6"
-color = { colors.grey[300] }
-sx = {{ m: "15px 0 5px 20px" }}
-            >
-    Pages
-    </Typography>
-
-    < Item
-title = "Đội Ngũ"
-to = "/admin/team"
-icon = {< PeopleOutlinedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    <Item
-              title="Tài khoản Admin"
-to = "/admin/form"
-icon = {< PersonOutlinedIcon />}
-selected = { selected }
-setSelected = { setSelected }
-    />
-
-    </Box>
-    </Menu>
-    </ProSidebar>
-    </Box>
-
-  );
-};
-
-export default Sidebar;
-+ file Topbar.jsx có < IconButton >
-    <LogoutIcon />
-    < /IconButton> Tôi muốn bạn code chức năng đăng suất cho nó và sau khi đăng suất thì sẽ quay về trang /Loginadmin.
-        Có < IconButton >
-    <SettingsOutlinedIcon />
-    </IconButton> Tôi muốn bạn code riêng một trang cho phần setting (Ở trang này hiển thôi tin tài khoản  admin đang đăng nhập. Hiển thị avatar, tên, địa chỉ,...và avatar có thể thay đổi từ hình trong máy up lên):
-import { Box, IconButton, useTheme, Typography } from "@mui/material";
-import { useContext } from "react";
-import { ColorModeContext, tokens } from "../../theme";
-import InputBase from "@mui/material/InputBase";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import SearchIcon from "@mui/icons-material/Search";
-import LogoutIcon from '@mui/icons-material/Logout';
-import { useState, useEffect } from "react";
-
-const Topbar = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-    const colorMode = useContext(ColorModeContext);
-    const [currentTime, setCurrentTime] = useState("");
-    const updateTime = () => {
-        const today = new Date();
-        const weekday = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
-        const day = weekday[today.getDay()];
-        const dd = String(today.getDate()).padStart(2, "0");
-        const mm = String(today.getMonth() + 1).padStart(2, "0");
-        const yyyy = today.getFullYear();
-        const h = String(today.getHours()).padStart(2, "0");
-        const m = String(today.getMinutes()).padStart(2, "0");
-        const s = String(today.getSeconds()).padStart(2, "0");
-        const nowTime = `${h} giờ ${m} phút ${s} giây`;
-        const todayDate = `${day}, ${dd}/${mm}/${yyyy}`;
-        setCurrentTime(`${todayDate} - ${nowTime}`);
-    };
-    useEffect(() => {
-        const timer = setInterval(updateTime, 1000);
-        return () => clearInterval(timer); // Cleanup the timer on component unmount
-    }, []);
-
-    return (
-        <Box display= "flex" justifyContent = "space-between" p = { 2} >
-            <Box
-        display="flex"
-    backgroundColor = { colors.primary[400] }
-    borderRadius = "3px"
-        >
-        <InputBase sx={ { ml: 2, flex: 1 } } placeholder = "Search" />
-            </Box>
-    {/* DATE TIME */ }
-    <Box
-        display="flex"
-    justifyContent = "flex-end"
-    mt = { 1}
-        >
-        <Typography variant="h5" color = { colors.grey[100] } >
-            { currentTime }
-            </Typography>
-            </Box>
-
-    {/* ICONS */ }
-    <Box display="flex" >
-        <IconButton>
-        <SettingsOutlinedIcon />
-        </IconButton>
-        < IconButton >
-        <LogoutIcon />
-        </IconButton>
-        </Box>
-        </Box>
-  );
-};
-
-export default Topbar;
-
-- file category.jsx đây là trang quản lý danh mục tour.Ở đây tôi muốn lấy dữ liệu từ api(file category.controller.js).tôi muốn hoàn thiện các chức năng thêm, sửa, xoá, trạng thái hoạt đông hoặc tạm ngưng, thêm phần tìm kiếm danh mục tour và danh sách các danh mục toủ sẽ hiển thị trong bảng:
-import React, { useState } from "react";
-import {
-    Box,
-    Button,
-    IconButton,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    TextField,
-} from "@mui/material";
-import { DataGrid, GridToolbar } from "@mui/x-data-grid";
-import { useTheme } from "@mui/material";
-import { tokens } from "../../theme";
-import AddIcon from "@mui/icons-material/Add";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-
-const CategoryControl = () => {
-    const theme = useTheme();
-    const colors = tokens(theme.palette.mode);
-
-    // Dữ liệu mẫu
-    const [categories, setCategories] = useState([
-        {
-            id: 1,
-            title: "Du lịch trong nước",
-            image: "https://via.placeholder.com/100",
-            status: "Hoạt động",
-        },
-        {
-            id: 2,
-            title: "Du lịch nước ngoài",
-            image: "https://via.placeholder.com/100",
-            status: "Hoạt động",
-        },
-        {
-            id: 3,
-            title: "Tour mùa hè",
-            image: "https://via.placeholder.com/100",
-            status: "Hoạt động",
-        },
-        {
-            id: 4,
-            title: "Tour mùa đông",
-            image: "https://via.placeholder.com/100",
-            status: "Hoạt động",
-        },
-        {
-            id: 5,
-            title: "Tour thám hiểm",
-            image: "https://via.placeholder.com/100",
-            status: "Hoạt động",
-        },
-    ]);
-
-    // State quản lý modal
-    const [open, setOpen] = useState(false);
-    const [newCategory, setNewCategory] = useState({
-        id: "",
-        title: "",
-        image: "",
-        status: "Hoạt động",
-    });
-    // Hàm mở/đóng modal
-    const handleOpen = () => setOpen(true);
-    const handleClose = () => setOpen(false);
-
-    // Hàm xử lý thêm danh mục mới
-    const handleAdd = () => {
-        if (!newCategory.title || !newCategory.image) {
-            alert("Vui lòng điền đầy đủ thông tin!");
-            return;
-        }
-        setCategories([...categories, { ...newCategory, id: categories.length + 1 }]);
-        setNewCategory({ id: "", title: "", image: "", status: "Hoạt động" });
-        handleClose();
-    };
-
-
-    // Hàm xử lý sửa, xóa
-    const handleEdit = (id) => {
-        alert(`Sửa danh mục có ID: ${id}`);
-    };
-
-    const handleDelete = (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa danh mục này?")) {
-            setCategories(categories.filter((category) => category.id !== id));
-        }
-    };
-
-    // Cấu hình các cột trong DataGrid
-    const columns = [
-        { field: "id", headerName: "STT", flex: 0.3 },
-        {
-            field: "image",
-            headerName: "Hình ảnh",
-            flex: 1,
-            renderCell: (params) => (
-                <img
-                    src= { params.value }
-                    alt="Category"
-                    style={{ width: "100px", borderRadius: "8px" }}
-                />
-            ),
-        },
-{ field: "title", headerName: "Tiêu đề", flex: 1 },
-{
-    field: "status",
-        headerName: "Trạng thái",
-            flex: 0.5,
-                renderCell: (params) => (
-                    <Button
-                    variant= "contained"
-    size = "small"
-    sx = {{
-        backgroundColor: params.value === "Hoạt động" ? "green" : "red",
-            color: "white",
-                fontWeight: "bold",
-                    }
-}
-                >
-    { params.value }
-    </Button>
-            ),
-        },
-{
-    field: "actions",
-        headerName: "Hành động",
-            flex: 1,
-                renderCell: (params) => (
-                    <Box display= "flex" gap = { 1} >
-                        <Button
-                        variant="contained"
-    color = "primary"
-    size = "small"
-    onClick = {() => handleEdit(params.row.id)
-}
-                    >
-    Sửa
-    </Button>
-    < Button
-variant = "contained"
-color = "error"
-size = "small"
-onClick = {() => handleDelete(params.row.id)}
-                    >
-    Xóa
-    </Button>
-    </Box>
-            ),
-        },
-    ];
-
-
-return (
-    <Box m= "20px" >
-    {/* Thanh công cụ */ }
-    < Box display = "flex" justifyContent = "space-between" mb = { 2} >
-        <Button
-                    variant="contained"
-color = "success"
-startIcon = {< AddIcon />}
-onClick = { handleOpen }
-    >
-    Thêm mới danh mục tour
-        </Button>
-        </Box>
-
-{/* Bảng dữ liệu */ }
-<Box
-                height="75vh"
-sx = {{
-    "& .MuiDataGrid-root": {
-        border: "none",
-                    },
-    "& .MuiDataGrid-cell": {
-        borderBottom: "none",
-                    },
-    "& .MuiDataGrid-columnHeaders": {
-        backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-                    },
-    "& .MuiDataGrid-virtualScroller": {
-        backgroundColor: colors.primary[400],
-                    },
-    "& .MuiDataGrid-footerContainer": {
-        borderTop: "none",
-            backgroundColor: colors.blueAccent[700],
-                    },
-    "& .MuiCheckbox-root": {
-        color: `${colors.greenAccent[200]} !important`,
-                    },
-    "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
-        color: `${colors.grey[100]} !important`,
-                    },
-}}
-            >
-    <DataGrid rows={ categories } columns = { columns } />
-        </Box>
-{/* Modal thêm mới */ }
-<Dialog open={ open } onClose = { handleClose } >
-    <DialogTitle
-                    sx={
-    {
-        fontWeight: "bold",
-            fontSize: "1.3rem",
-                textAlign: "center",
-                    }
-}
-                >
-    Thêm mới danh mục
-        </DialogTitle>
-        < DialogContent >
-        <TextField
-                        fullWidth
-margin = "normal"
-label = "Tiêu đề"
-value = { newCategory.title }
-onChange = {(e) =>
-setNewCategory({ ...newCategory, title: e.target.value })
-                        }
-                    />
-    < TextField
-fullWidth
-margin = "normal"
-label = "Hình ảnh (URL)"
-value = { newCategory.image }
-onChange = {(e) =>
-setNewCategory({ ...newCategory, image: e.target.value })
-                        }
-                    />
-    </DialogContent>
-    < DialogActions >
-    <Button
-                        onClick={ handleClose }
-color = "error"
-variant = "contained"
-sx = {{ fontWeight: "bold" }}
-                    >
-    Hủy
-    </Button>
-    < Button
-onClick = { handleAdd }
-color = "success"
-variant = "contained"
-sx = {{ fontWeight: "bold" }}
-                    >
-    Thêm mới
-        </Button>
-        </DialogActions>
-        </Dialog>
-        </Box>
-    );
-};
-
-export default CategoryControl;
-
-- File Tourcontrol.jsx tôi muốn bạn hoàn thiện giống trang danh mục tour ở trên và file này lấy api từ trang tour.controller.js:
-const Tour = require("../../models/tour.model");
-const Category = require("../../models/category.model");
-const generate = require("../../helper/generate");
-const paginationHelper = require("../../helper/pagination");
-const tourHelper = require("../../helper/tours");
-
-// [GET]/api/v1/admin/tours
-module.exports.index = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem danh sách tour"
-        });
-    } else {
-        let find = { deleted: false };
-
-        if (req.query.status) {
-            find.status = req.query.status;
-        };
-
-        const sort = {};
-        if (req.query.sortKey && req.query.sortValue) {
-            sort[req.query.sortKey] = req.query.sortValue;
-        }
-
-        // pagination
-        const countRecords = await Tour.countDocuments(find);
-        let objPagination = paginationHelper(
-            {
-                currentPage: 1,
-                limitItems: 5
-            },
-            req.query,
-            countRecords
-        );
-        // end pagination
-
-        const tours = await Tour.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
-        let toursObject = tours.map(item => item.toObject());
-
-        toursObject.forEach(item => {
-            item.price_special = tourHelper.priceNewTour(item);
-        });
-        res.json(toursObject);
-    }
-};
-
-// [POST]/api/v1/admin/tours/create
-module.exports.createPost = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_create")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền tạo mới tour"
-        });
-    } else {
-        try {
-            const countTour = await Tour.countDocuments();
-            const code = generate.generateTourCode(countTour + 1);
-
-            const tour = new Tour({
-                title: req.body.title,
-                code: code,
-                price: parseInt(req.body.price),
-                discount: parseInt(req.body.discount),
-                stock: parseInt(req.body.stock),
-                category_id: req.body.category_id,
-                timeStart: req.body.timeStart,
-                status: req.body.status,
-                images: req.body.images,
-                information: req.body.information,
-                schedule: req.body.schedule,
-            });
-            const data = await tour.save();
-            res.json({
-                code: 200,
-                message: "Tạo thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Không tồn tại!" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/change-status/:status/:id
-module.exports.changeStatus = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const status = req.params.status;
-            await Tour.updateOne({
-                _id: id
-            }, {
-                status: status
-            });
-            res.json({
-                code: 200,
-                message: "Cập nhật trạng thái thành công"
-            })
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-
-// [DELETE]/api/v1/admin/delete/:id
-module.exports.deleteTour = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_delete")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xóa tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-
-            await Tour.deleteOne({
-                _id: id
-            });
-
-            res.json({
-                code: 200,
-                message: "Xóa tour thành công!"
-            })
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-
-// [GET]/api/v1/admin/detail/:id
-module.exports.detail = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_view")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền xem chi tiết tour"
-        });
-    } else {
-        const id = req.params.id;
-
-        const tour = await Tour.findOne({
-            _id: id,
-            deleted: false,
-        });
-
-        const category = await Category.findOne({
-            _id: tour.category_id,
-            deleted: false
-        });
-        res.json({
-            tour: tour,
-            category: category
-        });
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/edit/:id
-module.exports.editPatch = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            if (req.body.price) req.body.price = parseInt(req.body.price);
-            if (req.body.discount) req.body.discount = parseInt(req.body.discount);
-            if (req.body.stock) req.body.stock = parseInt(req.body.stock);
-            if (req.body.position) req.body.position = parseInt(req.body.position);
-
-            const data = await Tour.updateOne({
-                _id: id
-            }, {
-                ...req.body
-            });
-
-
-            res.json({
-                code: 200,
-                message: "Cập nhật tour thành công"
-            });
-        } catch (error) {
-            res.json({
-                code: 404,
-                message: "Cập nhật tour thất bại" + error
-            });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/change-stock/:stock/:id
-module.exports.stock = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const stock = parseInt(req.params.stock);
-            const data = await Tour.findOneAndUpdate({
-                _id: id
-            }, {
-                stock: stock
-            }, { new: true });
-            res.json({
-                code: 200,
-                message: "Cập nhật số lượng thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Lỗi! " + error
-            })
-        }
-    }
-};
-
-=> tôi muốn bạn hoàn hoàn thành các chức năng tôi đề ra ở trên trước khi làm cá trang khác nữa.Nếu có gì thắc mắc thì bạn cứ hỏi tôi!
-
-file index.js phía backend là:
-const express = require('express');
-const database = require("../backend/config/database");
-require("dotenv").config();
-const cors = require('cors');
-const cookieParser = require('cookie-parser')
-const bodyParser = require('body-parser');
-
-const routeApiV1 = require("../backend/api/v1/routes/client/index.route");
-const routeAdminApiV1 = require("./api/v1/routes/admin/index.route");
-
-const app = express()
-const port = process.env.PORT || 3000;
-
-app.use(cors());
-
-app.use(cookieParser());
-
-database.connect();
-
-// parse application/json
-app.use(bodyParser.json())
-
-routeApiV1(app);
-// routeAdminApiV1(app);
-
-app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`)
-})
+// bây giờ tôi sẽ gửi hết các file còn lại cho bạn sửa.
+// * Phía backend(bạn chỉ cần gọi api chứ không cần sửa gì thêm):
+// - File category.controller.js:
+// const Category = require("../../models/category.model");
+// const paginationHelper = require("../../helpers/pagination");
+
+// // [GET]/api/v1/admin/categories
+// module.exports.index = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem danh sách danh mục tour"
+//         });
+//     } else {
+//         let find = { deleted: false };
+
+//         if (req.query.status) {
+//             find.status = req.query.status;
+//         };
+
+//         // sort
+//         const sort = {};
+//         if (req.query.sortKey && req.query.sortValue) {
+//             sort[req.query.sortKey] = req.query.sortValue;
+//         }
+
+//         // pagination
+//         const countRecords = await Category.countDocuments(find);
+//         let objPagination = paginationHelper(
+//             {
+//                 currentPage: 1,
+//                 limitItems: 5
+//             },
+//             req.query,
+//             countRecords
+//         );
+//         // end pagination
+
+//         const categories = await Category.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
+
+//         res.json(categories);
+//     }
+// };
+
+// // [POST]/api/v1/admin/categories/create
+// module.exports.create = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_create")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền tạo danh mục tour"
+//         });
+//     } else {
+//         try {
+//             const category = new Category({
+//                 title: req.body.title,
+//                 image: req.body.image,
+//                 description: req.body.description,
+//                 status: req.body.status,
+//             });
+//             const data = await category.save();
+//             res.json({
+//                 code: 200,
+//                 message: "Tạo thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!"
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/categories/changeStatus/:status/:id
+// module.exports.changeStatus = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa trạng thái danh mục tour"
+//         });
+//     } else {
+//         try {
+//             const status = req.params.status;
+//             const id = req.params.id;
+//             await Category.updateOne({
+//                 _id: id
+//             }, {
+//                 status: status
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật trạng thái danh mục thành công",
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!"
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/categories/edit/:id
+// module.exports.edit = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa danh mục tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             await Category.updateOne({
+//                 _id: id,
+//                 deleted: false
+//             }, req.body);
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật danh mục thành công",
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!"
+//             });
+//         }
+//     }
+// };
+
+// // [GET]/api/v1/admin/categories/detail/:id
+// module.exports.detail = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem chi tiết danh mục tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             const data = await Category.findOne({
+//                 _id: id,
+//                 deleted: false
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!"
+//             });
+//         }
+//     }
+// };
+
+// // [DELETE]/api/v1/admin/categories/delete/:id
+// module.exports.delete = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("category_delete")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xóa danh mục tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             await Category.deleteOne({
+//                 _id: id
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa thành công",
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!"
+//             });
+//         }
+//     }
+// };
+// -File hotel.controller.js:
+// const Hotel = require("../../models/hotel.model");
+// const Room = require("../../models/room.model");
+
+// // [GET]/api/v1/admin/hotels
+// module.exports.index = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem danh sách khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotels = await Hotel.find({ deleted: false });
+//             res.json({
+//                 code: 200,
+//                 message: "Danh sách khách sạn",
+//                 data: hotels
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error: " + error
+//             });
+//         }
+//     }
+// }
+
+// // [GET]/api/v1/admin/hotels/:hotelId
+// module.exports.indexRoom = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem danh sách room của khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const room = await Room.find({
+//                 hotel_id: hotelId
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Danh sách room của khách sạn",
+//                 data: room
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error: " + error
+//             });
+//         }
+//     }
+// }
+
+// // [POST]/api/v1/admin/hotels/create
+// module.exports.createPost = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_create")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền tạo khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotel = new Hotel(req.body);
+//             const data = await hotel.save();
+//             res.json({
+//                 code: 200,
+//                 message: "Tạo thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [POST]/api/v1/admin/hotels/create/:hotelId
+// module.exports.createPostRoom = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền tạo phòng khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const room = new Room({
+//                 hotel_id: hotelId,
+//                 name: req.body.name,
+//                 price: req.body.price,
+//                 amenities: req.body.amenities,
+//                 availableRooms: parseInt(req.body.availableRooms),
+//                 images: req.body.images
+//             });
+//             const data = await room.save();
+//             res.json({
+//                 code: 200,
+//                 message: "Tạo thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/hotels/edit/:hotelId
+// module.exports.editHotel = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const updatedHotel = await Hotel.findOneAndUpdate(
+//                 { _id: hotelId, deleted: false },
+//                 req.body,
+//                 { new: true }
+//             );
+//             if (!updatedHotel) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Khách sạn không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật thành công",
+//                 data: updatedHotel
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/hotels/edit/:hotelId/:roomId
+// module.exports.editRoom = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa phòng khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const roomId = req.params.roomId;
+//             const updatedRoom = await Room.findOneAndUpdate(
+//                 {
+//                     _id: roomId,
+//                     hotel_id: hotelId
+//                 }
+//                 ,
+//                 req.body,
+//                 { new: true }
+//             );
+//             if (!updatedRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật thành công",
+//                 data: updatedRoom
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/hotels/changeStatus/:status/:hotelId
+// module.exports.changeStatus = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền cập nhật trạng thái khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const status = req.params.status;
+//             const statusHotel = await Hotel.findOneAndUpdate(
+//                 {
+//                     _id: hotelId,
+//                     deleted: false
+//                 }
+//                 ,
+//                 {
+//                     status: status
+//                 },
+//                 { new: true }
+//             );
+
+//             const statusRoom = await Room.updateMany(
+//                 {
+//                     hotel_id: hotelId
+//                 }
+//                 ,
+//                 {
+//                     status: status
+//                 },
+//                 { new: true }
+//             );
+//             if (!statusHotel) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Khách sạn không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+
+//             if (!statusRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật thành công",
+//                 statusHotel: statusHotel,
+//                 statusRoom: statusRoom
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/hotels/changeStatus/:status/:hotelId/:roomId
+// module.exports.changeStatusRoom = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền cập nhật trạng thái room khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const roomId = req.params.roomId;
+//             const status = req.params.status;
+//             const statusRoom = await Room.findOneAndUpdate(
+//                 {
+//                     _id: roomId,
+//                     hotel_id: hotelId
+//                 }
+//                 ,
+//                 {
+//                     status: status
+//                 },
+//                 { new: true }
+//             );
+
+//             if (!statusRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật thành công",
+//                 statusRoom: statusRoom
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [DELETE]/api/v1/admin/hotels/delete/:hotelId
+// module.exports.deleteHotel = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_delete")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xóa khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const dataRoom = await Room.deleteMany(
+//                 {
+//                     hotel_id: hotelId
+//                 });
+
+//             const dataHotel = await Hotel.findOneAndDelete(
+//                 {
+//                     _id: hotelId,
+//                     deleted: false
+//                 });
+//             if (!dataRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+
+//             if (!dataHotel) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "khách sạn không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa thành công",
+//                 dataRoom: dataRoom,
+//                 dataHotel: dataHotel
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [DELETE]/api/v1/admin/hotels/delete/:hotelId/:roomId
+// module.exports.deleteRoom = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_delete")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xóa room khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const roomId = req.params.roomId;
+//             const dataRoom = await Room.findOneAndDelete(
+//                 {
+//                     _id: roomId,
+//                     hotel_id: hotelId
+//                 });
+
+
+//             if (!dataRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa thành công",
+//                 dataRoom: dataRoom,
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [GET]/api/v1/admin/hotels/detail/:hotelId
+// module.exports.detail = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem chi tiết khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const dataHotel = await Hotel.findOne(
+//                 {
+//                     _id: hotelId,
+//                     deleted: false
+//                 });
+
+//             const dataRoom = await Room.findOne(
+//                 {
+//                     hotel_id: hotelId,
+//                 });
+//             if (!dataHotel) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Khách sạn không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+
+//             if (!dataRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa thành công",
+//                 dataHotel: dataHotel,
+//                 dataRoom: dataRoom
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/hotels/stockRoom/:stock/:hotelId/:roomId
+// module.exports.stock = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("hotel_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền cập nhật trạng thái room khách sạn"
+//         });
+//     } else {
+//         try {
+//             const hotelId = req.params.hotelId;
+//             const roomId = req.params.roomId;
+//             const stock = parseInt(req.params.stock);
+//             const stockRoom = await Room.findOneAndUpdate(
+//                 {
+//                     _id: roomId,
+//                     hotel_id: hotelId
+//                 }
+//                 ,
+//                 {
+//                     availableRooms: stock
+//                 },
+//                 { new: true }
+//             );
+
+//             if (!stockRoom) {
+//                 return res.json({
+//                     code: 404,
+//                     message: "Room không tồn tại hoặc đã bị xoá"
+//                 });
+//             }
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật thành công",
+//                 stockRoom: stockRoom
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Error:" + error
+//             });
+//         }
+//     }
+// };
+// -File tour.controller.js:
+// const Tour = require("../../models/tour.model");
+// const Category = require("../../models/category.model");
+// const generate = require("../../helper/generate");
+// const paginationHelper = require("../../helper/pagination");
+// const tourHelper = require("../../helper/tours");
+
+// // [GET]/api/v1/admin/tours
+// module.exports.index = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem danh sách tour"
+//         });
+//     } else {
+//         let find = { deleted: false };
+
+//         if (req.query.status) {
+//             find.status = req.query.status;
+//         };
+
+//         const sort = {};
+//         if (req.query.sortKey && req.query.sortValue) {
+//             sort[req.query.sortKey] = req.query.sortValue;
+//         }
+
+//         // pagination
+//         const countRecords = await Tour.countDocuments(find);
+//         let objPagination = paginationHelper(
+//             {
+//                 currentPage: 1,
+//                 limitItems: 5
+//             },
+//             req.query,
+//             countRecords
+//         );
+//         // end pagination
+
+//         const tours = await Tour.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
+//         let toursObject = tours.map(item => item.toObject());
+
+//         toursObject.forEach(item => {
+//             item.price_special = tourHelper.priceNewTour(item);
+//         });
+//         res.json(toursObject);
+//     }
+// };
+
+// // [POST]/api/v1/admin/tours/create
+// module.exports.createPost = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_create")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền tạo mới tour"
+//         });
+//     } else {
+//         try {
+//             const countTour = await Tour.countDocuments();
+//             const code = generate.generateTourCode(countTour + 1);
+
+//             const tour = new Tour({
+//                 title: req.body.title,
+//                 code: code,
+//                 price: parseInt(req.body.price),
+//                 discount: parseInt(req.body.discount),
+//                 stock: parseInt(req.body.stock),
+//                 category_id: req.body.category_id,
+//                 timeStart: req.body.timeStart,
+//                 status: req.body.status,
+//                 images: req.body.images,
+//                 information: req.body.information,
+//                 schedule: req.body.schedule,
+//             });
+//             const data = await tour.save();
+//             res.json({
+//                 code: 200,
+//                 message: "Tạo thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/change-status/:status/:id
+// module.exports.changeStatus = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa trạng thái tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             const status = req.params.status;
+//             await Tour.updateOne({
+//                 _id: id
+//             }, {
+//                 status: status
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật trạng thái thành công"
+//             })
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+
+// // [DELETE]/api/v1/admin/delete/:id
+// module.exports.deleteTour = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_delete")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xóa tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+
+//             await Tour.deleteOne({
+//                 _id: id
+//             });
+
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa tour thành công!"
+//             })
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+
+// // [GET]/api/v1/admin/detail/:id
+// module.exports.detail = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem chi tiết tour"
+//         });
+//     } else {
+//         const id = req.params.id;
+
+//         const tour = await Tour.findOne({
+//             _id: id,
+//             deleted: false,
+//         });
+
+//         const category = await Category.findOne({
+//             _id: tour.category_id,
+//             deleted: false
+//         });
+//         res.json({
+//             tour: tour,
+//             category: category
+//         });
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/edit/:id
+// module.exports.editPatch = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             if (req.body.price) req.body.price = parseInt(req.body.price);
+//             if (req.body.discount) req.body.discount = parseInt(req.body.discount);
+//             if (req.body.stock) req.body.stock = parseInt(req.body.stock);
+//             if (req.body.position) req.body.position = parseInt(req.body.position);
+
+//             const data = await Tour.updateOne({
+//                 _id: id
+//             }, {
+//                 ...req.body
+//             });
+
+
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật tour thành công"
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Cập nhật tour thất bại" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/change-stock/:stock/:id
+// module.exports.stock = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa trạng thái tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             const stock = parseInt(req.params.stock);
+//             const data = await Tour.findOneAndUpdate({
+//                 _id: id
+//             }, {
+//                 stock: stock
+//             }, { new: true });
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật số lượng thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+// - file uploadCloud.middleware.js:
+// const { uploadToCloudinary } = require("../../helper/uploadToCloudinary");
+
+// module.exports.uploadSingle = async (req, res, next) => {
+//     if (req["file"]) {
+//         const link = await uploadToCloudinary(req["file"].buffer);
+//         req.body[req["file"].fieldname] = link;
+//         next();
+//     } else {
+//         next();
+//     }
+// }
+
+// module.exports.uploadFields = async (req, res, next) => {
+//     for (const key in req["files"]) {
+//         const links = [];
+//         for (const item of req["files"][key]) {
+//             try {
+//                 const link = await uploadToCloudinary(item.buffer);
+//                 links.push(link);
+//             } catch (error) {
+//                 console.log(error);
+//             }
+//         }
+//         req.body[key] = links;
+//     }
+//     next();
+// }
+// - File cart.model.js:
+// const mongoose = require('mongoose');
+
+// const cartSchema = new mongoose.Schema({
+//     user_id: String,
+//     tours: [
+//         {
+//             tour_id: String,
+//             quantity: Number
+//         }
+//     ]
+// }, {
+//     timestamps: true
+// });
+// const Cart = mongoose.model("Cart", cartSchema, "carts");
+
+// module.exports = Cart;
+// - file category.model.js :
+// const mongoose = require('mongoose');
+// const slug = require('mongoose-slug-updater');
+
+// mongoose.plugin(slug);
+// const CategorySchema = new mongoose.Schema({
+//     title: String,
+//     image: String,
+//     description: String,
+//     status: {
+//         type: String,
+//         default: "active"
+//     },
+//     slug: {
+//         type: String,
+//         slug: "title",
+//         unique: true
+//     },
+//     deleted: {
+//         type: Boolean,
+//         default: false
+//     },
+// }, { timestamps: true });
+// const Category = mongoose.model('Category', CategorySchema, "categories");
+// module.exports = Category;
+
+// - file forgot - password.model.js:
+// const mongoose = require('mongoose');
+
+// const ForgotPasswordSchema = new mongoose.Schema({
+//     email: String,
+//     otp: String,
+//     "expireAt": { type: Date, expires: 180 }
+
+// }, { timestamps: true });
+// const ForgotPassword = mongoose.model('ForgotPassword', ForgotPasswordSchema, "forgot-passwords");
+// module.exports = ForgotPassword;
+// - file hotel.model.js:
+// const mongoose = require('mongoose');
+// const slug = require('mongoose-slug-updater');
+
+// mongoose.plugin(slug);
+// const HotelSchema = new mongoose.Schema({
+//     name: String,
+//     description: String,
+//     images: Array,
+//     location: {
+//         city: String,
+//         country: String,
+//         address: String
+//     },
+//     sold: {
+//         type: Number,
+//         default: 0
+//     },
+//     status: {
+//         type: String,
+//         default: "active"
+//     },
+//     slug: {
+//         type: String,
+//         slug: "name",
+//         unique: true
+//     },
+//     slug_city: {
+//         type: String,
+//         slug: "location.city"
+//     },
+//     deleted: {
+//         type: Boolean,
+//         default: false
+//     },
+// }, { timestamps: true });
+// const Hotel = mongoose.model('Hotel', HotelSchema, "hotels");
+// module.exports = Hotel;
+// -file hotelReview.model.js:
+// const mongoose = require('mongoose');
+
+// const reviewSchema = new mongoose.Schema({
+//     hotel_id: String,
+//     room_id: String,
+//     user_id: {
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: "User",
+//         required: true
+//     },
+//     rating: {
+//         type: Number,
+//         required: true,
+//         min: 1, max: 5
+//     },
+//     comment: String
+// }, {
+//     timestamps: true
+// });
+// const Review = mongoose.model("Review", reviewSchema, "reviews");
+
+// module.exports = Review;
+
+// - file room.model.js:
+// const mongoose = require('mongoose');
+
+// const RoomSchema = new mongoose.Schema({
+//     hotel_id: String,
+//     name: String,
+//     price: Number,
+//     amenities: String,
+//     availableRooms: {
+//         type: Number,
+//         default: 0
+//     },
+//     sold: {
+//         type: Number,
+//         default: 0
+//     },
+//     images: Array,
+//     status: {
+//         type: String,
+//         default: "active"
+//     },
+// });
+
+// const Room = mongoose.model('Room', RoomSchema, "rooms");
+// module.exports = Room;
+// - file tour.model.js:
+// const mongoose = require('mongoose');
+// const slug = require('mongoose-slug-updater');
+
+// mongoose.plugin(slug);
+// const TourSchema = new mongoose.Schema({
+//     title: String,
+//     code: String,
+//     images: Array,
+//     price: Number,
+//     discount: Number,
+//     information: String,
+//     schedule: String,
+//     timeStart: Date,
+//     stock: Number,
+//     category_id: {
+//         type: String,
+//         default: ""
+//     },
+//     sold: {
+//         type: Number,
+//         default: 0
+//     },
+//     status: {
+//         type: String,
+//         default: "active"
+//     },
+//     slug: {
+//         type: String,
+//         slug: "title",
+//         unique: true
+//     },
+//     deleted: {
+//         type: Boolean,
+//         default: false
+//     },
+// }, { timestamps: true });
+// const Tour = mongoose.model('Tour', TourSchema, "tours");
+// module.exports = Tour;
+// - file user.model.js:
+// const mongoose = require('mongoose');
+
+// const UserSchema = new mongoose.Schema({
+//     fullName: String,
+//     email: String,
+//     password: String,
+//     token: String,
+//     phone: String,
+//     avatar: String,
+//     status: {
+//         type: String,
+//         default: "active"
+//     },
+//     deleted: {
+//         type: Boolean,
+//         default: false
+//     },
+//     deletedAt: Date
+// }, { timestamps: true });
+// const User = mongoose.model('User', UserSchema, "users");
+// module.exports = User;
+// -file category.validate.js:
+// module.exports.categoryValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.title) {
+//         errors.push('Vui lòng nhập tiêu đề!');
+//     }
+//     if (!req.body.description) {
+//         errors.push('Vui lòng nhập mô tả!');
+//     }
+//     if (!req.body.status) {
+//         errors.push('Vui lòng chọn status!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+// -file hotel.validate.js:
+// module.exports.hotelValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.name) {
+//         errors.push('Vui lòng nhập tên khách sạn!');
+//     }
+//     if (!req.body.location || !req.body.location.city) {
+//         errors.push('Vui lòng nhập thành phố!');
+//     }
+//     if (!req.body.location || !req.body.location.country) {
+//         errors.push('Vui lòng nhập đất nước!');
+//     }
+//     if (!req.body.location || !req.body.location.address) {
+//         errors.push('Vui lòng nhập địa chỉ!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+
+// module.exports.roomValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.name) {
+//         errors.push('Vui lòng nhập tên phòng!');
+//     }
+//     if (parseInt(req.body.price) <= 0) {
+//         errors.push('Vui lòng nhập giá lớn hơn 0!');
+//     }
+//     if (!req.body.amenities) {
+//         errors.push('Vui lòng nhập tiện ích phòng!');
+//     }
+//     if (parseInt(req.body.availableRooms) <= 0) {
+//         errors.push('Vui lòng nhập số lượng lớn hơn 0!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+// -File role.validate.js:
+// module.exports.roleValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.title) {
+//         errors.push('Vui lòng nhập tiêu đề!');
+//     }
+//     if (!req.body.description) {
+//         errors.push('Vui lòng nhập chi tiết nhóm quyền!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+// -file setting.validate.js:
+// module.exports.settingValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.websiteName) {
+//         errors.push('Vui lòng nhập tên website!');
+//     }
+//     if (!req.body.logo) {
+//         errors.push('Vui lòng nhập logo!');
+//     }
+//     if (!req.body.phone) {
+//         errors.push('Vui lòng nhập số điện thoại!');
+//     }
+//     if (!req.body.email) {
+//         errors.push('Vui lòng nhập email!');
+//     }
+//     if (!req.body.address) {
+//         errors.push('Vui lòng nhập địa chỉ!');
+//     }
+//     if (!req.body.slogan) {
+//         errors.push('Vui lòng nhập câu slogan!');
+//     }
+//     if (!req.body.copyright) {
+//         errors.push('Vui lòng nhập copyright!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+// - file tour.validate.js:
+// module.exports.tourValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.title) {
+//         errors.push('Vui lòng nhập tiêu đề!');
+//     }
+//     if (!req.body.category_id) {
+//         errors.push('Vui lòng chọn danh mục!');
+//     }
+//     if (parseInt(req.body.price) <= 0) {
+//         errors.push('Vui lòng nhập giá lớn hơn 0!');
+//     }
+//     if (parseInt(req.body.discount) <= 0) {
+//         errors.push('Vui lòng nhập % giảm giá lớn hơn 0!');
+//     }
+//     if (parseInt(req.body.stock) <= 0) {
+//         errors.push('Vui lòng nhập số lượng lớn hơn 0!');
+//     }
+//     if (!req.body.timeStart) {
+//         errors.push('Vui lòng nhập ngày khởi hành!');
+//     }
+//     if (!req.body.schedule) {
+//         errors.push('Vui lòng nhập lịch trình tour!');
+//     }
+//     if (!req.body.status) {
+//         errors.push('Vui lòng chọn status!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+// - File voucher.validate.js:
+// module.exports.voucherValidate = (req, res, next) => {
+//     const errors = [];
+//     if (!req.body.title) {
+//         errors.push('Vui lòng nhập tiêu đề!');
+//     }
+//     if (!req.body.description) {
+//         errors.push('Vui lòng nhập mô tả!');
+//     }
+//     if (!req.body.code) {
+//         errors.push('Vui lòng mã code!');
+//     }
+//     if (parseInt(req.body.quantity) <= 0) {
+//         errors.push('Số lượng phải lớn hơn 0!');
+//     }
+//     if (parseInt(req.body.discount) <= 0) {
+//         errors.push('Giảm giá phải lớn hơn 0!');
+//     }
+//     if (new Date(req.body.endDate).getTime() < Date.now()) {
+//         errors.push('Ngày kết thúc phải lớn hơn ngày hiện tại!');
+//     }
+//     if (new Date(req.body.startDate).getTime() >= new Date(req.body.endDate).getTime()) {
+//         errors.push('Ngày bắt đầu phải nhỏ hơn ngày kết thúc!');
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+
+// module.exports.editVoucher = (req, res, next) => {
+//     const errors = [];
+//     if (req.body.endDate) {
+//         if (new Date(req.body.endDate).getTime() < Date.now()) {
+//             errors.push('Ngày kết thúc phải lớn hơn ngày hiện tại!');
+//         }
+//     }
+//     if (req.body.startDate) {
+//         if (new Date(req.body.startDate).getTime() >= new Date(req.body.endDate).getTime()) {
+//             errors.push('Ngày bắt đầu phải nhỏ hơn ngày kết thúc!');
+//         }
+//     }
+//     if (errors.length > 0) {
+//         return res.status(400).json({
+//             success: false,
+//             errors: errors
+//         });
+//     }
+//     next();
+// }
+
+// * Ở phía frontend.Ở các trang này tôi bạn có thể chỉnh lại giao diện giúp tôi cho phù hợp với cá chứa năng cầ có mà bên api đã viết.Tôi muốn nếu trang đó là một danh sách thì nó sex có nút timf kiếm(VD: trang danh sách hoá đơn thì có tìm kiếm hoá đơn theo mà hoặc ngày, danh sách khách hàng thì có tìm kiếm theo tên hoặc mã khách hàng, ... )
+//     - Đầu tiên là file global có chứa 2 file: Sidebar.jsx và Topbar.jsx.
+// + File Sidebar.jsx có các danh mục ở bên trái để khi bấm vào thì sẽ hiện ra trang đó.Ở đây tôi muốn khi đăng nhập thành công thì Avatar của admin sẽ hiện ở phần   "src={`../../assets/user.png`}" :
+// import { useState, useEffect } from "react";
+// import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
+// import { Box, IconButton, Typography, useTheme } from "@mui/material";
+// import { Link } from "react-router-dom";
+// import "react-pro-sidebar/dist/css/styles.css";
+// import { tokens } from "../../theme";
+// import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+// import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
+// import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
+// import ReceiptOutlinedIcon from "@mui/icons-material/ReceiptOutlined";
+// import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+// import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
+// import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+// import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
+// import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
+// import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+// import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
+// import DashboardIcon from '@mui/icons-material/Dashboard';
+// import TourIcon from '@mui/icons-material/Tour';
+// import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+// import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+// import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
+// import AppsOutageIcon from '@mui/icons-material/AppsOutage';
+
+
+// const Item = ({ title, to, icon, selected, setSelected }) => {
+//     const theme = useTheme();
+//     const colors = tokens(theme.palette.mode);
+//     return (
+//         <MenuItem
+//       active= { selected === title
+// }
+// style = {{
+//     color: colors.grey[100],
+//       }}
+// onClick = {() => setSelected(title)}
+// icon = { icon }
+//     >
+//     <Typography>{ title } </Typography>
+//     < Link to = { to } />
+//         </MenuItem>
+
+//   );
+
+// };
+
+// const Sidebar = () => {
+//     const theme = useTheme();
+//     const colors = tokens(theme.palette.mode);
+//     const [isCollapsed, setIsCollapsed] = useState(false);
+//     const [selected, setSelected] = useState("Dashboard");
+
+//     return (
+//         <Box
+//       sx= {{
+//         "& .pro-sidebar-inner": {
+//             background: `${colors.primary[400]} !important`,
+//         },
+//         "& .pro-icon-wrapper": {
+//             backgroundColor: "transparent !important",
+//         },
+//         "& .pro-inner-item": {
+//             padding: "5px 35px 5px 20px !important",
+//         },
+//         "& .pro-inner-item:hover": {
+//             color: "#868dfb !important",
+//         },
+//         "& .pro-menu-item.active": {
+//             color: "#6870fa !important",
+//         },
+//     }
+// }
+//     >
+//     <ProSidebar collapsed={ isCollapsed }>
+//         <Menu iconShape="square" >
+//             {/* LOGO AND MENU ICON */ }
+//             < MenuItem
+// onClick = {() => setIsCollapsed(!isCollapsed)}
+// icon = { isCollapsed?<MenuOutlinedIcon /> : undefined}
+// style = {{
+//     margin: "10px 0 20px 0",
+//         color: colors.grey[100],
+//             }}
+//           >
+//     {!isCollapsed && (
+//         <Box
+//                 display="flex"
+// justifyContent = "space-between"
+// alignItems = "center"
+// ml = "15px"
+//     >
+//     <Typography variant="h3" color = { colors.grey[100] } >
+//         ADMIN
+//         </Typography>
+//         < IconButton onClick = {() => setIsCollapsed(!isCollapsed)}>
+//             <MenuOutlinedIcon />
+//             </IconButton>
+//             </Box>
+//             )}
+// </MenuItem>
+
+// {
+//     !isCollapsed && (
+//         <Box mb="25px" >
+//             <Box display="flex" justifyContent = "center" alignItems = "center" >
+//                 <img
+//                   alt="profile-user"
+//     width = "100px"
+//     height = "100px"
+//     src = {`../../assets/user.png`
+// }
+// style = {{ cursor: "pointer", borderRadius: "50%" }}
+//                 />
+//     </Box>
+//     < Box textAlign = "center" >
+//         <Typography
+//                   variant="h2"
+// color = { colors.grey[100] }
+// fontWeight = "bold"
+// sx = {{ m: "10px 0 0 0" }}
+//                 >
+//     Nguyên
+//     </Typography>
+//     < Typography variant = "h5" color = { colors.greenAccent[500] } >
+//         Admin
+//         </Typography>
+//         </Box>
+//         </Box>
+//           )}
+
+
+// <Box paddingLeft={ isCollapsed ? undefined : "10%" }>
+//     <Item
+//               title="Bảng Điều Khiển"
+// to = "/admin/dashboard"
+// icon = {< DashboardIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Typography
+//               variant="h6"
+// color = { colors.grey[300] }
+// sx = {{ m: "15px 0 5px 20px" }}
+//             >
+//     Quản lý
+//         </Typography>
+//         < Item
+// title = "Quản lý danh mục"
+// to = "/admin/category"
+// icon = {< FormatListBulletedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Quản lý tour"
+// to = "/admin/tourcontrol"
+// icon = {< TourIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Quản lý đơn hàng"
+// to = "/admin/invoices"
+// icon = {< ReceiptOutlinedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Quản lý voucher"
+// to = "/admin/voucher"
+// icon = {< ConfirmationNumberIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Quản lý khách hàng"
+// to = "/admin/contacts"
+// icon = {< ContactsOutlinedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+
+//     <Typography
+//               variant="h6"
+// color = { colors.grey[300] }
+// sx = {{ m: "15px 0 5px 20px" }}
+//             >
+//     Quyền
+//     </Typography>
+
+//     < Item
+// title = "Nhóm quyền"
+// to = "/admin/rightsgroup"
+// icon = {< AppsOutageIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Phân quyền"
+// to = "/admin/delegation"
+// icon = {< AppRegistrationIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+// {/* <Item
+//               title="FAQ Page"
+//               to="/admin/faq"
+//               icon={<HelpOutlineOutlinedIcon />}
+//               selected={selected}
+//               setSelected={setSelected}
+//             /> */}
+
+//     < Typography
+// variant = "h6"
+// color = { colors.grey[300] }
+// sx = {{ m: "15px 0 5px 20px" }}
+//             >
+//     Charts
+//     </Typography>
+
+//     < Item
+// title = "Báo cáo doanh thu"
+// to = "/admin/bar"
+// icon = {< BarChartOutlinedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+// {/* <Item
+//               title="Pie Chart"
+//               to="/admin/pie"
+//               icon={<PieChartOutlineOutlinedIcon />}
+//               selected={selected}
+//               setSelected={setSelected}
+//             />
+//             <Item
+//               title="Line Chart"
+//               to="/admin/line"
+//               icon={<TimelineOutlinedIcon />}
+//               selected={selected}
+//               setSelected={setSelected}
+//             /> */}
+// {/* <Item
+//               title="Geography Chart"
+//               to="/admin/geography"
+//               icon={<MapOutlinedIcon />}
+//               selected={selected}
+//               setSelected={setSelected}
+//             /> */}
+// <Typography
+//               variant="h6"
+// color = { colors.grey[300] }
+// sx = {{ m: "15px 0 5px 20px" }}
+//             >
+//     Pages
+//     </Typography>
+
+//     < Item
+// title = "Đội Ngũ"
+// to = "/admin/team"
+// icon = {< PeopleOutlinedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     <Item
+//               title="Tài khoản Admin"
+// to = "/admin/form"
+// icon = {< PersonOutlinedIcon />}
+// selected = { selected }
+// setSelected = { setSelected }
+//     />
+
+//     </Box>
+//     </Menu>
+//     </ProSidebar>
+//     </Box>
+
+//   );
+// };
+
+// export default Sidebar;
+// + file Topbar.jsx có < IconButton >
+//     <LogoutIcon />
+//     < /IconButton> Tôi muốn bạn code chức năng đăng suất cho nó và sau khi đăng suất thì sẽ quay về trang /Loginadmin.
+//         Có < IconButton >
+//     <SettingsOutlinedIcon />
+//     </IconButton> Tôi muốn bạn code riêng một trang cho phần setting (Ở trang này hiển thôi tin tài khoản  admin đang đăng nhập. Hiển thị avatar, tên, địa chỉ,...và avatar có thể thay đổi từ hình trong máy up lên):
+// import { Box, IconButton, useTheme, Typography } from "@mui/material";
+// import { useContext } from "react";
+// import { ColorModeContext, tokens } from "../../theme";
+// import InputBase from "@mui/material/InputBase";
+// import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+// import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+// import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+// import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+// import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+// import SearchIcon from "@mui/icons-material/Search";
+// import LogoutIcon from '@mui/icons-material/Logout';
+// import { useState, useEffect } from "react";
+
+// const Topbar = () => {
+//     const theme = useTheme();
+//     const colors = tokens(theme.palette.mode);
+//     const colorMode = useContext(ColorModeContext);
+//     const [currentTime, setCurrentTime] = useState("");
+//     const updateTime = () => {
+//         const today = new Date();
+//         const weekday = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+//         const day = weekday[today.getDay()];
+//         const dd = String(today.getDate()).padStart(2, "0");
+//         const mm = String(today.getMonth() + 1).padStart(2, "0");
+//         const yyyy = today.getFullYear();
+//         const h = String(today.getHours()).padStart(2, "0");
+//         const m = String(today.getMinutes()).padStart(2, "0");
+//         const s = String(today.getSeconds()).padStart(2, "0");
+//         const nowTime = `${h} giờ ${m} phút ${s} giây`;
+//         const todayDate = `${day}, ${dd}/${mm}/${yyyy}`;
+//         setCurrentTime(`${todayDate} - ${nowTime}`);
+//     };
+//     useEffect(() => {
+//         const timer = setInterval(updateTime, 1000);
+//         return () => clearInterval(timer); // Cleanup the timer on component unmount
+//     }, []);
+
+//     return (
+//         <Box display= "flex" justifyContent = "space-between" p = { 2} >
+//             <Box
+//         display="flex"
+//     backgroundColor = { colors.primary[400] }
+//     borderRadius = "3px"
+//         >
+//         <InputBase sx={ { ml: 2, flex: 1 } } placeholder = "Search" />
+//             </Box>
+//     {/* DATE TIME */ }
+//     <Box
+//         display="flex"
+//     justifyContent = "flex-end"
+//     mt = { 1}
+//         >
+//         <Typography variant="h5" color = { colors.grey[100] } >
+//             { currentTime }
+//             </Typography>
+//             </Box>
+
+//     {/* ICONS */ }
+//     <Box display="flex" >
+//         <IconButton>
+//         <SettingsOutlinedIcon />
+//         </IconButton>
+//         < IconButton >
+//         <LogoutIcon />
+//         </IconButton>
+//         </Box>
+//         </Box>
+//   );
+// };
+
+// export default Topbar;
+
+// - file category.jsx đây là trang quản lý danh mục tour.Ở đây tôi muốn lấy dữ liệu từ api(file category.controller.js).tôi muốn hoàn thiện các chức năng thêm, sửa, xoá, trạng thái hoạt đông hoặc tạm ngưng, thêm phần tìm kiếm danh mục tour và danh sách các danh mục toủ sẽ hiển thị trong bảng:
+// import React, { useState } from "react";
+// import {
+//     Box,
+//     Button,
+//     IconButton,
+//     Dialog,
+//     DialogActions,
+//     DialogContent,
+//     DialogTitle,
+//     TextField,
+// } from "@mui/material";
+// import { DataGrid, GridToolbar } from "@mui/x-data-grid";
+// import { useTheme } from "@mui/material";
+// import { tokens } from "../../theme";
+// import AddIcon from "@mui/icons-material/Add";
+// import EditIcon from "@mui/icons-material/Edit";
+// import DeleteIcon from "@mui/icons-material/Delete";
+
+// const CategoryControl = () => {
+//     const theme = useTheme();
+//     const colors = tokens(theme.palette.mode);
+
+//     // Dữ liệu mẫu
+//     const [categories, setCategories] = useState([
+//         {
+//             id: 1,
+//             title: "Du lịch trong nước",
+//             image: "https://via.placeholder.com/100",
+//             status: "Hoạt động",
+//         },
+//         {
+//             id: 2,
+//             title: "Du lịch nước ngoài",
+//             image: "https://via.placeholder.com/100",
+//             status: "Hoạt động",
+//         },
+//         {
+//             id: 3,
+//             title: "Tour mùa hè",
+//             image: "https://via.placeholder.com/100",
+//             status: "Hoạt động",
+//         },
+//         {
+//             id: 4,
+//             title: "Tour mùa đông",
+//             image: "https://via.placeholder.com/100",
+//             status: "Hoạt động",
+//         },
+//         {
+//             id: 5,
+//             title: "Tour thám hiểm",
+//             image: "https://via.placeholder.com/100",
+//             status: "Hoạt động",
+//         },
+//     ]);
+
+//     // State quản lý modal
+//     const [open, setOpen] = useState(false);
+//     const [newCategory, setNewCategory] = useState({
+//         id: "",
+//         title: "",
+//         image: "",
+//         status: "Hoạt động",
+//     });
+//     // Hàm mở/đóng modal
+//     const handleOpen = () => setOpen(true);
+//     const handleClose = () => setOpen(false);
+
+//     // Hàm xử lý thêm danh mục mới
+//     const handleAdd = () => {
+//         if (!newCategory.title || !newCategory.image) {
+//             alert("Vui lòng điền đầy đủ thông tin!");
+//             return;
+//         }
+//         setCategories([...categories, { ...newCategory, id: categories.length + 1 }]);
+//         setNewCategory({ id: "", title: "", image: "", status: "Hoạt động" });
+//         handleClose();
+//     };
+
+
+//     // Hàm xử lý sửa, xóa
+//     const handleEdit = (id) => {
+//         alert(`Sửa danh mục có ID: ${id}`);
+//     };
+
+//     const handleDelete = (id) => {
+//         if (window.confirm("Bạn có chắc chắn muốn xóa danh mục này?")) {
+//             setCategories(categories.filter((category) => category.id !== id));
+//         }
+//     };
+
+//     // Cấu hình các cột trong DataGrid
+//     const columns = [
+//         { field: "id", headerName: "STT", flex: 0.3 },
+//         {
+//             field: "image",
+//             headerName: "Hình ảnh",
+//             flex: 1,
+//             renderCell: (params) => (
+//                 <img
+//                     src= { params.value }
+//                     alt="Category"
+//                     style={{ width: "100px", borderRadius: "8px" }}
+//                 />
+//             ),
+//         },
+// { field: "title", headerName: "Tiêu đề", flex: 1 },
+// {
+//     field: "status",
+//         headerName: "Trạng thái",
+//             flex: 0.5,
+//                 renderCell: (params) => (
+//                     <Button
+//                     variant= "contained"
+//     size = "small"
+//     sx = {{
+//         backgroundColor: params.value === "Hoạt động" ? "green" : "red",
+//             color: "white",
+//                 fontWeight: "bold",
+//                     }
+// }
+//                 >
+//     { params.value }
+//     </Button>
+//             ),
+//         },
+// {
+//     field: "actions",
+//         headerName: "Hành động",
+//             flex: 1,
+//                 renderCell: (params) => (
+//                     <Box display= "flex" gap = { 1} >
+//                         <Button
+//                         variant="contained"
+//     color = "primary"
+//     size = "small"
+//     onClick = {() => handleEdit(params.row.id)
+// }
+//                     >
+//     Sửa
+//     </Button>
+//     < Button
+// variant = "contained"
+// color = "error"
+// size = "small"
+// onClick = {() => handleDelete(params.row.id)}
+//                     >
+//     Xóa
+//     </Button>
+//     </Box>
+//             ),
+//         },
+//     ];
+
+
+// return (
+//     <Box m= "20px" >
+//     {/* Thanh công cụ */ }
+//     < Box display = "flex" justifyContent = "space-between" mb = { 2} >
+//         <Button
+//                     variant="contained"
+// color = "success"
+// startIcon = {< AddIcon />}
+// onClick = { handleOpen }
+//     >
+//     Thêm mới danh mục tour
+//         </Button>
+//         </Box>
+
+// {/* Bảng dữ liệu */ }
+// <Box
+//                 height="75vh"
+// sx = {{
+//     "& .MuiDataGrid-root": {
+//         border: "none",
+//                     },
+//     "& .MuiDataGrid-cell": {
+//         borderBottom: "none",
+//                     },
+//     "& .MuiDataGrid-columnHeaders": {
+//         backgroundColor: colors.blueAccent[700],
+//             borderBottom: "none",
+//                     },
+//     "& .MuiDataGrid-virtualScroller": {
+//         backgroundColor: colors.primary[400],
+//                     },
+//     "& .MuiDataGrid-footerContainer": {
+//         borderTop: "none",
+//             backgroundColor: colors.blueAccent[700],
+//                     },
+//     "& .MuiCheckbox-root": {
+//         color: `${colors.greenAccent[200]} !important`,
+//                     },
+//     "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
+//         color: `${colors.grey[100]} !important`,
+//                     },
+// }}
+//             >
+//     <DataGrid rows={ categories } columns = { columns } />
+//         </Box>
+// {/* Modal thêm mới */ }
+// <Dialog open={ open } onClose = { handleClose } >
+//     <DialogTitle
+//                     sx={
+//     {
+//         fontWeight: "bold",
+//             fontSize: "1.3rem",
+//                 textAlign: "center",
+//                     }
+// }
+//                 >
+//     Thêm mới danh mục
+//         </DialogTitle>
+//         < DialogContent >
+//         <TextField
+//                         fullWidth
+// margin = "normal"
+// label = "Tiêu đề"
+// value = { newCategory.title }
+// onChange = {(e) =>
+// setNewCategory({ ...newCategory, title: e.target.value })
+//                         }
+//                     />
+//     < TextField
+// fullWidth
+// margin = "normal"
+// label = "Hình ảnh (URL)"
+// value = { newCategory.image }
+// onChange = {(e) =>
+// setNewCategory({ ...newCategory, image: e.target.value })
+//                         }
+//                     />
+//     </DialogContent>
+//     < DialogActions >
+//     <Button
+//                         onClick={ handleClose }
+// color = "error"
+// variant = "contained"
+// sx = {{ fontWeight: "bold" }}
+//                     >
+//     Hủy
+//     </Button>
+//     < Button
+// onClick = { handleAdd }
+// color = "success"
+// variant = "contained"
+// sx = {{ fontWeight: "bold" }}
+//                     >
+//     Thêm mới
+//         </Button>
+//         </DialogActions>
+//         </Dialog>
+//         </Box>
+//     );
+// };
+
+// export default CategoryControl;
+
+// - File Tourcontrol.jsx tôi muốn bạn hoàn thiện giống trang danh mục tour ở trên và file này lấy api từ trang tour.controller.js:
+// const Tour = require("../../models/tour.model");
+// const Category = require("../../models/category.model");
+// const generate = require("../../helper/generate");
+// const paginationHelper = require("../../helper/pagination");
+// const tourHelper = require("../../helper/tours");
+
+// // [GET]/api/v1/admin/tours
+// module.exports.index = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem danh sách tour"
+//         });
+//     } else {
+//         let find = { deleted: false };
+
+//         if (req.query.status) {
+//             find.status = req.query.status;
+//         };
+
+//         const sort = {};
+//         if (req.query.sortKey && req.query.sortValue) {
+//             sort[req.query.sortKey] = req.query.sortValue;
+//         }
+
+//         // pagination
+//         const countRecords = await Tour.countDocuments(find);
+//         let objPagination = paginationHelper(
+//             {
+//                 currentPage: 1,
+//                 limitItems: 5
+//             },
+//             req.query,
+//             countRecords
+//         );
+//         // end pagination
+
+//         const tours = await Tour.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
+//         let toursObject = tours.map(item => item.toObject());
+
+//         toursObject.forEach(item => {
+//             item.price_special = tourHelper.priceNewTour(item);
+//         });
+//         res.json(toursObject);
+//     }
+// };
+
+// // [POST]/api/v1/admin/tours/create
+// module.exports.createPost = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_create")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền tạo mới tour"
+//         });
+//     } else {
+//         try {
+//             const countTour = await Tour.countDocuments();
+//             const code = generate.generateTourCode(countTour + 1);
+
+//             const tour = new Tour({
+//                 title: req.body.title,
+//                 code: code,
+//                 price: parseInt(req.body.price),
+//                 discount: parseInt(req.body.discount),
+//                 stock: parseInt(req.body.stock),
+//                 category_id: req.body.category_id,
+//                 timeStart: req.body.timeStart,
+//                 status: req.body.status,
+//                 images: req.body.images,
+//                 information: req.body.information,
+//                 schedule: req.body.schedule,
+//             });
+//             const data = await tour.save();
+//             res.json({
+//                 code: 200,
+//                 message: "Tạo thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Không tồn tại!" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/change-status/:status/:id
+// module.exports.changeStatus = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa trạng thái tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             const status = req.params.status;
+//             await Tour.updateOne({
+//                 _id: id
+//             }, {
+//                 status: status
+//             });
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật trạng thái thành công"
+//             })
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+
+// // [DELETE]/api/v1/admin/delete/:id
+// module.exports.deleteTour = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_delete")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xóa tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+
+//             await Tour.deleteOne({
+//                 _id: id
+//             });
+
+//             res.json({
+//                 code: 200,
+//                 message: "Xóa tour thành công!"
+//             })
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+
+// // [GET]/api/v1/admin/detail/:id
+// module.exports.detail = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_view")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền xem chi tiết tour"
+//         });
+//     } else {
+//         const id = req.params.id;
+
+//         const tour = await Tour.findOne({
+//             _id: id,
+//             deleted: false,
+//         });
+
+//         const category = await Category.findOne({
+//             _id: tour.category_id,
+//             deleted: false
+//         });
+//         res.json({
+//             tour: tour,
+//             category: category
+//         });
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/edit/:id
+// module.exports.editPatch = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             if (req.body.price) req.body.price = parseInt(req.body.price);
+//             if (req.body.discount) req.body.discount = parseInt(req.body.discount);
+//             if (req.body.stock) req.body.stock = parseInt(req.body.stock);
+//             if (req.body.position) req.body.position = parseInt(req.body.position);
+
+//             const data = await Tour.updateOne({
+//                 _id: id
+//             }, {
+//                 ...req.body
+//             });
+
+
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật tour thành công"
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 404,
+//                 message: "Cập nhật tour thất bại" + error
+//             });
+//         }
+//     }
+// };
+
+// // [PATCH]/api/v1/admin/tours/change-stock/:stock/:id
+// module.exports.stock = async (req, res) => {
+//     const permissions = req.roles.permissions;
+//     if (!permissions.includes("tour_edit")) {
+//         return res.json({
+//             code: 400,
+//             message: "Bạn không có quyền chỉnh sửa trạng thái tour"
+//         });
+//     } else {
+//         try {
+//             const id = req.params.id;
+//             const stock = parseInt(req.params.stock);
+//             const data = await Tour.findOneAndUpdate({
+//                 _id: id
+//             }, {
+//                 stock: stock
+//             }, { new: true });
+//             res.json({
+//                 code: 200,
+//                 message: "Cập nhật số lượng thành công",
+//                 data: data
+//             });
+//         } catch (error) {
+//             res.json({
+//                 code: 500,
+//                 message: "Lỗi! " + error
+//             })
+//         }
+//     }
+// };
+
+// => tôi muốn bạn hoàn hoàn thành các chức năng tôi đề ra ở trên trước khi làm cá trang khác nữa.Nếu có gì thắc mắc thì bạn cứ hỏi tôi!
+
+// file index.js phía backend là:
+// const express = require('express');
+// const database = require("../backend/config/database");
+// require("dotenv").config();
+// const cors = require('cors');
+// const cookieParser = require('cookie-parser')
+// const bodyParser = require('body-parser');
+
+// const routeApiV1 = require("../backend/api/v1/routes/client/index.route");
+// const routeAdminApiV1 = require("./api/v1/routes/admin/index.route");
+
+// const app = express()
+// const port = process.env.PORT || 3000;
+
+// app.use(cors());
+
+// app.use(cookieParser());
+
+// database.connect();
+
+// // parse application/json
+// app.use(bodyParser.json())
+
+// routeApiV1(app);
+// // routeAdminApiV1(app);
+
+// app.listen(port, () => {
+//     console.log(`Example app listening on port ${port}`)
+// })

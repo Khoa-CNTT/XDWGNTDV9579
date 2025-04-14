@@ -37,7 +37,7 @@ module.exports.index = async (req, res) => {
         );
         // end pagination
 
-        const accounts = await Account.find().sort(sort).limit(objPagination.limitItems).skip(objPagination.skip).select("-password");
+        const accounts = await Account.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip).select("-password");
 
         res.json(accounts);
     }
