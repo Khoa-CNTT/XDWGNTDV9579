@@ -1,14 +1,46 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography, Link } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { Box, Button, TextField, Typography, CircularProgress } from "@mui/material";
+import api from "../../utils/api"; // Import instance api từ api.js
+import { useAdminAuth } from "../../context/AdminContext"; // Import useAdminAuth từ AdminAuthContext
 
 const LoginAdmin = () => {
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
+    const { loginAdmin } = useAdminAuth(); // Lấy hàm loginAdmin từ AdminAuthContext
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        console.log("Username:", username);
-        console.log("Password:", password);
+        setError("");
+        setLoading(true);
+
+        try {
+            const response = await api.post("/admin/accounts/login", {
+                email,
+                password,
+            });
+
+            if (response.data.code === 200) {
+                // Chuẩn bị dữ liệu admin
+                const adminData = {
+                    email: email,
+                };
+
+                // Gọi hàm loginAdmin từ AdminAuthContext
+                loginAdmin(adminData, response.data.token);
+
+                // Chuyển hướng được xử lý trong loginAdmin
+            } else {
+                setError(response.data.message || "Đăng nhập thất bại!");
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại!");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -18,7 +50,7 @@ const LoginAdmin = () => {
             justifyContent="center"
             height="100vh"
             sx={{
-                backgroundImage: `url('https://cellphones.com.vn/sforum/wp-content/uploads/2023/10/canh-dep-2.jpg')`, // Hình nền từ URL
+                backgroundImage: `url('https://cellphones.com.vn/sforum/wp-content/uploads/2023/10/canh-dep-2.jpg')`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",
@@ -28,10 +60,9 @@ const LoginAdmin = () => {
                 width="400px"
                 p={4}
                 borderRadius="12px"
-                bgcolor="rgb(255, 255, 255,0.4)"
+                bgcolor="rgba(255, 255, 255, 0.4)"
                 boxShadow="0px 4px 20px rgba(0, 0, 0, 0.2)"
             >
-                {/* Tiêu đề */}
                 <Typography
                     variant="h4"
                     textAlign="center"
@@ -42,21 +73,27 @@ const LoginAdmin = () => {
                     Đăng nhập Admin
                 </Typography>
 
-                {/* Form đăng nhập */}
+                {error && (
+                    <Typography color="error" textAlign="center" mb={2}>
+                        {error}
+                    </Typography>
+                )}
+
                 <form onSubmit={handleLogin}>
                     <TextField
                         fullWidth
                         label="Email"
                         variant="outlined"
                         margin="normal"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         InputLabelProps={{
                             style: { color: "#222222" },
                         }}
                         InputProps={{
                             style: { color: "#222222" },
                         }}
+                        disabled={loading}
                     />
                     <TextField
                         fullWidth
@@ -72,12 +109,8 @@ const LoginAdmin = () => {
                         InputProps={{
                             style: { color: "#222222" },
                         }}
+                        disabled={loading}
                     />
-                    {/* <Box display="flex" justifyContent="space-between" mt={1}>
-                        <Link href="#" underline="hover" sx={{ fontSize: "14px", color: "#555" }}>
-                            Forgot Password?
-                        </Link>
-                    </Box> */}
                     <Button
                         type="submit"
                         fullWidth
@@ -85,18 +118,18 @@ const LoginAdmin = () => {
                         sx={{
                             mt: 3,
                             fontWeight: "bold",
-                            backgroundColor: "#28a745", // Màu xanh lá
+                            backgroundColor: "#28a745",
                             color: "#fff",
                             "&:hover": {
-                                backgroundColor: "#218838", // Màu xanh lá đậm hơn khi hover
+                                backgroundColor: "#218838",
                             },
                         }}
+                        disabled={loading}
                     >
-                        ĐĂNG NHẬP
+                        {loading ? <CircularProgress size={24} color="inherit" /> : "ĐĂNG NHẬP"}
                     </Button>
                 </form>
 
-                {/* Footer */}
                 <Typography
                     variant="body2"
                     textAlign="center"
