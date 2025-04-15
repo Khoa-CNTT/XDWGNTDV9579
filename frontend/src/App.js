@@ -3,7 +3,7 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext"; // Thêm AdminAuthProvider
+import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -51,14 +51,27 @@ import Invoicess from "./pages/Invoices/Invoicess";
 
 // Component con chứa logic chính
 const AppContent = () => {
-  const { user, loading: userLoading } = useAuth(); // AuthContext cho user
-  const { admin, loading: adminLoading } = useAdminAuth(); // AdminAuthContext cho admin
+  const { user, loading: userLoading } = useAuth();
+  const { admin, loading: adminLoading } = useAdminAuth();
   const location = useLocation();
   const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(true);
 
   const isAdminPath = location.pathname.startsWith("/admin");
   const isLoginAdmin = location.pathname === "/loginadmin";
+
+  // Danh sách các route không cần bao bọc Header, Chatbox, Footer
+  const noWrapperRoutes = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ];
+
+  // Kiểm tra xem route hiện tại có cần bao bọc không
+  const shouldWrap = !noWrapperRoutes.some((route) =>
+    location.pathname.startsWith(route)
+  );
 
   if (userLoading || adminLoading) {
     return <div className="loading-spinner">Đang tải...</div>;
@@ -79,20 +92,77 @@ const AppContent = () => {
     return <Navigate to="/" replace />;
   }
 
+  // Các route chung cho Client
+  const clientRoutes = (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/about-us" element={<About />} />
+      <Route path="/contact-us" element={<Contact />} />
+      <Route path="/tours" element={<Tours />} />
+      <Route path="/tour-details" element={<TourDetails />} />
+      <Route
+        path="/booking"
+        element={
+          <PrivateRoute>
+            <Booking />
+          </PrivateRoute>
+        }
+      />
+      <Route path="/destinations" element={<Destinations />} />
+      <Route path="/gallery" element={<PhotoGallery />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPasswordForm />} />
+      <Route
+        path="/cart"
+        element={
+          <PrivateRoute>
+            <CartPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <PrivateRoute>
+            <Profile />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/invoices"
+        element={
+          <PrivateRoute>
+            <Invoicess />
+          </PrivateRoute>
+        }
+      />
+      <Route path="/hotel-services" element={<HotelServices />} />
+      <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
+      <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
+    </Routes>
+  );
+
   return (
     <ColorModeContext.Provider value={colorMode}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {isLoginAdmin ? (
-          // Giao diện đăng nhập Admin
+      {isLoginAdmin ? (
+        // Giao diện đăng nhập Admin
+        // Áp dụng ThemeProvider chỉ cho Admin
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
           <Routes>
             <Route path="/loginadmin" element={<LoginAdmin />} />
           </Routes>
-        ) : isAdminPath ? (
-          // Giao diện Admin
-          <div className="app">
+        </ThemeProvider>
+      ) : isAdminPath ? (
+        // Giao diện Admin
+        // Áp dụng ThemeProvider chỉ cho Admin
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <div className="admin-app">
             <Sidebar isSidebar={isSidebar} />
-            <main className="content">
+            <main className="admin-content">
               <Topbar setIsSidebar={setIsSidebar} />
               <Routes>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
@@ -114,62 +184,21 @@ const AppContent = () => {
               </Routes>
             </main>
           </div>
-        ) : (
-          // Giao diện Client
+        </ThemeProvider>
+      ) : (
+        // Giao diện Client
+        // Không áp dụng ThemeProvider và CssBaseline cho Client
+        shouldWrap ? (
           <>
             <Header />
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/about-us" element={<About />} />
-              <Route path="/contact-us" element={<Contact />} />
-              <Route path="/tours" element={<Tours />} />
-              <Route path="/tour-details" element={<TourDetails />} />
-              <Route
-                path="/booking"
-                element={
-                  <PrivateRoute>
-                    <Booking />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/destinations" element={<Destinations />} />
-              <Route path="/gallery" element={<PhotoGallery />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPasswordForm />} />
-              <Route
-                path="/cart"
-                element={
-                  <PrivateRoute>
-                    <CartPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/invoices"
-                element={
-                  <PrivateRoute>
-                    <Invoicess />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/hotel-services" element={<HotelServices />} />
-              <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
-            </Routes>
+            {clientRoutes}
             <Chatbox />
             <Footer />
           </>
-        )}
-      </ThemeProvider>
+        ) : (
+          clientRoutes
+        )
+      )}
     </ColorModeContext.Provider>
   );
 };
