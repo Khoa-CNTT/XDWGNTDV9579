@@ -17,4 +17,5 @@ module.exports = (app) => {
     app.use(version + PARTH_ADMIN + "/categories", authMiddleware.requireAuth, categoryRoutes);
     app.use(version + PARTH_ADMIN + "/tours", authMiddleware.requireAuth, tourRoutes);
     app.use(version + PARTH_ADMIN + "/users", authMiddleware.requireAuth, userRoutes);
+
 }

@@ -6,8 +6,8 @@ import { useNavigate } from "react-router-dom";
 const Auth_Context = createContext({
   user: null,
   token: null,
-  login: () => {},
-  logout: () => {},
+  login: () => { },
+  logout: () => { },
   loading: false,
 });
 
