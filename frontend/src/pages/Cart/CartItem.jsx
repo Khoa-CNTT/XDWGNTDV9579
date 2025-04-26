@@ -1,33 +1,43 @@
-import React from "react";
-import { Button, Image } from "react-bootstrap";
-import { FaTrash, FaMinus, FaPlus } from "react-icons/fa";
+import React, { useState } from "react";
+import "./cart.css";
 
 const CartItem = ({ item, removeItem, updateQuantity }) => {
+  const [quantity, setQuantity] = useState(item.quantity);
+
+  const handleQuantityChange = (newQuantity) => {
+    if (newQuantity < 1) return;
+    setQuantity(newQuantity);
+    updateQuantity(item.id, newQuantity);
+  };
+
   return (
     <tr>
       <td>
-        {/* Bọc ảnh trong div để kiểm soát kích thước */}
-        <div className="cart-image-container">
-          <Image src={item.image} alt={item.name} className="cart-item-image" rounded />
-        </div>
+        {item.image ? (
+          <img src={item.image} alt={item.name} className="cart-item-image" />
+        ) : (
+          <div className="cart-placeholder">No Image</div>
+        )}
       </td>
       <td>{item.name}</td>
-      <td>{item.price.toLocaleString()}đ</td>
-      <td>{item.discount}%</td>
+      <td>{item.price.toLocaleString()} VNĐ</td>
       <td>
-        <Button variant="outline-secondary" size="sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-          <FaMinus />
-        </Button>
-        <span className="mx-2">{item.quantity}</span>
-        <Button variant="outline-primary" size="sm" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-          <FaPlus />
-        </Button>
+        <div className="quantity-control">
+          <button onClick={() => handleQuantityChange(quantity - 1)}>-</button>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+            min="1"
+          />
+          <button onClick={() => handleQuantityChange(quantity + 1)}>+</button>
+        </div>
       </td>
-      <td>{(item.quantity * (item.price * (1 - item.discount / 100))).toLocaleString()}đ</td>
+      <td>{(item.price * quantity).toLocaleString()} VNĐ</td>
       <td>
-        <Button variant="danger" size="sm" onClick={() => removeItem(item.id)}>
-          <FaTrash /> Xóa
-        </Button>
+        <button className="remove-btn" onClick={removeItem}>
+          <i className="bi bi-trash"></i> Xóa
+        </button>
       </td>
     </tr>
   );

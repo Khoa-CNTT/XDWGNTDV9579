@@ -1,128 +1,444 @@
-/* Header giống trang liên hệ */
-.cart-header {
-    background-color: #f8f9fa;
-    text-align: center;
+/* cart.css */
+
+/* Cart Section */
+.cart-section {
+  padding: 60px 0;
+  background: var(--bgClr);
+  min-height: 100vh;
+}
+
+.cart-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+.cart-container .main_heading {
+  margin-bottom: 30px;
+}
+
+.cart-container .main_heading h1 {
+  font-size: var(--heading);
+  color: var(--black);
+  font-weight: bold;
+  font-family: var(--fontFamily1);
+  text-align: center;
+}
+
+/* Cart Table */
+.cart-table-container {
+  overflow-x: auto;
+}
+
+.cart-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.cart-table thead {
+  background: var(--primaryClr);
+  color: var(--white);
+}
+
+.cart-table th,
+.cart-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.cart-table th {
+  font-size: var(--subTitle);
+  font-weight: 600;
+}
+
+.cart-table td {
+  font-size: var(--bodyText);
+  color: var(--textclr);
+}
+
+.cart-table img {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.cart-table .quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cart-table .quantity-control button {
+  background: var(--primaryClr);
+  color: var(--white);
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  font-size: var(--bodyText);
+  transition: all 0.2s ease-in-out;
+}
+
+.cart-table .quantity-control button:hover {
+  transform: translateY(-3px);
+}
+
+.cart-table .quantity-control span {
+  font-size: var(--bodyText);
+  font-weight: 500;
+}
+
+.cart-table .delete-btn {
+  background: var(--primaryClr);
+  color: var(--white);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: var(--bodyText);
+  transition: all 0.2s ease-in-out;
+}
+
+.cart-table .delete-btn:hover {
+  transform: translateY(-3px);
+  background: #e63924; /* Màu đỏ đậm hơn khi hover */
+}
+
+/* Order Summary */
+.order-summary {
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+  margin-bottom: 20px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.order-summary h3 {
+  font-size: var(--subTitle);
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 20px;
+  font-family: var(--fontFamily1);
+}
+
+.order-summary .summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--bodyText);
+  color: var(--textclr);
+  margin-bottom: 10px;
+}
+
+.order-summary .summary-item span:last-child {
+  color: var(--black);
+  font-weight: 500;
+}
+
+/* Voucher Section */
+.voucher-section {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.voucher-section .form-control {
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  padding: 10px;
+  font-size: var(--bodyText);
+}
+
+.voucher-section .btn {
+  background: var(--primaryClr);
+  padding: 8px 15px;
+  font-size: var(--bodyText);
+  color: var(--white);
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 4px;
+  border: none;
+}
+
+.voucher-section .btn:hover {
+  transform: translateY(-3px);
+}
+
+.voucher-section .spinner-border {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Cart Form */
+.cart-form {
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+  position: sticky;
+  top: 20px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.cart-form h3 {
+  font-size: var(--subTitle);
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 20px;
+  font-family: var(--fontFamily1);
+}
+
+.cart-form .form-label {
+  font-size: var(--bodyText);
+  color: var(--textclr);
+  margin-bottom: 5px;
+}
+
+.cart-form .form-control {
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  padding: 10px;
+  font-size: var(--bodyText);
+  margin-bottom: 10px;
+}
+
+.cart-form .form-control[readonly] {
+  background: #f5f5f5;
+  color: var(--textclr);
+}
+
+.cart-form .btn-primary {
+  background: var(--primaryClr);
+  padding: 8px 15px;
+  font-size: var(--bodyText);
+  color: var(--white);
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 4px;
+  border: none;
+  width: 100%;
+}
+
+.cart-form .btn-primary:hover {
+  transform: translateY(-3px);
+}
+
+.cart-form .cart-summary-details {
+  margin-top: 20px;
+}
+
+.cart-form .cart-summary-details .d-flex {
+  font-size: var(--bodyText);
+  color: var(--textclr);
+  margin-bottom: 10px;
+}
+
+.cart-form .cart-summary-details .d-flex span:last-child {
+  color: var(--black);
+  font-weight: 500;
+}
+
+.cart-form .cart-summary-details .text-success {
+  color: var(--secondaryClr) !important;
+}
+
+.cart-form .cart-summary-details .fw-bold {
+  font-size: var(--bodyText);
+  color: var(--black);
+  border-top: 1px solid #e0e0e0;
+  padding-top: 10px;
+}
+
+/* Payment Return Section */
+.payment-return-section {
+  padding: 60px 0;
+  background: var(--bgClr);
+  min-height: 100vh;
+}
+
+.payment-return-section .card {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  background: var(--white);
+  animation: fadeIn 0.5s ease-in;
+}
+
+.payment-return-section h2 {
+  font-size: var(--heading);
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 20px;
+  font-family: var(--fontFamily1);
+}
+
+.payment-return-section .success {
+  color: var(--primaryClr);
+}
+
+.payment-return-section .error {
+  color: var(--primaryClr);
+}
+
+.payment-return-section p {
+  font-size: var(--bodyText);
+  color: var(--textclr);
+  margin-bottom: 25px;
+}
+
+.payment-return-section .btn {
+  padding: 8px 15px;
+  font-size: var(--bodyText);
+  border-radius: 4px;
+  margin: 0 10px;
+  transition: all 0.2s ease-in-out;
+}
+
+.payment-return-section .btn-primary {
+  background: var(--primaryClr);
+  color: var(--white);
+  border: none;
+}
+
+.payment-return-section .btn-primary:hover {
+  transform: translateY(-3px);
+}
+
+.payment-return-section .btn-success {
+  background: var(--primaryClr);
+  color: var(--white);
+  border: none;
+}
+
+.payment-return-section .btn-success:hover {
+  transform: translateY(-3px);
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .cart-section {
     padding: 40px 0;
   }
-  
-  .cart-header h1 {
-    font-size: 2rem;
-    font-weight: bold;
-  }
-  
-  .cart-header p {
-    font-size: 1.1rem;
-    color: #6c757d;
-  }
-  
-  /* Tổng thể */
-  .cart-container {
-    width: 80%;
-    margin: 20px auto;
-    text-align: center;
-  }
-  
-  /* Bảng giỏ hàng */
-  .cart-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 30px;
-  }
-  
-  .cart-table th, .cart-table td {
-    border: 1px solid #ddd;
+
+  .cart-table th,
+  .cart-table td {
     padding: 10px;
   }
-  
-  .cart-table th {
-    background: #f5f5f5;
+
+  .cart-table img {
+    width: 60px;
+    height: 40px;
   }
-  
-  .cart-table-container {
-    max-height: 400px;
-    overflow-y: auto;
+
+  .order-summary {
+    padding: 20px;
+    margin-bottom: 15px;
   }
-  
-  /* Ảnh sản phẩm */
-  .cart-item-image {
-    width: 80px; /* 👈 Đặt kích thước cố định */
-    height: 80px;
-    object-fit: cover; /* 👈 Đảm bảo ảnh không bị méo */
-    border-radius: 5px; /* 👈 Bo góc nhẹ */
-    display: block;
-    margin: auto;
+
+  .order-summary h3 {
+    font-size: var(--bodyText);
   }
-  
-  .cart-placeholder {
-    width: 80px;
-    height: 80px;
-    background: #ddd;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-  }
-  
-  /* Nút bấm */
-  button {
-    cursor: pointer;
-    padding: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    transition: 0.3s;
-  }
-  
-  button:hover {
-    opacity: 0.8;
-  }
-  
-  .remove-btn {
-    background: red;
-    color: white;
-  }
-  
-  .remove-btn:hover {
-    background-color: darkred;
-  }
-  
-  /* Form khách hàng */
-  .cart-form {
-    width: 100%;
-    margin: 0 auto;
-    display: flex;
+
+  .voucher-section {
     flex-direction: column;
     gap: 10px;
-    background: #fff;
-    padding: 15px;
-    border-radius: 10px;
-    align-items: center; 
-    text-align: center; 
-}
+  }
 
-.cart-form input, 
-.cart-form textarea {
+  .voucher-section .form-control,
+  .voucher-section .btn {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+  }
+
+  .cart-form {
+    padding: 20px;
+    position: static;
+    margin-top: 20px;
+  }
+
+  .cart-form h3 {
+    font-size: var(--bodyText);
+  }
+
+  .cart-form .btn-primary {
+    font-size: var(--smallText);
+    padding: 8px;
+  }
+
+  .payment-return-section {
+    padding: 40px 0;
+  }
+
+  .payment-return-section .card {
+    padding: 20px;
+  }
+
+  .payment-return-section h2 {
+    font-size: var(--subTitle);
+  }
+
+  .payment-return-section .btn {
+    width: 100%;
+    margin: 5px 0;
+    font-size: var(--smallText);
+    padding: 8px;
+  }
 }
 
-.cart-form .cart-submit-btn {
-    background: #28a745;
-    color: white;
-    padding: 12px;
-    font-size: 16px;
-    width: 50%; 
-    text-align: center; 
-    display: flex;
-    justify-content: center; 
-    align-items: center; 
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
-}
+@media (max-width: 600px) {
+  .cart-table th,
+  .cart-table td {
+    font-size: var(--smallText);
+  }
 
-.cart-form .cart-submit-btn:hover {
-    background: #218838;
+  .cart-table img {
+    width: 50px;
+    height: 30px;
+  }
+
+  .order-summary .summary-item {
+    font-size: var(--smallText);
+  }
+
+  .voucher-section .form-control,
+  .voucher-section .btn {
+    font-size: var(--smallText);
+    padding: 8px;
+  }
+
+  .cart-form .form-control {
+    font-size: var(--smallText);
+    padding: 8px;
+  }
+
+  .cart-form .btn-primary {
+    font-size: var(--smallText);
+    padding: 8px;
+  }
 }

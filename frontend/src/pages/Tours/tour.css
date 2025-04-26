@@ -1,129 +1,129 @@
-@import "~react-image-gallery/styles/css/image-gallery.css";
+/* tour.css */
 
-.filter_box{
-    padding: 20px 30px 30px;
-    border: 1px solid #e7e6e6;
-}
-
-.filter_box .accordion-item{
-    border-bottom: 1px solid #e7e6e6 !important ;
-}
-.filter_box .accordion:last-child .accordion-item{
-    border: none !important;
-    
-}
-.filter_box .accordion-item,
-.filter_box .accordion-item button
-{
-    background: none;
-    border: none;
-    border-radius: 0;
+/* Header */
+.tour-header {
+  background-color: #f8f9fa;
+  text-align: center;
+  padding: 40px 0;
+  width: 100%;
 }
 
-.filter_box .accordion-item button {
-    border: none !important;
-    font-size: 16px;
-    font-weight: 600;
-    padding: 16px 0px;
-    box-shadow: none !important;
+.tour-header h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--black);
+  margin-bottom: 10px;
 }
 
-.filter_box .accordion-item button:focus{
-    border: none;
-    outline: none;
-    box-shadow: none;
+.tour-header p {
+  font-size: 1.1rem;
+  color: #6c757d;
 }
 
-.filter_box .accordion-item  .accordion-body{
-    padding: 0;
-    margin-bottom: 15px;
+/* Tổng thể */
+.tour-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 0 15px;
 }
 
-.filter_box .accordion-item  .accordion-body .form-check {
-    margin-bottom: 10px;
-}
-.filter_box .accordion-item  .accordion-body .form-check-input {
-    width: 1.2em;
-    height: 1.2em;
-}
-.filter_box .accordion-item  .accordion-body .form-check-label {
-    margin-left: 8px;
-    margin-top: 5px;
+/* Tour card */
+.tour-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease;
+  animation: fadeIn 0.5s ease-in;
 }
 
-.filters {
-    position: sticky;
-    top:55px
+.tour-card:hover {
+  transform: translateY(-5px);
 }
 
-
-/* tour detail */
-.tour_details .image-gallery-thumbnail{
-    width: 12.3%;
+.tour-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
 }
 
-.tour_details .image-gallery-thumbnail:hover,
-.tour_details .image-gallery-thumbnail.active {
-    border-color: var(--primaryClr);
+.tour-card-body {
+  padding: 15px;
 }
 
-.tour_details .nav_bars {
-    background-color: #f14b361a;
-    padding: 8px;
+.tour-card-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 10px;
 }
 
-.tour_details .nav_bars  .nav-link {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 10px 0px ;
-    color:black
+.tour-card-price {
+  font-size: 1.1rem;
+  color: var(--primaryClr);
+  margin-bottom: 10px;
 }
 
-.tour_details .nav_bars .nav-item {
-    flex-basis: 0;
-    flex-grow: 1;
-    text-align: center;
+.tour-card-description {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  margin-bottom: 15px;
 }
 
-.tour_details .nav-pills .nav-link.active, .tour_details .nav-pills .show>.nav-link{
-    color: white;
-    background-color: var(--primaryClr);
-}
-
-.tour_details  .list-group-item  {
-  padding: 16px 0px;
+.tour-card-btn {
+  background: var(--primaryClr);
+  color: #fff;
+  padding: 10px 20px;
   border: none;
-  font-size: var(--bodyText);
-  background:unset;
-  line-height: 24px;
-  border-bottom: 1px solid gainsboro;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.tour_details  .list-group-item strong {
-    font-weight: bold;
+.tour-card-btn:hover {
+  background: #2980b9;
 }
 
-.tour_details .accordion, 
-.tour_details .accordion-item{
-    border: none;
-}
-.tour_details .accordion-header button {
-    background: #f5f5f6;
-    border: none;
-    border-radius: 8px;
-}
-
-.tour_details .accordion-header button:focus{
-    border: none;
-    outline: none;
-    box-shadow: none !important;
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.tour_details .card-info{
-    background: #f5f5f6;
-    border: none;
+/* Responsive */
+@media (max-width: 768px) {
+  .tour-container {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  .tour-card img {
+    height: 150px;
+  }
+
+  .tour-card-title {
+    font-size: 1.1rem;
+  }
+
+  .tour-card-price {
+    font-size: 1rem;
+  }
 }
 
-.tour_details .card-info i {
-    color: var(--primaryClr);
+@media (max-width: 576px) {
+  .tour-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .tour-header p {
+    font-size: 1rem;
+  }
 }

@@ -1,4 +1,3 @@
-// src/pages/HotelDetails/HotelDetails.jsx
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
@@ -19,7 +18,7 @@ import {
 } from "react-bootstrap";
 import ImageGallery from "react-image-gallery";
 import { useAuth } from "../../context/AuthContext";
-import "./hotel.css"; // Import CSS mới
+import "./hotel.css";
 
 const HotelDetails = () => {
   const { hotelId } = useParams();
@@ -74,7 +73,6 @@ const HotelDetails = () => {
     }
 
     try {
-      const cartId = localStorage.getItem("cartId") || (await createCart())._id;
       const response = await api.post(`/carts/add/${hotelId}/${roomId}`, {
         quantity,
         checkIn,
@@ -82,17 +80,22 @@ const HotelDetails = () => {
       });
       if (response.data.code === 200) {
         toast.success("Đã thêm phòng vào giỏ hàng!");
-        localStorage.setItem("cartId", cartId);
+        // Cập nhật số lượng giỏ hàng trong Header (có thể dispatch một event hoặc dùng context)
+        const cartResponse = await api.get("/checkout");
+        const cart = cartResponse.data;
+        const tourQuantity = cart.tours.reduce((total, item) => total + item.quantity, 0);
+        const roomQuantity = cart.hotels.reduce(
+          (total, hotel) => total + hotel.rooms.reduce((sum, room) => sum + room.quantity, 0),
+          0
+        );
+        window.dispatchEvent(
+          new CustomEvent("cartUpdate", { detail: { cartCount: tourQuantity + roomQuantity } })
+        );
       }
     } catch (error) {
       console.error("Lỗi khi thêm phòng vào giỏ hàng:", error);
       toast.error(error.response?.data?.message || "Không thể thêm vào giỏ hàng!");
     }
-  };
-
-  const createCart = async () => {
-    const response = await api.post("/carts/create", { user_id: user._id });
-    return response.data.data;
   };
 
   return (

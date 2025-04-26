@@ -157,7 +157,7 @@ const Home = () => {
           <Row>
             <Col md="12">
               <div className="main_heading">
-                <h1>Thư viện ảnh </h1>
+                <h1>Trang chủ </h1>
               </div>
             </Col>
           </Row>

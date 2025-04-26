@@ -4,6 +4,7 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
+import { CartProvider } from "./context/CartContext";
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -42,14 +43,15 @@ import Register from "./pages/auth/Register/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword/ForgotPassword";
 import ResetPasswordForm from "./pages/auth/ForgotPassword/ResetPasswordForm";
 import CartPage from "./pages/Cart/CartPage";
+import PaymentReturn from "./pages/Cart/PaymentReturn";
 import Chatbox from "./components/Chatbox/ChatBox";
 import PrivateRoute from "./components/Common/PrivateRoute";
 import HotelServices from "./pages/HotelService/HotelServices";
 import HotelDetails from "./pages/HotelService/HotelDetails";
 import Profile from "./pages/Profile/Profile";
 import Invoicess from "./pages/Invoices/Invoicess";
+import Categories from "./pages/Categories/Categories"; // Thêm import cho Categories
 
-// Component con chứa logic chính
 const AppContent = () => {
   const { user, loading: userLoading } = useAuth();
   const { admin, loading: adminLoading } = useAdminAuth();
@@ -60,7 +62,6 @@ const AppContent = () => {
   const isAdminPath = location.pathname.startsWith("/admin");
   const isLoginAdmin = location.pathname === "/loginadmin";
 
-  // Danh sách các route không cần bao bọc Header, Chatbox, Footer
   const noWrapperRoutes = [
     "/login",
     "/register",
@@ -68,7 +69,6 @@ const AppContent = () => {
     "/reset-password",
   ];
 
-  // Kiểm tra xem route hiện tại có cần bao bọc không
   const shouldWrap = !noWrapperRoutes.some((route) =>
     location.pathname.startsWith(route)
   );
@@ -77,29 +77,26 @@ const AppContent = () => {
     return <div className="loading-spinner">Đang tải...</div>;
   }
 
-  // Chuyển hướng từ /admin/* về /loginadmin nếu chưa đăng nhập admin
   if (isAdminPath && !admin && !isLoginAdmin) {
     return <Navigate to="/loginadmin" replace />;
   }
 
-  // Chuyển hướng từ /loginadmin về /admin/dashboard nếu đã đăng nhập admin
   if (isLoginAdmin && admin) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // Chuyển hướng từ /admin/* về / nếu người dùng không phải admin
   if (isAdminPath && user && user.role !== "admin" && !admin) {
     return <Navigate to="/" replace />;
   }
 
-  // Các route chung cho Client
   const clientRoutes = (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/about-us" element={<About />} />
       <Route path="/contact-us" element={<Contact />} />
       <Route path="/tours" element={<Tours />} />
-      <Route path="/tour-details" element={<TourDetails />} />
+      <Route path="/tours/category/:slugCategory" element={<Tours />} />
+      <Route path="/tour-details/:slugTour" element={<TourDetails />} />
       <Route
         path="/booking"
         element={
@@ -122,6 +119,7 @@ const AppContent = () => {
           </PrivateRoute>
         }
       />
+      <Route path="/payment/return" element={<PaymentReturn />} />
       <Route
         path="/profile"
         element={
@@ -140,6 +138,7 @@ const AppContent = () => {
       />
       <Route path="/hotel-services" element={<HotelServices />} />
       <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
+      <Route path="/categories" element={<Categories />} /> {/* Thêm route cho Categories */}
       <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
     </Routes>
   );
@@ -147,8 +146,6 @@ const AppContent = () => {
   return (
     <ColorModeContext.Provider value={colorMode}>
       {isLoginAdmin ? (
-        // Giao diện đăng nhập Admin
-        // Áp dụng ThemeProvider chỉ cho Admin
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <Routes>
@@ -156,8 +153,6 @@ const AppContent = () => {
           </Routes>
         </ThemeProvider>
       ) : isAdminPath ? (
-        // Giao diện Admin
-        // Áp dụng ThemeProvider chỉ cho Admin
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <div className="admin-app">
@@ -186,8 +181,6 @@ const AppContent = () => {
           </div>
         </ThemeProvider>
       ) : (
-        // Giao diện Client
-        // Không áp dụng ThemeProvider và CssBaseline cho Client
         shouldWrap ? (
           <>
             <Header />
@@ -203,12 +196,13 @@ const AppContent = () => {
   );
 };
 
-// Component chính bao bọc toàn bộ ứng dụng trong AuthProvider và AdminAuthProvider
 function App() {
   return (
     <AuthProvider>
       <AdminAuthProvider>
-        <AppContent />
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
       </AdminAuthProvider>
     </AuthProvider>
   );
