@@ -1,6 +1,6 @@
 const Tour = require("../../models/tour.model");
 const Category = require("../../models/category.model");
-const generate = require("../../helper/generate");
+const generate = require("../../helpers/generate");
 const paginationHelper = require("../../helper/pagination");
 const tourHelper = require("../../helper/tours");
 
