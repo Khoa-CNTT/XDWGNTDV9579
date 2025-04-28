@@ -5,6 +5,7 @@ const hotelRoutes = require("./hotel.route");
 const categoryRoutes = require("./category.route");
 const tourRoutes = require("./tour.route");
 const userRoutes = require("./user.route");
+const settingsRoutes = require("./settings.route");
 
 const authMiddleware = require("../../middlewares/admin/auth.middleware");
 
@@ -17,5 +18,5 @@ module.exports = (app) => {
     app.use(version + PARTH_ADMIN + "/categories", authMiddleware.requireAuth, categoryRoutes);
     app.use(version + PARTH_ADMIN + "/tours", authMiddleware.requireAuth, tourRoutes);
     app.use(version + PARTH_ADMIN + "/users", authMiddleware.requireAuth, userRoutes);
-
+    app.use(version + PARTH_ADMIN + "/settings", authMiddleware.requireAuth, settingsRoutes);
 }

@@ -8,8 +8,7 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import TrafficIcon from "@mui/icons-material/Traffic";
 import Header from "../../components/Scenes/Header";
 import LineChart from "../../components/Scenes/LineChart";
-import GeographyChart from "../../components/Scenes/GeographyChart";
-import BarChart from "../../components/Scenes/BarChart";
+import BarChart from "../bar";
 import StatBox from "../../components/Scenes/StatBox";
 import ProgressCircle from "../../components/Scenes/ProgressCircle";
 
@@ -265,16 +264,7 @@ const Dashboard = () => {
           backgroundColor={colors.primary[400]}
           padding="30px"
         >
-          <Typography
-            variant="h5"
-            fontWeight="600"
-            sx={{ marginBottom: "15px" }}
-          >
-            Geography Based Traffic
-          </Typography>
-          <Box height="200px">
-            <GeographyChart isDashboard={true} />
-          </Box>
+          
         </Box>
       </Box>
     </Box>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
 import { CartProvider } from "./context/CartContext";
 
@@ -11,20 +11,22 @@ import Topbar from "./Admin/global/Topbar";
 import Sidebar from "./Admin/global/Sidebar";
 import Dashboard from "./Admin/dashboard";
 import Team from "./Admin/team";
-import Invoices from "./Admin/invoices";
+import InvoicesAdmin from "./Admin/invoices";
 import Contacts from "./Admin/contacts";
-import Bar from "./Admin/bar";
+import Bar from "./Admin/bar/index";
 import Form from "./Admin/form";
 import Line from "./Admin/line";
 import Pie from "./Admin/pie";
-import FAQ from "./Admin/faq";
-import Geography from "./Admin/geography";
 import TourControl from "./Admin/TourControl";
 import LoginAdmin from "./Admin/Loginadmin";
 import Category from "./Admin/category";
 import Voucher from "./Admin/voucher";
 import Rightsgroup from "./Admin/rightsgroup";
 import Delegation from "./Admin/delegation";
+import Setting from "./Admin/Setting";
+import Hotel from "./Admin/Hotel/hotel";
+import QLHotel from "./Admin/Hotel/RoomManagement";
+import Review from "./Admin/Review/review";
 
 // Client Components
 import "./App.css";
@@ -50,17 +52,13 @@ import HotelServices from "./pages/HotelService/HotelServices";
 import HotelDetails from "./pages/HotelService/HotelDetails";
 import Profile from "./pages/Profile/Profile";
 import Invoicess from "./pages/Invoices/Invoicess";
-import Categories from "./pages/Categories/Categories"; // Thêm import cho Categories
+import Categories from "./pages/Categories/Categories";
 
 const AppContent = () => {
-  const { user, loading: userLoading } = useAuth();
-  const { admin, loading: adminLoading } = useAdminAuth();
-  const location = useLocation();
   const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(true);
-
-  const isAdminPath = location.pathname.startsWith("/admin");
-  const isLoginAdmin = location.pathname === "/loginadmin";
+  const location = useLocation();
+  const { admin, loading: adminLoading } = useAdminAuth();
 
   const noWrapperRoutes = [
     "/login",
@@ -73,20 +71,20 @@ const AppContent = () => {
     location.pathname.startsWith(route)
   );
 
-  if (userLoading || adminLoading) {
+  const isAdminPath = location.pathname.startsWith("/admin");
+  const isLoginAdmin = location.pathname === "/loginadmin";
+  const isAuthenticated = !!admin;
+
+  if (adminLoading) {
     return <div className="loading-spinner">Đang tải...</div>;
   }
 
-  if (isAdminPath && !admin && !isLoginAdmin) {
+  if (isAdminPath && !isAuthenticated && !isLoginAdmin) {
     return <Navigate to="/loginadmin" replace />;
   }
 
-  if (isLoginAdmin && admin) {
+  if (isLoginAdmin && isAuthenticated) {
     return <Navigate to="/admin/dashboard" replace />;
-  }
-
-  if (isAdminPath && user && user.role !== "admin" && !admin) {
-    return <Navigate to="/" replace />;
   }
 
   const clientRoutes = (
@@ -138,73 +136,72 @@ const AppContent = () => {
       />
       <Route path="/hotel-services" element={<HotelServices />} />
       <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
-      <Route path="/categories" element={<Categories />} /> {/* Thêm route cho Categories */}
+      <Route path="/categories" element={<Categories />} />
       <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
     </Routes>
   );
 
   return (
     <ColorModeContext.Provider value={colorMode}>
-      {isLoginAdmin ? (
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {isLoginAdmin ? (
           <Routes>
             <Route path="/loginadmin" element={<LoginAdmin />} />
           </Routes>
-        </ThemeProvider>
-      ) : isAdminPath ? (
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <div className="admin-app">
+        ) : isAdminPath ? (
+          <div className="app">
             <Sidebar isSidebar={isSidebar} />
-            <main className="admin-content">
+            <main className="content">
               <Topbar setIsSidebar={setIsSidebar} />
               <Routes>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
                 <Route path="/admin/team" element={<Team />} />
                 <Route path="/admin/contacts" element={<Contacts />} />
-                <Route path="/admin/invoices" element={<Invoices />} />
+                <Route path="/admin/invoices" element={<InvoicesAdmin />} />
                 <Route path="/admin/form" element={<Form />} />
                 <Route path="/admin/bar" element={<Bar />} />
                 <Route path="/admin/pie" element={<Pie />} />
                 <Route path="/admin/line" element={<Line />} />
-                <Route path="/admin/faq" element={<FAQ />} />
                 <Route path="/admin/tourcontrol" element={<TourControl />} />
                 <Route path="/admin/category" element={<Category />} />
                 <Route path="/admin/voucher" element={<Voucher />} />
                 <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
                 <Route path="/admin/delegation" element={<Delegation />} />
-                <Route path="/admin/geography" element={<Geography />} />
+                <Route path="/admin/settings" element={<Setting />} />
+                <Route path="/admin/hotel" element={<Hotel />} />
+                <Route path="/admin/qlhotel" element={<QLHotel />} />
+                <Route path="/admin/review" element={<Review />} />
                 <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
               </Routes>
             </main>
           </div>
-        </ThemeProvider>
-      ) : (
-        shouldWrap ? (
-          <>
-            <Header />
-            {clientRoutes}
-            <Chatbox />
-            <Footer />
-          </>
         ) : (
-          clientRoutes
-        )
-      )}
+          shouldWrap ? (
+            <AuthProvider>
+              <Header />
+              {clientRoutes}
+              <Chatbox />
+              <Footer />
+            </AuthProvider>
+          ) : (
+            <AuthProvider>
+              {clientRoutes}
+            </AuthProvider>
+          )
+        )}
+      </ThemeProvider>
     </ColorModeContext.Provider>
   );
 };
 
 function App() {
   return (
-    <AuthProvider>
-      <AdminAuthProvider>
-        <CartProvider>
-          <AppContent />
-        </CartProvider>
-      </AdminAuthProvider>
-    </AuthProvider>
+    <AdminAuthProvider>
+      <CartProvider>
+        <AppContent />
+      </CartProvider>
+    </AdminAuthProvider>
   );
 }
 
