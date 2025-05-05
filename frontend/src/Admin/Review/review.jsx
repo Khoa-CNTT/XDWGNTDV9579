@@ -6,7 +6,8 @@ import { tokens } from "../../theme";
 import Header from "../../components/Scenes/Header";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { getHotelReviews, getRoomReviews, deleteReview, getHotels } from "./reviewApi";
+import { getHotelReviews, getHotels, deleteReview } from "./reviewApi";
+import { getContactDetail } from "../contacts/ContactsApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -24,6 +25,7 @@ const Reviews = () => {
     const [allReviews, setAllReviews] = useState([]);
     const [searchText, setSearchText] = useState("");
     const [loading, setLoading] = useState(false);
+    const [userCache, setUserCache] = useState({});
     const [paginationModel, setPaginationModel] = useState({
         page: 0,
         pageSize: 5,
@@ -40,7 +42,6 @@ const Reviews = () => {
                 if (response.data.length === 0) {
                     toast.info("Không có khách sạn nào để hiển thị!", { position: "top-right" });
                 } else {
-                    // Chọn khách sạn đầu tiên mặc định
                     setSelectedHotel(response.data[0]);
                 }
             } else {
@@ -61,7 +62,45 @@ const Reviews = () => {
         }
     };
 
-    // Lấy danh sách đánh giá
+    // Lấy tổng số đánh giá
+    const fetchTotalReviews = async (hotelId) => {
+        try {
+            const response = await getHotelReviews(hotelId, {
+                page: 1,
+                limit: 9999,
+                sortKey: "createdAt",
+                sortValue: "desc",
+            }, adminToken);
+            return Array.isArray(response) ? response.length : 0;
+        } catch (err) {
+            console.error("Error fetching total reviews:", err);
+            return 0;
+        }
+    };
+
+    // Lấy thông tin người dùng dựa trên user_id
+    const fetchUserDetails = async (userId) => {
+        if (userCache[userId]) {
+            return userCache[userId];
+        }
+        try {
+            const response = await getContactDetail(userId, adminToken);
+            if (response.code === 200 && response.data) {
+                const userData = {
+                    username: response.data.username || response.data.fullName || "N/A",
+                    email: response.data.email || "N/A",
+                };
+                setUserCache((prev) => ({ ...prev, [userId]: userData }));
+                return userData;
+            }
+            return { username: "N/A", email: "N/A" };
+        } catch (err) {
+            console.error(`Error fetching user ${userId}:`, err);
+            return { username: "N/A", email: "N/A" };
+        }
+    };
+
+    // Lấy danh sách đánh giá và thông tin người dùng
     const fetchReviews = async (hotelId) => {
         if (!hotelId) return;
         setLoading(true);
@@ -72,15 +111,26 @@ const Reviews = () => {
                 sortKey: "createdAt",
                 sortValue: "desc",
             }, adminToken);
-            if (response.code === 200 && Array.isArray(response.data)) {
-                setAllReviews(response.data);
-                setReviews(response.data);
-                setRowCount(response.total || response.data.length);
-                if (response.data.length === 0) {
+            if (Array.isArray(response)) {
+                setAllReviews(response);
+                const reviewsWithUsers = await Promise.all(
+                    response.map(async (review, index) => {
+                        const userData = await fetchUserDetails(review.user_id);
+                        return {
+                            ...review,
+                            userData,
+                            stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                        };
+                    })
+                );
+                setReviews(reviewsWithUsers);
+                const total = await fetchTotalReviews(hotelId);
+                setRowCount(total);
+                if (response.length === 0) {
                     toast.info("Không có đánh giá nào để hiển thị!", { position: "top-right" });
                 }
             } else {
-                toast.error(response.message || "Không thể tải danh sách đánh giá!", { position: "top-right" });
+                toast.error("Dữ liệu đánh giá không hợp lệ!", { position: "top-right" });
                 setReviews([]);
                 setAllReviews([]);
                 setRowCount(0);
@@ -113,29 +163,39 @@ const Reviews = () => {
         }
     }, [adminToken, navigate]);
 
-    // Tự động lấy đánh giá của khách sạn đầu tiên khi selectedHotel thay đổi
     useEffect(() => {
         if (selectedHotel?._id) {
             fetchReviews(selectedHotel._id);
         }
     }, [selectedHotel, paginationModel]);
 
-    // Xử lý tìm kiếm ở frontend
     useEffect(() => {
         const filteredReviews = allReviews.filter((review) =>
             review.comment?.toLowerCase().includes(searchText.toLowerCase())
         );
-        setReviews(filteredReviews);
+        const updateFilteredReviews = async () => {
+            const reviewsWithUsers = await Promise.all(
+                filteredReviews.map(async (review, index) => {
+                    const userData = await fetchUserDetails(review.user_id);
+                    return {
+                        ...review,
+                        userData,
+                        stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                    };
+                })
+            );
+            setReviews(reviewsWithUsers);
+        };
+        updateFilteredReviews();
     }, [searchText, allReviews]);
 
-    // Xử lý thay đổi khách sạn
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
         const hotel = hotels.find((h) => h._id === hotelId) || null;
         setSelectedHotel(hotel);
+        setPaginationModel({ ...paginationModel, page: 0 });
     };
 
-    // Xử lý xóa đánh giá
     const handleDelete = async (reviewId) => {
         if (window.confirm("Bạn có chắc muốn xóa đánh giá này?")) {
             try {
@@ -154,7 +214,6 @@ const Reviews = () => {
         }
     };
 
-    // Xử lý tìm kiếm thủ công
     const handleSearch = (e) => {
         e.preventDefault();
         const filteredReviews = allReviews.filter((review) =>
@@ -163,13 +222,24 @@ const Reviews = () => {
         setReviews(filteredReviews);
     };
 
-    // Cột của DataGrid
     const columns = [
+        {
+            field: "stt",
+            headerName: "STT",
+            flex: 0.5,
+            renderCell: ({ row }) => row.stt,
+        },
         {
             field: "user_id",
             headerName: "Người dùng",
             flex: 1,
-            renderCell: ({ row }) => row.user_id?.username || "N/A",
+            renderCell: ({ row }) => row.userData?.username || "N/A",
+        },
+        {
+            field: "email",
+            headerName: "Email",
+            flex: 1,
+            renderCell: ({ row }) => row.userData?.email || "N/A",
         },
         {
             field: "rating",

@@ -7,7 +7,7 @@ export const getRevenueStatistics = async (params) => {
         const response = await api.get(BASE_URL, {
             params: {
                 ...params,
-                status: "confirmed" // Chỉ lấy các đơn hàng đã xác nhận
+                status: "confirmed"
             },
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`
@@ -38,8 +38,9 @@ export const getRevenueStatistics = async (params) => {
             // Đếm số lượng và tính doanh thu tour
             if (order.tours && order.tours.length > 0) {
                 order.tours.forEach(tour => {
-                    statistics[key].tours += tour.quantity || 0;
-                    statistics[key].tourRevenue += (tour.price || 0) * (tour.quantity || 0);
+                    const stock = tour.timeStarts && tour.timeStarts.length > 0 ? tour.timeStarts[0].stock || 0 : 0;
+                    statistics[key].tours += stock;
+                    statistics[key].tourRevenue += (tour.price || 0) * stock;
                 });
             }
 
@@ -66,7 +67,7 @@ export const getRevenueStatistics = async (params) => {
             return new Date(yearA, monthA - 1) - new Date(yearB, monthB - 1);
         });
 
-        console.log("Dữ liệu thống kê:", result); // Thêm log để kiểm tra dữ liệu
+        console.log("Dữ liệu thống kê:", result);
 
         return {
             code: 200,
