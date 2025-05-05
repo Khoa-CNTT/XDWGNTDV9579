@@ -28,21 +28,25 @@ const Tours = () => {
   const fetchTours = async () => {
     setLoading(true);
     try {
-      let url = "/tours";
+      let url = "/tours"; // Loại bỏ /api/v1 vì đã có trong baseURL
       if (slugCategory) {
-        url = `/tours/${slugCategory}`;
-        const categoryResponse = await api.get("/categories");
+        url = `/tours/${slugCategory}`; // Loại bỏ /api/v1
+        const categoryResponse = await api.get("/categories"); // Loại bỏ /api/v1
         const category = categoryResponse.data.find((cat) => cat.slug === slugCategory);
         if (category) {
           setCategoryTitle(category.title);
+        } else {
+          setCategoryTitle("Danh mục không xác định");
         }
       }
       const response = await api.get(url);
+      console.log("Dữ liệu tours từ API:", response.data);
       setTours(response.data || []);
       setFilteredTours(response.data || []);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách tour:", error);
-      toast.error("Không thể tải danh sách tour!");
+      const errorMessage = error.response?.data?.message || "Không thể tải danh sách tour!";
+      toast.error(errorMessage);
       setTours([]);
       setFilteredTours([]);
     } finally {
@@ -80,8 +84,11 @@ const Tours = () => {
       });
     }
 
+    console.log("Filtered Tours:", filtered);
     setFilteredTours(filtered);
   };
+
+  console.log("Rendering Tours - filteredTours:", filteredTours);
 
   return (
     <>

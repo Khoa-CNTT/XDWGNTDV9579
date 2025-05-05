@@ -29,29 +29,31 @@ const CartPage = () => {
     setLoading(true);
     try {
       const response = await api.get("/carts");
-      if (response.data.code === 200) {
+      if (response.status === 200) { // Kiểm tra status thay vì data.code
         setCart(response.data);
-        await fetchCartCount(); // Cập nhật số lượng trên biểu tượng giỏ hàng
+        await fetchCartCount();
       } else {
         toast.error(response.data.message || "Không thể tải giỏ hàng!");
         setCart({ tours: [], hotels: [], totalPrice: 0 });
       }
     } catch (error) {
       console.error("Lỗi khi lấy giỏ hàng:", error);
-      toast.error("Không thể tải giỏ hàng!");
+      toast.error(error.response?.data?.message || "Không thể tải giỏ hàng!");
       setCart({ tours: [], hotels: [], totalPrice: 0 });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateTourQuantity = async (tourId, quantity) => {
+  const updateTourQuantity = async (tourId, timeDepart, quantity) => {
     if (quantity < 1) {
       toast.error("Số lượng phải lớn hơn 0!");
       return;
     }
     try {
-      const response = await api.patch(`/carts/update/${tourId}/${quantity}`);
+      const response = await api.patch(`/carts/update/${tourId}`, null, {
+        params: { timeDepart, quantity },
+      });
       if (response.data.code === 200) {
         setCart(response.data.data);
         toast.success("Cập nhật số lượng tour thành công!");
@@ -71,7 +73,9 @@ const CartPage = () => {
       return;
     }
     try {
-      const response = await api.patch(`/carts/updateRoom/${hotelId}/${roomId}/${quantity}`);
+      const response = await api.patch(`/carts/updateRoom/${hotelId}/${roomId}`, null, {
+        params: { quantity },
+      });
       if (response.data.code === 200) {
         setCart(response.data.data);
         toast.success("Cập nhật số lượng phòng thành công!");
@@ -139,6 +143,7 @@ const CartPage = () => {
                     <tr>
                       <th>Ảnh</th>
                       <th>Tiêu đề</th>
+                      <th>Thời gian khởi hành</th>
                       <th>Giá</th>
                       <th>Số lượng</th>
                       <th>Tổng tiền</th>
@@ -146,22 +151,27 @@ const CartPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {cart.tours.map((item) => (
-                      <CartItem
-                        key={item.tour_id}
-                        item={{
-                          id: item.tour_id,
-                          name: item.tourInfo.title,
-                          price: item.priceNew,
-                          quantity: item.quantity,
-                          image: item.tourInfo.images[0] || "",
-                          discount: item.tourInfo.discount || 0,
-                        }}
-                        updateQuantity={(id, qty) => updateTourQuantity(item.tour_id, qty)}
-                        removeItem={() => removeTour(item.tour_id)}
-                      />
-                    ))}
-                    {cart.hotels.map((hotel) =>
+                    {cart.tours.flatMap((item) =>
+                      item.timeStarts.map((time, index) => (
+                        <CartItem
+                          key={`${item.tour_id}-${time.timeDepart}`}
+                          item={{
+                            id: item.tour_id,
+                            timeDepart: time.timeDepart,
+                            name: item.tourInfo.title,
+                            price: item.priceNew,
+                            quantity: time.quantity,
+                            image: item.tourInfo.images[0] || "",
+                            discount: item.tourInfo.discount || 0,
+                          }}
+                          updateQuantity={(id, qty) =>
+                            updateTourQuantity(item.tour_id, time.timeDepart, qty)
+                          }
+                          removeItem={() => removeTour(item.tour_id)}
+                        />
+                      ))
+                    )}
+                    {cart.hotels.flatMap((hotel) =>
                       hotel.rooms.map((room) => (
                         <CartItem
                           key={`${hotel.hotel_id}-${room.room_id}`}

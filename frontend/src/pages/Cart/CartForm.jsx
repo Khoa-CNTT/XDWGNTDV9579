@@ -10,35 +10,28 @@ const CartForm = ({ totalPrice }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [voucherCode, setVoucherCode] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [finalPrice, setFinalPrice] = useState(totalPrice);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customer, setCustomer] = useState({
     name: "",
     email: "",
     phone: "",
+    note: "", // Thêm trường note
   });
-  const [errors, setErrors] = useState({ name: "", email: "", phone: "" });
+  const [errors, setErrors] = useState({ name: "", email: "", phone: "", note: "" });
 
   useEffect(() => {
-    // Tự động điền thông tin từ user trong AuthContext
     if (user) {
       setCustomer({
-        name: user.name || "",
+        name: user.fullName || "", // Sử dụng fullName từ user
         email: user.email || "",
         phone: user.phone || "",
+        note: "",
       });
     }
   }, [user]);
 
-  useEffect(() => {
-    // Cập nhật giá cuối cùng khi totalPrice hoặc discount thay đổi
-    const priceAfterDiscount = totalPrice - discount;
-    setFinalPrice(priceAfterDiscount > 0 ? priceAfterDiscount : 0);
-  }, [totalPrice, discount]);
-
   const validateForm = () => {
-    const newErrors = { name: "", email: "", phone: "" };
+    const newErrors = { name: "", email: "", phone: "", note: "" };
     let isValid = true;
 
     if (!customer.name.trim()) {
@@ -66,25 +59,6 @@ const CartForm = ({ totalPrice }) => {
     return isValid;
   };
 
-  const handleApplyVoucher = async () => {
-    if (!voucherCode) {
-      toast.error("Vui lòng nhập mã giảm giá!");
-      return;
-    }
-    try {
-      const response = await api.post("/vouchers/apply", { code: voucherCode });
-      if (response.data.code === 200) {
-        const discountValue = response.data.discount || 0;
-        setDiscount(discountValue);
-        toast.success("Áp dụng mã giảm giá thành công!");
-      } else {
-        toast.error(response.data.message || "Mã giảm giá không hợp lệ!");
-      }
-    } catch (error) {
-      toast.error("Không thể áp dụng mã giảm giá!");
-    }
-  };
-
   const handleCheckout = async () => {
     if (!user) {
       toast.error("Vui lòng đăng nhập để thanh toán!");
@@ -92,12 +66,11 @@ const CartForm = ({ totalPrice }) => {
       return;
     }
 
-    if (finalPrice === 0) {
+    if (totalPrice === 0) {
       toast.error("Giỏ hàng trống, không thể thanh toán!");
       return;
     }
 
-    // Validate thông tin khách hàng
     if (!validateForm()) {
       toast.error("Vui lòng điền đầy đủ và chính xác thông tin!");
       return;
@@ -105,21 +78,29 @@ const CartForm = ({ totalPrice }) => {
 
     setIsSubmitting(true);
     try {
-      const response = await api.post("/orders/vnpay", {
-        amount: finalPrice,
-        orderInfo: `Thanh toán đơn hàng #${Date.now()} cho khách hàng ${customer.name}`,
-        customer, // Gửi thông tin khách hàng
-        voucherCode, // Gửi mã giảm giá nếu có
+      // Bước 1: Tạo đơn hàng
+      const orderResponse = await api.post("/checkout/order", {
+        fullName: customer.name,
+        phone: customer.phone,
+        note: customer.note,
+        voucherCode: voucherCode || undefined, // Chỉ gửi nếu có voucherCode
       });
 
-      if (response.data.code === 200) {
-        const paymentUrl = response.data.data;
-        window.location.href = paymentUrl; // Chuyển hướng tới URL VNPay
+      if (orderResponse.data.status === "200") { // API trả về status thay vì code
+        const orderId = orderResponse.data.order._id;
+
+        // Bước 2: Tạo URL thanh toán VNPay
+        const paymentResponse = await api.post(`/checkout/payment/${orderId}`);
+        if (paymentResponse.data.paymentUrl) {
+          window.location.href = paymentResponse.data.paymentUrl;
+        } else {
+          toast.error("Không thể tạo URL thanh toán!");
+        }
       } else {
-        toast.error(response.data.message || "Không thể tạo URL thanh toán!");
+        toast.error(orderResponse.data.message || "Không thể tạo đơn hàng!");
       }
     } catch (error) {
-      console.error("Lỗi khi tạo URL thanh toán:", error);
+      console.error("Lỗi khi tạo đơn hàng hoặc URL thanh toán:", error);
       toast.error(error.response?.data?.message || "Có lỗi xảy ra khi tạo đơn hàng!");
     } finally {
       setIsSubmitting(false);
@@ -129,7 +110,6 @@ const CartForm = ({ totalPrice }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setCustomer((prev) => ({ ...prev, [name]: value }));
-    // Xóa lỗi của trường khi người dùng bắt đầu nhập
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -180,33 +160,36 @@ const CartForm = ({ totalPrice }) => {
           </Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
+          <Form.Label>Ghi chú</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={3}
+            name="note"
+            value={customer.note}
+            onChange={handleInputChange}
+            placeholder="Nhập ghi chú (nếu có)"
+            isInvalid={!!errors.note}
+          />
+          <Form.Control.Feedback type="invalid">
+            {errors.note}
+          </Form.Control.Feedback>
+        </Form.Group>
+        <Form.Group className="mb-3">
           <Form.Label>Mã giảm giá</Form.Label>
-          <div className="d-flex gap-2">
-            <Form.Control
-              type="text"
-              placeholder="Nhập mã giảm giá"
-              value={voucherCode}
-              onChange={(e) => setVoucherCode(e.target.value)}
-            />
-            <Button variant="primary" onClick={handleApplyVoucher}>
-              Áp dụng
-            </Button>
-          </div>
+          <Form.Control
+            type="text"
+            placeholder="Nhập mã giảm giá"
+            value={voucherCode}
+            onChange={(e) => setVoucherCode(e.target.value)}
+          />
+          <small className="text-muted">
+            Mã giảm giá sẽ được áp dụng khi tạo đơn hàng.
+          </small>
         </Form.Group>
         <div className="cart-summary-details mb-3">
-          <div className="d-flex justify-content-between mb-2">
-            <span>Tạm tính:</span>
-            <span>{totalPrice.toLocaleString()} VNĐ</span>
-          </div>
-          {discount > 0 && (
-            <div className="d-flex justify-content-between mb-2 text-success">
-              <span>Giảm giá:</span>
-              <span>-{discount.toLocaleString()} VNĐ</span>
-            </div>
-          )}
           <div className="d-flex justify-content-between fw-bold">
             <span>Tổng cộng:</span>
-            <span>{finalPrice.toLocaleString()} VNĐ</span>
+            <span>{totalPrice.toLocaleString()} VNĐ</span>
           </div>
         </div>
         <Button

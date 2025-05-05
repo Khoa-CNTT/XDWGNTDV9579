@@ -22,25 +22,25 @@ const PaymentReturn = () => {
 
   const fetchPaymentStatus = async () => {
     const query = new URLSearchParams(location.search);
-    const vnp_TxnRef = query.get("vnp_TxnRef");
-    const vnp_ResponseCode = query.get("vnp_ResponseCode");
+    const queryParams = Object.fromEntries(query.entries());
 
-    if (!vnp_TxnRef || !vnp_ResponseCode) {
+    if (!queryParams.vnp_TxnRef || !queryParams.vnp_ResponseCode) {
       setPaymentStatus({ success: false, message: "Thông tin thanh toán không hợp lệ!" });
       setLoading(false);
       return;
     }
 
     try {
-      const response = await api.get("/orders/vnpay-return", {
-        params: { vnp_TxnRef, vnp_ResponseCode }
+      const response = await api.get("/checkout/success", {
+        params: queryParams,
       });
       if (response.data.code === 200) {
-        setPaymentStatus({ success: true, message: "Thanh toán thành công!", order: response.data.data });
+        setPaymentStatus({ success: true, message: "Thanh toán thành công!", order: response.data.order });
       } else {
         setPaymentStatus({ success: false, message: response.data.message || "Thanh toán thất bại!" });
       }
     } catch (error) {
+      console.error("Lỗi khi kiểm tra trạng thái thanh toán:", error);
       setPaymentStatus({ success: false, message: "Có lỗi xảy ra khi kiểm tra trạng thái thanh toán!" });
     } finally {
       setLoading(false);
@@ -50,13 +50,16 @@ const PaymentReturn = () => {
   const fetchCartCount = async () => {
     try {
       const response = await api.get("/carts");
-      if (response.data.code === 200) {
-        const totalQuantity = response.data.tours.reduce((total, item) => total + item.quantity, 0) +
-          response.data.hotels.reduce((total, hotel) => total + hotel.rooms.reduce((sum, room) => sum + room.quantity, 0), 0);
+      if (response.status === 200) {
+        const totalQuantity = response.data.tours.reduce((total, item) =>
+          total + item.timeStarts.reduce((sum, time) => sum + time.quantity, 0), 0) +
+          response.data.hotels.reduce((total, hotel) =>
+            total + hotel.rooms.reduce((sum, room) => sum + room.quantity, 0), 0);
         setCartCount(totalQuantity);
       }
     } catch (error) {
-      console.error("Không thể tải số lượng giỏ hàng!");
+      console.error("Không thể tải số lượng giỏ hàng:", error);
+      setCartCount(0); // Nếu lỗi, đặt cartCount về 0
     }
   };
 

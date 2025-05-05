@@ -54,7 +54,7 @@ const Categories = () => {
           ) : (
             <Row>
               {categories.map((category, index) => (
-                <Col xl={3} lg={4} md={6} sm={6} className="mb-4" key={index}>
+                <Col xl={6} lg={6} md={6} sm={6} className="mb-4" key={index}>
                   <Card className="category-card shadow-sm border-0">
                     <div className="category-image-wrapper">
                       <Card.Img
@@ -73,9 +73,6 @@ const Categories = () => {
                       </div>
                     </div>
                     <Card.Body className="category-body">
-                      <Card.Text className="category-tour-count">
-                        {category.tourCount} tour có sẵn
-                      </Card.Text>
                       <Card.Text className="category-description">
                         {category.description || "Chưa có mô tả."}
                       </Card.Text>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { CssBaseline, ThemeProvider } from "@mui/material";
+import { CssBaseline, ThemeProvider } from "@mui/material"; // Import ThemeProvider
 import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
@@ -54,11 +54,9 @@ import Profile from "./pages/Profile/Profile";
 import Invoicess from "./pages/Invoices/Invoicess";
 import Categories from "./pages/Categories/Categories";
 
-const AppContent = () => {
-  const [theme, colorMode] = useMode();
-  const [isSidebar, setIsSidebar] = useState(true);
+const ClientContent = () => {
+  const [theme, colorMode] = useMode(); // Theme mặc định cho client
   const location = useLocation();
-  const { admin, loading: adminLoading } = useAdminAuth();
 
   const noWrapperRoutes = [
     "/login",
@@ -71,125 +69,131 @@ const AppContent = () => {
     location.pathname.startsWith(route)
   );
 
-  const isAdminPath = location.pathname.startsWith("/admin");
-  const isLoginAdmin = location.pathname === "/loginadmin";
-  const isAuthenticated = !!admin;
+  return (
+    <ColorModeContext.Provider value={colorMode}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          {shouldWrap ? (
+            <>
+              <Header />
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/about-us" element={<About />} />
+                <Route path="/contact-us" element={<Contact />} />
+                <Route path="/tours" element={<Tours />} />
+                <Route path="/tours/category/:slugCategory" element={<Tours />} />
+                <Route path="/tour-details/:slugTour" element={<TourDetails />} />
+                <Route
+                  path="/booking"
+                  element={
+                    <PrivateRoute>
+                      <Booking />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/destinations" element={<Destinations />} />
+                <Route path="/gallery" element={<PhotoGallery />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPasswordForm />} />
+                <Route
+                  path="/cart"
+                  element={
+                    <PrivateRoute>
+                      <CartPage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/payment/return" element={<PaymentReturn />} />
+                <Route
+                  path="/profile"
+                  element={
+                    <PrivateRoute>
+                      <Profile />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/invoices"
+                  element={
+                    <PrivateRoute>
+                      <Invoicess />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/hotel-services" element={<HotelServices />} />
+                <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
+              </Routes>
+              <Chatbox />
+              <Footer />
+            </>
+          ) : (
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPasswordForm />} />
+            </Routes>
+          )}
+        </AuthProvider>
+      </ThemeProvider>
+    </ColorModeContext.Provider>
+  );
+};
+
+const AdminContent = () => {
+  const [theme, colorMode] = useMode(); // Theme riêng cho admin
+  const [isSidebar, setIsSidebar] = useState(true);
+  const location = useLocation();
+  const { admin, loading: adminLoading } = useAdminAuth();
 
   if (adminLoading) {
     return <div className="loading-spinner">Đang tải...</div>;
   }
 
-  if (isAdminPath && !isAuthenticated && !isLoginAdmin) {
+  if (!admin && location.pathname !== "/loginadmin") {
     return <Navigate to="/loginadmin" replace />;
   }
 
-  if (isLoginAdmin && isAuthenticated) {
+  if (location.pathname === "/loginadmin" && admin) {
     return <Navigate to="/admin/dashboard" replace />;
   }
-
-  const clientRoutes = (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/about-us" element={<About />} />
-      <Route path="/contact-us" element={<Contact />} />
-      <Route path="/tours" element={<Tours />} />
-      <Route path="/tours/category/:slugCategory" element={<Tours />} />
-      <Route path="/tour-details/:slugTour" element={<TourDetails />} />
-      <Route
-        path="/booking"
-        element={
-          <PrivateRoute>
-            <Booking />
-          </PrivateRoute>
-        }
-      />
-      <Route path="/destinations" element={<Destinations />} />
-      <Route path="/gallery" element={<PhotoGallery />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPasswordForm />} />
-      <Route
-        path="/cart"
-        element={
-          <PrivateRoute>
-            <CartPage />
-          </PrivateRoute>
-        }
-      />
-      <Route path="/payment/return" element={<PaymentReturn />} />
-      <Route
-        path="/profile"
-        element={
-          <PrivateRoute>
-            <Profile />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/invoices"
-        element={
-          <PrivateRoute>
-            <Invoicess />
-          </PrivateRoute>
-        }
-      />
-      <Route path="/hotel-services" element={<HotelServices />} />
-      <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
-      <Route path="/categories" element={<Categories />} />
-      <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
-    </Routes>
-  );
 
   return (
     <ColorModeContext.Provider value={colorMode}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        {isLoginAdmin ? (
-          <Routes>
-            <Route path="/loginadmin" element={<LoginAdmin />} />
-          </Routes>
-        ) : isAdminPath ? (
-          <div className="app">
-            <Sidebar isSidebar={isSidebar} />
-            <main className="content">
-              <Topbar setIsSidebar={setIsSidebar} />
-              <Routes>
-                <Route path="/admin/dashboard" element={<Dashboard />} />
-                <Route path="/admin/team" element={<Team />} />
-                <Route path="/admin/contacts" element={<Contacts />} />
-                <Route path="/admin/invoices" element={<InvoicesAdmin />} />
-                <Route path="/admin/form" element={<Form />} />
-                <Route path="/admin/bar" element={<Bar />} />
-                <Route path="/admin/pie" element={<Pie />} />
-                <Route path="/admin/line" element={<Line />} />
-                <Route path="/admin/tourcontrol" element={<TourControl />} />
-                <Route path="/admin/category" element={<Category />} />
-                <Route path="/admin/voucher" element={<Voucher />} />
-                <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
-                <Route path="/admin/delegation" element={<Delegation />} />
-                <Route path="/admin/settings" element={<Setting />} />
-                <Route path="/admin/hotel" element={<Hotel />} />
-                <Route path="/admin/qlhotel" element={<QLHotel />} />
-                <Route path="/admin/review" element={<Review />} />
-                <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              </Routes>
-            </main>
-          </div>
-        ) : (
-          shouldWrap ? (
-            <AuthProvider>
-              <Header />
-              {clientRoutes}
-              <Chatbox />
-              <Footer />
-            </AuthProvider>
-          ) : (
-            <AuthProvider>
-              {clientRoutes}
-            </AuthProvider>
-          )
-        )}
+        <div className="app">
+          <Sidebar isSidebar={isSidebar} />
+          <main className="content">
+            <Topbar setIsSidebar={setIsSidebar} />
+            <Routes>
+              <Route path="/admin/dashboard" element={<Dashboard />} />
+              <Route path="/admin/team" element={<Team />} />
+              <Route path="/admin/contacts" element={<Contacts />} />
+              <Route path="/admin/invoices" element={<InvoicesAdmin />} />
+              <Route path="/admin/form" element={<Form />} />
+              <Route path="/admin/bar" element={<Bar />} />
+              <Route path="/admin/pie" element={<Pie />} />
+              <Route path="/admin/line" element={<Line />} />
+              <Route path="/admin/tourcontrol" element={<TourControl />} />
+              <Route path="/admin/category" element={<Category />} />
+              <Route path="/admin/voucher" element={<Voucher />} />
+              <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
+              <Route path="/admin/delegation" element={<Delegation />} />
+              <Route path="/admin/settings" element={<Setting />} />
+              <Route path="/admin/hotel" element={<Hotel />} />
+              <Route path="/admin/qlhotel" element={<QLHotel />} />
+              <Route path="/admin/review" element={<Review />} />
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="/loginadmin" element={<LoginAdmin />} />
+            </Routes>
+          </main>
+        </div>
       </ThemeProvider>
     </ColorModeContext.Provider>
   );
@@ -199,7 +203,11 @@ function App() {
   return (
     <AdminAuthProvider>
       <CartProvider>
-        <AppContent />
+        <Routes>
+          <Route path="/*" element={<ClientContent />} />
+          <Route path="/admin/*" element={<AdminContent />} />
+          <Route path="/loginadmin" element={<AdminContent />} />
+        </Routes>
       </CartProvider>
     </AdminAuthProvider>
   );

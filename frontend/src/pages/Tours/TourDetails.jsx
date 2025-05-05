@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, NavLink, useNavigate } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import "../Tours/tour.css";
-import { NavLink, useNavigate } from "react-router-dom";
 import ImageGallery from "react-image-gallery";
 import {
   Container,
@@ -14,6 +13,7 @@ import {
   Accordion,
   Card,
   Stack,
+  Form,
 } from "react-bootstrap";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
@@ -28,6 +28,7 @@ const TourDetails = () => {
   const [tour, setTour] = useState(null);
   const [category, setCategory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedTimeDepart, setSelectedTimeDepart] = useState(null); // State để lưu thời gian khởi hành được chọn
 
   useEffect(() => {
     document.title = "Tours Details - GoTravel";
@@ -46,6 +47,11 @@ const TourDetails = () => {
       }));
       setTour(tourData);
 
+      // Nếu có timeStarts, mặc định chọn thời gian đầu tiên
+      if (tourData.timeStarts && tourData.timeStarts.length > 0) {
+        setSelectedTimeDepart(tourData.timeStarts[0].timeDepart);
+      }
+
       if (tourData.category_id) {
         const categoryResponse = await api.get("/categories");
         const foundCategory = categoryResponse.data.find(
@@ -55,7 +61,8 @@ const TourDetails = () => {
       }
     } catch (error) {
       console.error("Lỗi khi lấy chi tiết tour:", error);
-      toast.error("Không thể tải chi tiết tour!");
+      const errorMessage = error.response?.data?.message || "Không thể tải chi tiết tour!";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -68,17 +75,34 @@ const TourDetails = () => {
       return;
     }
 
+    if (!tour || !tour._id) {
+      toast.error("Không tìm thấy tour để thêm vào giỏ hàng!");
+      return;
+    }
+
+    if (!selectedTimeDepart) {
+      toast.error("Vui lòng chọn thời gian khởi hành!");
+      return;
+    }
+
     try {
+      console.log("Thêm tour vào giỏ hàng:", { tourId: tour._id, timeDepart: selectedTimeDepart, quantity: 1 });
       const response = await api.post(`/carts/add/${tour._id}`, {
+        timeDepart: selectedTimeDepart, // Gửi thời gian khởi hành
         quantity: 1,
       });
+      console.log("Kết quả từ API /carts/add:", response.data);
+
       if (response.data.code === 200) {
         toast.success("Đã thêm tour vào giỏ hàng!");
         fetchCartCount();
+      } else {
+        toast.error(response.data.message || "Không thể thêm tour vào giỏ hàng!");
       }
     } catch (error) {
       console.error("Lỗi khi thêm tour vào giỏ hàng:", error);
-      toast.error(error.response?.data?.message || "Không thể thêm tour vào giỏ hàng!");
+      const errorMessage = error.response?.data?.message || "Không thể thêm tour vào giỏ hàng! Vui lòng thử lại.";
+      toast.error(errorMessage);
     }
   };
 
@@ -90,7 +114,6 @@ const TourDetails = () => {
     return <p>Không tìm thấy tour.</p>;
   }
 
-  // Tính giá sau giảm giá theo logic của priceNewTour
   const priceAfterDiscount = (tour.price * (100 - (tour.discount || 0)) / 100).toFixed(0);
 
   return (
@@ -143,7 +166,7 @@ const TourDetails = () => {
                             <h5 className="font-bold mb-2 h5 mt-3">Danh mục</h5>
                             <ListGroup>
                               <ListGroup.Item className="border-0 pt-0 body-text">
-                                <NavLink to={`/tours/category/${category.slug}`}>
+                                <NavLink to={`/tours/${category.slug}`}>
                                   {category.title}
                                 </NavLink>
                               </ListGroup.Item>
@@ -158,10 +181,21 @@ const TourDetails = () => {
                           </ListGroup.Item>
                           <ListGroup.Item className="border-0 pt-0 body-text">
                             <strong>Thời gian khởi hành:</strong>{" "}
-                            {new Date(tour.timeStart).toLocaleDateString("vi-VN")}
-                          </ListGroup.Item>
-                          <ListGroup.Item className="border-0 pt-0 body-text">
-                            <strong>Số chỗ còn lại:</strong> {tour.stock}
+                            <Form.Select
+                              value={selectedTimeDepart || ""}
+                              onChange={(e) => setSelectedTimeDepart(e.target.value)}
+                              className="d-inline-block w-auto"
+                            >
+                              {tour.timeStarts && tour.timeStarts.length > 0 ? (
+                                tour.timeStarts.map((time, index) => (
+                                  <option key={index} value={time.timeDepart}>
+                                    {new Date(time.timeDepart).toLocaleDateString("vi-VN")} (Còn {time.stock} chỗ)
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="">Chưa có ngày</option>
+                              )}
+                            </Form.Select>
                           </ListGroup.Item>
                         </ListGroup>
                       </div>
@@ -233,7 +267,7 @@ const TourDetails = () => {
                           className="primaryBtn w-100 d-flex justify-content-center fw-bold"
                           onClick={handleAddToCart}
                         >
-                          Đặt ngay
+                          Đặt Tour
                         </button>
                       </Card.Body>
                     </Card>
