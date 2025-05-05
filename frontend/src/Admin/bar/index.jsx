@@ -1,5 +1,6 @@
-import { useTheme, Box, FormControl, InputLabel, Select, MenuItem, TextField, Paper, Typography, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { useTheme, Box, FormControl, InputLabel, Select, MenuItem, TextField, Paper, Typography, ToggleButton, ToggleButtonGroup, Button, CircularProgress, useMediaQuery } from "@mui/material";
 import { ResponsiveBar } from "@nivo/bar";
+import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import { useEffect, useState } from "react";
 import { getRevenueStatistics } from "./BarApi";
@@ -7,6 +8,7 @@ import { getRevenueStatistics } from "./BarApi";
 const BarChart = ({ isDashboard = false }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [data, setData] = useState([]);
   const [filterType, setFilterType] = useState("year");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -16,11 +18,11 @@ const BarChart = ({ isDashboard = false }) => {
   const [loading, setLoading] = useState(false);
   const [viewType, setViewType] = useState("all");
   const [statType, setStatType] = useState("revenue");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showTable, setShowTable] = useState(true);
 
-  // Tạo danh sách năm (10 năm gần nhất)
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 
-  // Danh sách tháng
   const months = [
     { value: "", label: "Tất cả tháng" },
     { value: 1, label: "Tháng 1" },
@@ -40,9 +42,10 @@ const BarChart = ({ isDashboard = false }) => {
   useEffect(() => {
     const fetchStatistics = async () => {
       setLoading(true);
+      setErrorMessage("");
       try {
         const params = {
-          status: "confirmed" // Chỉ lấy các hóa đơn đã xác nhận
+          status: "confirmed"
         };
 
         if (filterType === "year") {
@@ -57,23 +60,54 @@ const BarChart = ({ isDashboard = false }) => {
           }
         }
 
+        console.log("Sending request with params:", params);
         const response = await getRevenueStatistics(params);
-        console.log("API Response:", response); // Thêm log để kiểm tra dữ liệu
-        if (response.code === 200) {
-          // Chuyển đổi dữ liệu thành định dạng phù hợp cho biểu đồ
-          const formattedData = response.data.map(item => ({
-            month: item.month,
-            tours: item.tours,
-            hotels: item.hotels,
-            totalPrice: item.totalPrice,
-            tourRevenue: item.tourRevenue, // Thêm trường doanh thu tours
-            hotelRevenue: item.hotelRevenue // Thêm trường doanh thu hotels
-          }));
-          console.log("Formatted Data:", formattedData); // Thêm log để kiểm tra dữ liệu đã format
-          setData(formattedData);
+        console.log("API Response:", response);
+
+        if (response.code === 200 && Array.isArray(response.data)) {
+          if (response.data.length === 0) {
+            setErrorMessage(`Không có dữ liệu thống kê cho năm ${selectedYear}.`);
+            setData([]);
+          } else {
+            const formattedData = response.data
+              .filter(item => {
+                if (!item.month) {
+                  console.warn("Dữ liệu thiếu trường month:", item);
+                  return false;
+                }
+                const [, year] = item.month.split('/');
+                return parseInt(year) === parseInt(selectedYear);
+              })
+              .map(item => {
+                if (!isFinite(item.totalPrice)) {
+                  console.warn("Dữ liệu không hợp lệ:", item);
+                  return null;
+                }
+                return {
+                  month: item.month,
+                  tours: Number(item.tours) || 0,
+                  hotels: Number(item.hotels) || 0,
+                  totalPrice: Number(item.totalPrice) || 0,
+                  tourRevenue: Number(item.tourRevenue) || 0,
+                  hotelRevenue: Number(item.hotelRevenue) || 0
+                };
+              })
+              .filter(item => item !== null);
+
+            console.log("Formatted Data:", formattedData);
+            if (formattedData.length === 0) {
+              setErrorMessage(`Không có dữ liệu hợp lệ cho năm ${selectedYear}.`);
+            }
+            setData(formattedData);
+          }
+        } else {
+          setErrorMessage(`Lỗi API: Mã ${response.code || "không xác định"}. Phản hồi: ${JSON.stringify(response)}.`);
+          setData([]);
         }
       } catch (error) {
         console.error("Lỗi khi lấy dữ liệu thống kê:", error);
+        setErrorMessage(`Lỗi kết nối API: ${error.message}. Kiểm tra server backend hoặc token xác thực.`);
+        setData([]);
       } finally {
         setLoading(false);
       }
@@ -81,13 +115,96 @@ const BarChart = ({ isDashboard = false }) => {
     fetchStatistics();
   }, [filterType, selectedYear, selectedMonth, startDate, endDate]);
 
+  const getChartConfig = () => {
+    let keys = [];
+    let barColors = [];
+    let legendLabels = [];
+
+    if (viewType === "all") {
+      if (statType === "quantity") {
+        keys = ["tours", "hotels"];
+        barColors = [colors.redAccent[400], colors.redAccent[400]];
+        legendLabels = ["Tổng hợp"];
+      } else {
+        keys = ["totalPrice"];
+        barColors = [colors.redAccent[400]];
+        legendLabels = ["Tổng hợp"];
+      }
+    } else if (viewType === "tours") {
+      keys = [statType === "quantity" ? "tours" : "tourRevenue"];
+      barColors = [colors.blueAccent[700]];
+      legendLabels = ["Tours"];
+    } else if (viewType === "hotels") {
+      keys = [statType === "quantity" ? "hotels" : "hotelRevenue"];
+      barColors = [colors.greenAccent[500]];
+      legendLabels = ["Hotels"];
+    }
+
+    return { keys, barColors, legendLabels };
+  };
+
+  const { keys, barColors, legendLabels } = getChartConfig();
+
+  const handleResetFilters = () => {
+    setFilterType("year");
+    setSelectedYear(new Date().getFullYear());
+    setSelectedMonth("");
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const toggleTableVisibility = () => {
+    setShowTable(prev => !prev);
+  };
+
+  const columns = [
+    { field: 'month', headerName: 'Tháng', flex: 0.5 },
+    { field: 'tours', headerName: 'Số lượng Tours', flex: 0.7 },
+    { field: 'hotels', headerName: 'Số lượng Hotels', flex: 0.7 },
+    {
+      field: 'totalPrice',
+      headerName: 'Tổng doanh thu (K VNĐ)',
+      flex: 1,
+      renderCell: (params) => (
+        <Box display="flex" alignItems="center" height="100%">
+          <Typography color={colors.grey[100]}>
+            {Math.round(params.value / 1000).toLocaleString("vi-VN")}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'tourRevenue',
+      headerName: 'Doanh thu Tours (K VNĐ)',
+      flex: 1,
+      renderCell: (params) => (
+        <Box display="flex" alignItems="center" height="100%">
+          <Typography color={colors.grey[100]}>
+            {Math.round(params.value / 1000).toLocaleString("vi-VN")}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'hotelRevenue',
+      headerName: 'Doanh thu Hotels (K VNĐ)',
+      flex: 1,
+      renderCell: (params) => (
+        <Box display="flex" alignItems="center" height="100%">
+          <Typography color={colors.grey[100]}>
+            {Math.round(params.value / 1000).toLocaleString("vi-VN")}
+          </Typography>
+        </Box>
+      )
+    }
+  ];
+
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h2" sx={{ mb: 3, color: colors.grey[100] }}>
         Báo cáo doanh thu
       </Typography>
 
-      {/* Bộ lọc */}
       <Paper sx={{ p: 2, mb: 2, backgroundColor: colors.primary[400] }}>
         <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
           <Box display="flex" alignItems="center" gap={2}>
@@ -160,15 +277,17 @@ const BarChart = ({ isDashboard = false }) => {
                 />
               </>
             )}
+            <Button variant="contained" onClick={handleResetFilters}>
+              Đặt lại
+            </Button>
           </Box>
 
           <Box display="flex" gap={2}>
-            {/* Nút chuyển đổi giữa doanh thu và số lượng */}
             <ToggleButtonGroup
               value={statType}
               exclusive
               onChange={(e, newValue) => {
-                if (newValue) setStatType(newValue);
+                if (newValue !== null) setStatType(newValue);
               }}
               sx={{
                 backgroundColor: colors.primary[400],
@@ -185,12 +304,11 @@ const BarChart = ({ isDashboard = false }) => {
               <ToggleButton value="quantity">Số lượng</ToggleButton>
             </ToggleButtonGroup>
 
-            {/* Nút chuyển đổi giữa các loại thống kê */}
             <ToggleButtonGroup
               value={viewType}
               exclusive
               onChange={(e, newValue) => {
-                if (newValue) setViewType(newValue);
+                if (newValue !== null) setViewType(newValue);
               }}
               sx={{
                 backgroundColor: colors.primary[400],
@@ -221,16 +339,19 @@ const BarChart = ({ isDashboard = false }) => {
         </Box>
       </Paper>
 
-      {/* Biểu đồ */}
       <Paper sx={{ p: 2, backgroundColor: colors.primary[400] }}>
-        <Box height={isDashboard ? "50vh" : "75vh"}>
+        <Box sx={{ minHeight: isMobile ? 300 : 400, height: isDashboard ? "50vh" : isMobile ? "60vh" : "75vh" }}>
           {loading ? (
             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <Typography>Đang tải dữ liệu...</Typography>
+              <CircularProgress />
+            </Box>
+          ) : errorMessage ? (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+              <Typography color="error">{errorMessage}</Typography>
             </Box>
           ) : data.length === 0 ? (
             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <Typography>Không có dữ liệu để hiển thị biểu đồ</Typography>
+              <Typography>Không có dữ liệu để hiển thị biểu đồ cho năm {selectedYear}.</Typography>
             </Box>
           ) : (
             <>
@@ -278,32 +399,19 @@ const BarChart = ({ isDashboard = false }) => {
                 }}
                 layout="vertical"
                 valueFormat={(value) => {
+                  if (!isFinite(value)) return "0";
                   if (statType === "quantity") {
                     return Math.round(value);
                   }
                   return Math.round(value / 1000);
                 }}
-                keys={viewType === "all"
-                  ? statType === "quantity"
-                    ? ["tours", "hotels"]
-                    : ["totalPrice"]
-                  : statType === "quantity"
-                    ? [viewType]
-                    : [viewType === "tours" ? "tourRevenue" : "hotelRevenue"]}
+                keys={keys}
                 indexBy="month"
                 margin={{ top: 50, right: 130, bottom: 70, left: 60 }}
                 padding={0.3}
                 valueScale={{ type: "linear" }}
                 indexScale={{ type: "band", round: true }}
-                colors={viewType === "all"
-                  ? statType === "quantity"
-                    ? [colors.redAccent[400], colors.redAccent[400]]
-                    : [colors.redAccent[400]]
-                  : viewType === "tours"
-                    ? [colors.blueAccent[700]]
-                    : viewType === "hotels"
-                      ? [colors.greenAccent[500]]
-                      : [colors.redAccent[400]]}
+                colors={barColors}
                 borderColor={{
                   from: "color",
                   modifiers: [["darker", "1.6"]],
@@ -323,8 +431,9 @@ const BarChart = ({ isDashboard = false }) => {
                   tickPadding: 5,
                   tickRotation: 0,
                   format: (value) => {
+                    if (!isFinite(value)) return "0";
                     if (statType === "quantity") {
-                      return value;
+                      return Math.round(value);
                     }
                     return Math.round(value / 1000);
                   },
@@ -332,16 +441,27 @@ const BarChart = ({ isDashboard = false }) => {
                   legendPosition: "middle",
                   legendOffset: -40,
                 }}
-                enableLabel={false}
+                enableLabel={true}
+                label={({ value }) => statType === "quantity" ? value : `${Math.round(value / 1000)}K`}
                 labelSkipWidth={12}
                 labelSkipHeight={12}
                 labelTextColor={{
                   from: "color",
                   modifiers: [["darker", 1.6]],
                 }}
+                tooltip={({ id, value, indexValue }) => (
+                  <div style={{ padding: 12, background: '#222', color: '#fff' }}>
+                    <strong>{indexValue}</strong><br />
+                    {id}: {id === 'tours' || id === 'hotels' ? value : `${Math.round(value / 1000)}K VNĐ`}
+                  </div>
+                )}
                 legends={[
                   {
-                    dataFrom: "keys",
+                    data: legendLabels.map((label, index) => ({
+                      id: keys[index] || label,
+                      label: label,
+                      color: barColors[index]
+                    })),
                     anchor: "bottom-right",
                     direction: "column",
                     justify: false,
@@ -371,6 +491,74 @@ const BarChart = ({ isDashboard = false }) => {
             </>
           )}
         </Box>
+        {data.length > 0 && (
+          <>
+            <Box display="flex" justifyContent="flex-end" mt={2}>
+              <Button
+                variant="contained"
+                onClick={toggleTableVisibility}
+                sx={{ backgroundColor: colors.blueAccent[400], '&:hover': { backgroundColor: colors.blueAccent[300] } }}
+              >
+                {showTable ? "Ẩn bảng" : "Hiện bảng"}
+              </Button>
+            </Box>
+            {showTable && (
+              <Box
+                mt={2}
+                height="300px"
+                sx={{
+                  "& .MuiDataGrid-root": {
+                    border: "none",
+                    width: "100%",
+                  },
+                  "& .MuiDataGrid-main": {
+                    width: "100%",
+                  },
+                  "& .MuiDataGrid-cell": {
+                    borderBottom: "none",
+                  },
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: colors.blueAccent[700],
+                    borderBottom: "none",
+                    color: colors.grey[100],
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                  },
+                  "& .MuiDataGrid-columnHeader": {
+                    backgroundColor: colors.blueAccent[700],
+                    color: colors.grey[100],
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": {
+                    color: colors.grey[100],
+                    fontWeight: "bold",
+                  },
+                  "& .MuiDataGrid-virtualScroller": {
+                    backgroundColor: colors.primary[400],
+                  },
+                  "& .MuiDataGrid-footerContainer": {
+                    borderTop: "none",
+                    backgroundColor: colors.blueAccent[700],
+                  },
+                  "& .MuiCheckbox-root": {
+                    color: `${colors.greenAccent[200]} !important`,
+                  },
+                }}
+              >
+                <DataGrid
+                  rows={data.map((item, index) => ({ id: index, ...item }))}
+                  columns={columns}
+                  pageSize={5}
+                  rowsPerPageOptions={[5]}
+                  disableSelectionOnClick
+                  getRowHeight={() => 60}
+                  sx={{ width: "100%" }}
+                />
+              </Box>
+            )}
+          </>
+        )}
       </Paper>
     </Box>
   );

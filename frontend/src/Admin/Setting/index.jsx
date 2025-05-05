@@ -110,7 +110,7 @@ const Setting = () => {
                 zIndex={9999}
             />
             <Box sx={{ margin: '40px' }}>
-                <Card>
+                <Card sx={{ backgroundColor: colors.primary[400] }}>
                     <CardHeader
                         title={
                             <Typography variant="h4" color={colors.grey[100]}>

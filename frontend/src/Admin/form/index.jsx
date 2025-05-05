@@ -9,6 +9,10 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
+  Card,
+  CardHeader,
+  CardContent,
+  Divider,
 } from "@mui/material";
 import { tokens } from "../../theme";
 import { useAdminAuth } from "../../context/AdminContext";
@@ -241,7 +245,7 @@ const Form = () => {
   };
 
   return (
-    <Box m="20px">
+    <Box sx={{ margin: '40px' }}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -255,113 +259,115 @@ const Form = () => {
         theme="light"
         limit={3}
       />
+      <Card sx={{ backgroundColor: colors.primary[400] }}>
+        <CardHeader
+          title={
+            <Typography variant="h4" color={colors.grey[100]}>
+              Cài đặt tài khoản
+            </Typography>
+          }
+        />
+        <Divider />
+        <CardContent>
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center">
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Box display="flex" flexDirection="column" alignItems="center">
+              {/* Hiển thị avatar */}
+              <Avatar
+                src={adminInfo.avatar}
+                alt="Admin Avatar"
+                sx={{ width: 150, height: 150, mb: 2 }}
+              />
+              <input
+                accept="image/*"
+                style={{ display: "none" }}
+                id="avatar-upload"
+                type="file"
+                onChange={handleAvatarChange}
+                disabled={loading}
+              />
+              <label htmlFor="avatar-upload">
+                <Button
+                  variant="contained"
+                  component="span"
+                  color="primary"
+                  disabled={loading}
+                >
+                  Thay đổi Avatar
+                </Button>
+              </label>
 
-      <Typography
-        variant="h2"
-        color={colors.grey[100]}
-        fontWeight="bold"
-        mb={3}
-      >
-        Cài đặt tài khoản
-      </Typography>
+              {/* Hiển thị và chỉnh sửa thông tin admin */}
+              <Box mt={3} width="50%">
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Họ và tên"
+                  name="fullName"
+                  value={adminInfo.fullName || ""}
+                  variant="outlined"
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Email"
+                  name="email"
+                  value={adminInfo.email || ""}
+                  variant="outlined"
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Số điện thoại"
+                  name="phone"
+                  value={adminInfo.phone || ""}
+                  variant="outlined"
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Mật khẩu mới"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  variant="outlined"
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={handleTogglePassword} edge="end">
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
 
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center">
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Box display="flex" flexDirection="column" alignItems="center">
-          {/* Hiển thị avatar */}
-          <Avatar
-            src={adminInfo.avatar}
-            alt="Admin Avatar"
-            sx={{ width: 150, height: 150, mb: 2 }}
-          />
-          <input
-            accept="image/*"
-            style={{ display: "none" }}
-            id="avatar-upload"
-            type="file"
-            onChange={handleAvatarChange}
-            disabled={loading}
-          />
-          <label htmlFor="avatar-upload">
-            <Button
-              variant="contained"
-              component="span"
-              color="primary"
-              disabled={loading}
-            >
-              Thay đổi Avatar
-            </Button>
-          </label>
-
-          {/* Hiển thị và chỉnh sửa thông tin admin */}
-          <Box mt={3} width="50%">
-            <TextField
-              fullWidth
-              margin="normal"
-              label="Họ và tên"
-              name="fullName"
-              value={adminInfo.fullName || ""}
-              variant="outlined"
-              onChange={handleInputChange}
-              disabled={loading}
-            />
-            <TextField
-              fullWidth
-              margin="normal"
-              label="Email"
-              name="email"
-              value={adminInfo.email || ""}
-              variant="outlined"
-              onChange={handleInputChange}
-              disabled={loading}
-            />
-            <TextField
-              fullWidth
-              margin="normal"
-              label="Số điện thoại"
-              name="phone"
-              value={adminInfo.phone || ""}
-              variant="outlined"
-              onChange={handleInputChange}
-              disabled={loading}
-            />
-            <TextField
-              fullWidth
-              margin="normal"
-              label="Mật khẩu mới"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              variant="outlined"
-              onChange={handleInputChange}
-              disabled={loading}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={handleTogglePassword} edge="end">
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
-
-          {/* Nút lưu thay đổi */}
-          <Button
-            variant="contained"
-            color="success"
-            sx={{ mt: 3, fontWeight: "bold" }}
-            onClick={handleSave}
-            disabled={loading}
-          >
-            Lưu thay đổi
-          </Button>
-        </Box>
-      )}
+              {/* Nút lưu thay đổi */}
+              <Button
+                variant="contained"
+                color="success"
+                sx={{ mt: 3, fontWeight: "bold" }}
+                onClick={handleSave}
+                disabled={loading}
+              >
+                Lưu thay đổi
+              </Button>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 };

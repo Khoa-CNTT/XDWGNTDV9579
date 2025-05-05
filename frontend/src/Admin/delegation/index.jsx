@@ -256,19 +256,30 @@ const DelegationControl = () => {
                 <>
                     <TableContainer component={Paper} sx={{ backgroundColor: colors.primary[400], border: "none" }}>
                         <Table sx={{ width: "100%", border: "none" }}>
-                            <TableHead sx={{
-                                backgroundColor: colors.blueAccent[700],
-                                color: colors.grey[100], borderBottom: "none"
-                            }}>
-                                <TableRow>
-                                    <TableCell sx={{ color: colors.grey[100], fontSize: "14px", fontWeight: "bold", borderBottom: "none" }}>
+                            <TableHead>
+                                <TableRow sx={{
+                                    backgroundColor: colors.blueAccent[700] + " !important",
+                                }}>
+                                    <TableCell sx={{
+                                        backgroundColor: colors.blueAccent[700] + " !important",
+                                        color: colors.grey[100],
+                                        fontSize: "14px",
+                                        fontWeight: "bold",
+                                        borderBottom: "none",
+                                    }}>
                                         Tính năng
                                     </TableCell>
                                     {roles.map((role) => (
                                         <TableCell
                                             align="center"
                                             key={role.id}
-                                            sx={{ color: colors.grey[100], fontSize: "14px", fontWeight: "bold", borderBottom: "none" }}
+                                            sx={{
+                                                backgroundColor: colors.blueAccent[700] + " !important",
+                                                color: colors.grey[100],
+                                                fontSize: "14px",
+                                                fontWeight: "bold",
+                                                borderBottom: "none",
+                                            }}
                                         >
                                             <Box display="flex" alignItems="center" gap={1} justifyContent="center">
                                                 {role.title}
