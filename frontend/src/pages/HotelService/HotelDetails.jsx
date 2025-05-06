@@ -9,25 +9,36 @@ import {
   Col,
   Tab,
   Nav,
-  ListGroup,
   Card,
   Stack,
   Table,
   Form,
   Button,
+  Spinner,
+  Alert,
 } from "react-bootstrap";
 import ImageGallery from "react-image-gallery";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
+import { useNavigate } from "react-router-dom";
 import "./hotel.css";
 
 const HotelDetails = () => {
   const { hotelId } = useParams();
   const [hotel, setHotel] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [reviews, setReviews] = useState({});
   const [loading, setLoading] = useState(false);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState("");
+  const [fetchReviewError, setFetchReviewError] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [deletingReview, setDeletingReview] = useState(null);
   const { user } = useAuth();
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = "Chi tiết khách sạn - GoTravel";
@@ -37,11 +48,36 @@ const HotelDetails = () => {
 
   const fetchHotelDetails = async () => {
     setLoading(true);
+    setFetchReviewError(false);
     try {
       const response = await api.get(`/hotels/${hotelId}`);
       if (response.data.code === 200) {
         setHotel(response.data.hotel);
         setRooms(response.data.rooms);
+
+        // Lấy đánh giá cho từng phòng
+        const reviewsData = {};
+        let hasError = false;
+        for (const room of response.data.rooms) {
+          try {
+            const reviewsResponse = await api.get(`/reviews/${hotelId}/${room._id}`);
+            if (reviewsResponse.data.code === 200) {
+              reviewsData[room._id] = reviewsResponse.data.reviews || [];
+            } else {
+              console.warn(`Không lấy được đánh giá cho phòng ${room._id}:`, reviewsResponse.data.message);
+              reviewsData[room._id] = [];
+            }
+          } catch (error) {
+            console.warn(`Lỗi khi lấy đánh giá cho phòng ${room._id}:`, error.message);
+            reviewsData[room._id] = [];
+            hasError = true;
+          }
+        }
+        setReviews(reviewsData);
+        if (hasError) {
+          setFetchReviewError(true);
+          toast.warn("Không thể lấy một số đánh giá. Vui lòng thử lại sau!");
+        }
       }
     } catch (error) {
       console.error("Lỗi khi lấy chi tiết khách sạn:", error);
@@ -73,28 +109,84 @@ const HotelDetails = () => {
     }
 
     try {
-      const response = await api.post(`/carts/add/${hotelId}/${roomId}`, {
+      await addToCart("room", {
+        hotelId,
+        roomId,
         quantity,
         checkIn,
         checkOut,
       });
-      if (response.data.code === 200) {
-        toast.success("Đã thêm phòng vào giỏ hàng!");
-        // Cập nhật số lượng giỏ hàng trong Header (có thể dispatch một event hoặc dùng context)
-        const cartResponse = await api.get("/checkout");
-        const cart = cartResponse.data;
-        const tourQuantity = cart.tours.reduce((total, item) => total + item.quantity, 0);
-        const roomQuantity = cart.hotels.reduce(
-          (total, hotel) => total + hotel.rooms.reduce((sum, room) => sum + room.quantity, 0),
-          0
-        );
-        window.dispatchEvent(
-          new CustomEvent("cartUpdate", { detail: { cartCount: tourQuantity + roomQuantity } })
-        );
-      }
+      navigate("/cart");
     } catch (error) {
       console.error("Lỗi khi thêm phòng vào giỏ hàng:", error);
-      toast.error(error.response?.data?.message || "Không thể thêm vào giỏ hàng!");
+      toast.error(error.message || "Không thể thêm vào giỏ hàng!");
+    }
+  };
+
+  const calculateAverageRating = (roomId) => {
+    const roomReviews = reviews[roomId] || [];
+    if (roomReviews.length === 0) return 0;
+    const totalRating = roomReviews.reduce((sum, review) => sum + review.rating, 0);
+    return (totalRating / roomReviews.length).toFixed(1);
+  };
+
+  const hasUserReviewed = (roomId) => {
+    if (!user) return false;
+    const roomReviews = reviews[roomId] || [];
+    return roomReviews.some((review) => review.user_id._id.toString() === user._id.toString());
+  };
+
+  const handleSubmitReview = async (roomId) => {
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để đánh giá!");
+      navigate("/login");
+      return;
+    }
+
+    if (!newComment.trim()) {
+      toast.error("Vui lòng nhập bình luận!");
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const response = await api.post(`/reviews/${hotelId}/${roomId}`, {
+        rating: newRating,
+        comment: newComment,
+      });
+      if (response.data.code === 200) {
+        toast.success("Đánh giá thành công!");
+        setNewComment("");
+        setNewRating(5);
+        setFetchReviewError(false);
+        fetchHotelDetails();
+      } else {
+        toast.error(response.data.message || "Đánh giá thất bại!");
+      }
+    } catch (error) {
+      console.error("Lỗi khi gửi đánh giá:", error);
+      toast.error(error.response?.data?.message || "Đánh giá thất bại!");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    setDeletingReview(reviewId);
+    try {
+      const response = await api.delete(`/reviews/delete/${reviewId}`);
+      if (response.data.code === 200) {
+        toast.success("Xóa đánh giá thành công!");
+        setFetchReviewError(false);
+        fetchHotelDetails();
+      } else {
+        toast.error(response.data.message || "Xóa thất bại!");
+      }
+    } catch (error) {
+      console.error("Lỗi khi xóa đánh giá:", error);
+      toast.error(error.response?.data?.message || "Xóa thất bại!");
+    } finally {
+      setDeletingReview(null);
     }
   };
 
@@ -108,9 +200,12 @@ const HotelDetails = () => {
       <section className="hotel-section">
         <Container>
           {loading ? (
-            <p>Đang tải chi tiết khách sạn...</p>
+            <div className="text-center my-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-2">Đang tải chi tiết khách sạn...</p>
+            </div>
           ) : !hotel ? (
-            <p>Không tìm thấy khách sạn.</p>
+            <Alert variant="danger">Không tìm thấy khách sạn.</Alert>
           ) : (
             <Row>
               <h1 className="hotel-details-title mb-4">{hotel.name}</h1>
@@ -137,6 +232,9 @@ const HotelDetails = () => {
                         <Nav.Item>
                           <Nav.Link eventKey="3">Vị trí</Nav.Link>
                         </Nav.Item>
+                        <Nav.Item>
+                          <Nav.Link eventKey="4">Đánh giá</Nav.Link>
+                        </Nav.Item>
                       </Nav>
                     </Col>
 
@@ -146,15 +244,15 @@ const HotelDetails = () => {
                         <p className="body-text">{hotel.description || "Chưa có mô tả."}</p>
 
                         <h5 className="font-bold mb-2 h5 mt-3">Thông tin khách sạn</h5>
-                        <ListGroup>
-                          <ListGroup.Item className="body-text">
+                        <ul className="list-group">
+                          <li className="list-group-item body-text">
                             <strong>Địa điểm:</strong> {hotel.location.city},{" "}
                             {hotel.location.country}
-                          </ListGroup.Item>
-                          <ListGroup.Item className="body-text">
+                          </li>
+                          <li className="list-group-item body-text">
                             <strong>Địa chỉ:</strong> {hotel.location.address}
-                          </ListGroup.Item>
-                        </ListGroup>
+                          </li>
+                        </ul>
                       </Tab.Pane>
 
                       <Tab.Pane eventKey="2">
@@ -193,7 +291,7 @@ const HotelDetails = () => {
                         </Form>
 
                         {rooms.length === 0 ? (
-                          <p>Khách sạn này hiện không có phòng nào.</p>
+                          <Alert variant="info">Khách sạn này hiện không có phòng nào.</Alert>
                         ) : (
                           <Table striped bordered hover className="hotel-table">
                             <thead>
@@ -248,12 +346,143 @@ const HotelDetails = () => {
                           ></iframe>
                         </div>
                       </Tab.Pane>
+
+                      <Tab.Pane eventKey="4">
+                        <h1 className="h3 mb-4">Đánh giá</h1>
+                        {fetchReviewError && (
+                          <Alert variant="warning">
+                            Không thể lấy một số đánh giá do lỗi hệ thống. Vui lòng thử lại sau!
+                          </Alert>
+                        )}
+                        {rooms.length > 0 ? (
+                          rooms.map((room) => {
+                            const roomReviews = reviews[room._id] || [];
+                            const avgRating = calculateAverageRating(room._id);
+                            return (
+                              <div key={room._id} className="mb-5">
+                                <h5 className="font-bold mb-3 h5">
+                                  Đánh giá cho {room.name}: {avgRating}/5{" "}
+                                  <span className="text-warning">
+                                    {"★".repeat(Math.round(avgRating))}
+                                    {"☆".repeat(5 - Math.round(avgRating))}
+                                  </span>{" "}
+                                  ({roomReviews.length} đánh giá)
+                                </h5>
+                                {roomReviews.length > 0 ? (
+                                  <div className="review-list">
+                                    {roomReviews.map((review, index) => (
+                                      <Card key={index} className="mb-3 shadow-sm">
+                                        <Card.Body>
+                                          <div className="d-flex justify-content-between align-items-center mb-2">
+                                            <div className="d-flex align-items-center">
+                                              <strong>{review.user_id.fullName}</strong>
+                                              <span className="text-warning ms-2">
+                                                {"★".repeat(review.rating)}
+                                                {"☆".repeat(5 - review.rating)}
+                                              </span>
+                                            </div>
+                                            {user &&
+                                              review.user_id._id.toString() === user._id.toString() && (
+                                                <Button
+                                                  variant="danger"
+                                                  size="sm"
+                                                  onClick={() => handleDeleteReview(review._id)}
+                                                  disabled={deletingReview === review._id}
+                                                >
+                                                  {deletingReview === review._id ? (
+                                                    <Spinner
+                                                      as="span"
+                                                      animation="border"
+                                                      size="sm"
+                                                      className="me-1"
+                                                    />
+                                                  ) : (
+                                                    <i className="bi bi-trash"></i>
+                                                  )}
+                                                  Xóa
+                                                </Button>
+                                              )}
+                                          </div>
+                                          <p className="mb-1">{review.comment}</p>
+                                          <small className="text-muted">
+                                            {new Date(review.createdAt).toLocaleDateString("vi-VN")}
+                                          </small>
+                                        </Card.Body>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <Alert variant="info">Chưa có đánh giá nào cho phòng này.</Alert>
+                                )}
+                                {user && !hasUserReviewed(room._id) && (
+                                  <Card className="mt-4 shadow-sm">
+                                    <Card.Body>
+                                      <h6 className="mb-3">Viết đánh giá của bạn</h6>
+                                      <Form>
+                                        <Form.Group className="mb-3">
+                                          <Form.Label>Điểm đánh giá</Form.Label>
+                                          <Form.Select
+                                            value={newRating}
+                                            onChange={(e) => setNewRating(parseInt(e.target.value))}
+                                          >
+                                            {[1, 2, 3, 4, 5].map((rate) => (
+                                              <option key={rate} value={rate}>
+                                                {rate} sao
+                                              </option>
+                                            ))}
+                                          </Form.Select>
+                                        </Form.Group>
+                                        <Form.Group className="mb-3">
+                                          <Form.Label>Bình luận</Form.Label>
+                                          <Form.Control
+                                            as="textarea"
+                                            rows={3}
+                                            value={newComment}
+                                            onChange={(e) => setNewComment(e.target.value)}
+                                            placeholder="Viết đánh giá của bạn..."
+                                          />
+                                        </Form.Group>
+                                        <Button
+                                          variant="primary"
+                                          onClick={() => handleSubmitReview(room._id)}
+                                          disabled={submittingReview}
+                                        >
+                                          {submittingReview ? (
+                                            <>
+                                              <Spinner
+                                                as="span"
+                                                animation="border"
+                                                size="sm"
+                                                className="me-2"
+                                              />
+                                              Đang gửi...
+                                            </>
+                                          ) : (
+                                            "Gửi đánh giá"
+                                          )}
+                                        </Button>
+                                      </Form>
+                                    </Card.Body>
+                                  </Card>
+                                )}
+                                {user && hasUserReviewed(room._id) && (
+                                  <Alert variant="info" className="mt-3">
+                                    Bạn đã đánh giá phòng này rồi.
+                                  </Alert>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <Alert variant="info">Chưa có phòng nào để đánh giá.</Alert>
+                        )}
+                      </Tab.Pane>
                     </Tab.Content>
                   </Col>
 
                   <Col md={4}>
                     <aside>
-                      <Card className="hotel-price-card mb-4">
+                      <Card className="hotel-price-card mb-4 shadow-sm">
                         <Card.Body>
                           <Stack gap={2} direction="horizontal">
                             <h1 className="h2">
@@ -274,28 +503,28 @@ const HotelDetails = () => {
                         </Card.Body>
                       </Card>
 
-                      <Card className="hotel-support-card">
+                      <Card className="hotel-support-card shadow-sm">
                         <Card.Body>
                           <h1 className="h3">Cần giúp đỡ?</h1>
-                          <ListGroup>
-                            <ListGroup.Item>
+                          <ul className="list-group">
+                            <li className="list-group-item">
                               <i className="bi bi-telephone me-1"></i> Gọi cho chúng tôi{" "}
                               <strong>+84 779407905</strong>
-                            </ListGroup.Item>
-                            <ListGroup.Item>
+                            </li>
+                            <li className="list-group-item">
                               <i className="bi bi-alarm me-1"></i> Thời gian:{" "}
                               <strong>8AM to 7PM</strong>
-                            </ListGroup.Item>
-                            <ListGroup.Item>
+                            </li>
+                            <li className="list-group-item">
                               <strong>
                                 <i className="bi bi-headset me-1"></i> Hãy để chúng tôi gọi bạn
                               </strong>
-                            </ListGroup.Item>
-                            <ListGroup.Item>
+                            </li>
+                            <li className="list-group-item">
                               <i className="bi bi-calendar-check me-1"></i>{" "}
                               <strong>Đặt lịch hẹn</strong>
-                            </ListGroup.Item>
-                          </ListGroup>
+                            </li>
+                          </ul>
                         </Card.Body>
                       </Card>
                     </aside>

@@ -21,7 +21,6 @@ export const CartProvider = ({ children }) => {
       }
       const response = await api.get("/carts");
       if (response.data.code === 200) {
-        // Kiểm tra và mặc định tours và hotels là mảng rỗng nếu không tồn tại
         const tours = response.data.tours || [];
         const hotels = response.data.hotels || [];
         
@@ -56,7 +55,7 @@ export const CartProvider = ({ children }) => {
       }
       if (response.data.code === 200) {
         toast.success("Đã thêm vào giỏ hàng!");
-        await fetchCartCount(); // Cập nhật số lượng sau khi thêm
+        await fetchCartCount();
       } else {
         toast.error(response.data.message || "Không thể thêm vào giỏ hàng!");
       }

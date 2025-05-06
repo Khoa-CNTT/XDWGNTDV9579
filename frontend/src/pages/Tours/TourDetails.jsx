@@ -23,12 +23,12 @@ import { useCart } from "../../context/CartContext";
 const TourDetails = () => {
   const { slugTour } = useParams();
   const { user } = useAuth();
-  const { fetchCartCount } = useCart();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const [tour, setTour] = useState(null);
   const [category, setCategory] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTimeDepart, setSelectedTimeDepart] = useState(null); // State để lưu thời gian khởi hành được chọn
+  const [selectedTimeDepart, setSelectedTimeDepart] = useState(null);
 
   useEffect(() => {
     document.title = "Tours Details - GoTravel";
@@ -47,7 +47,6 @@ const TourDetails = () => {
       }));
       setTour(tourData);
 
-      // Nếu có timeStarts, mặc định chọn thời gian đầu tiên
       if (tourData.timeStarts && tourData.timeStarts.length > 0) {
         setSelectedTimeDepart(tourData.timeStarts[0].timeDepart);
       }
@@ -86,23 +85,15 @@ const TourDetails = () => {
     }
 
     try {
-      console.log("Thêm tour vào giỏ hàng:", { tourId: tour._id, timeDepart: selectedTimeDepart, quantity: 1 });
-      const response = await api.post(`/carts/add/${tour._id}`, {
-        timeDepart: selectedTimeDepart, // Gửi thời gian khởi hành
+      await addToCart("tour", {
+        tourId: tour._id,
         quantity: 1,
+        timeDepart: selectedTimeDepart, // Gửi thêm timeDepart cho API
       });
-      console.log("Kết quả từ API /carts/add:", response.data);
-
-      if (response.data.code === 200) {
-        toast.success("Đã thêm tour vào giỏ hàng!");
-        fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể thêm tour vào giỏ hàng!");
-      }
+      navigate("/cart"); // Điều hướng đến trang giỏ hàng
     } catch (error) {
       console.error("Lỗi khi thêm tour vào giỏ hàng:", error);
-      const errorMessage = error.response?.data?.message || "Không thể thêm tour vào giỏ hàng! Vui lòng thử lại.";
-      toast.error(errorMessage);
+      toast.error(error.message || "Không thể thêm tour vào giỏ hàng! Vui lòng thử lại.");
     }
   };
 
