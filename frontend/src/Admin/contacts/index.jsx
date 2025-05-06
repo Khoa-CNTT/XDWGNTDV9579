@@ -370,7 +370,10 @@ const ContactsControl = () => {
                   <img
                     src={currentContact.avatar}
                     alt="Avatar"
-                    style={{ width: "120px", height: "120px", borderRadius: "50%" }}
+                    style={{
+                      width: "120px", height: "120px", borderRadius: "50%", boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', objectFit: 'contain',
+                      border: '2px solid #000'
+                    }}
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/120";
                     }}

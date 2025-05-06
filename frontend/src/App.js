@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
@@ -53,12 +53,70 @@ import HotelDetails from "./pages/HotelService/HotelDetails";
 import Profile from "./pages/Profile/Profile";
 import Invoicess from "./pages/Invoices/Invoicess";
 import Categories from "./pages/Categories/Categories";
+import { getGeneralSettings } from "./Admin/Setting/SettingApi";
+
+const AdminContent = ({ children, isSidebar, setIsSidebar }) => {
+  const [theme, colorMode] = useMode();
+  return (
+    <ColorModeContext.Provider value={colorMode}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <div className="app">
+          <Sidebar isSidebar={isSidebar} />
+          <main className="content">
+            <Topbar setIsSidebar={setIsSidebar} />
+            {children}
+          </main>
+        </div>
+      </ThemeProvider>
+    </ColorModeContext.Provider>
+  );
+};
+
+const ClientContent = ({ children, shouldWrap }) => {
+  return shouldWrap ? (
+    <AuthProvider>
+      <Header />
+      {children}
+      <Chatbox />
+      <Footer />
+    </AuthProvider>
+  ) : (
+    <AuthProvider>{children}</AuthProvider>
+  );
+};
 
 const AppContent = () => {
-  const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(true);
   const location = useLocation();
   const { admin, loading: adminLoading } = useAdminAuth();
+  const [settings, setSettings] = useState({
+    websiteName: "GoTravel",
+    logo: "%PUBLIC_URL%/favicon.ico",
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await getGeneralSettings();
+        if (data) {
+          const newSettings = {
+            websiteName: data.websiteName || "GoTravel",
+            logo: data.logo || "%PUBLIC_URL%/favicon.ico",
+          };
+          setSettings(newSettings);
+          document.title = newSettings.websiteName;
+          const favicon = document.getElementById("favicon");
+          if (favicon) {
+            favicon.href = newSettings.logo;
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching settings in App.jsx:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const noWrapperRoutes = [
     "/login",
@@ -94,7 +152,7 @@ const AppContent = () => {
       <Route path="/contact-us" element={<Contact />} />
       <Route path="/tours" element={<Tours />} />
       <Route path="/tours/category/:slugCategory" element={<Tours />} />
-      <Route path="/tour-details/:slugTour" element={<TourDetails />} />
+      <Route path="/tour-details/:SlugTour" element={<TourDetails />} />
       <Route
         path="/booking"
         element={
@@ -142,56 +200,38 @@ const AppContent = () => {
   );
 
   return (
-    <ColorModeContext.Provider value={colorMode}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {isLoginAdmin ? (
+    <>
+      {isLoginAdmin ? (
+        <Routes>
+          <Route path="/loginadmin" element={<LoginAdmin />} />
+        </Routes>
+      ) : isAdminPath ? (
+        <AdminContent isSidebar={isSidebar} setIsSidebar={setIsSidebar}>
           <Routes>
-            <Route path="/loginadmin" element={<LoginAdmin />} />
+            <Route path="/admin/dashboard" element={<Dashboard />} />
+            <Route path="/admin/team" element={<Team />} />
+            <Route path="/admin/contacts" element={<Contacts />} />
+            <Route path="/admin/invoices" element={<InvoicesAdmin />} />
+            <Route path="/admin/form" element={<Form />} />
+            <Route path="/admin/bar" element={<Bar />} />
+            <Route path="/admin/pie" element={<Pie />} />
+            <Route path="/admin/line" element={<Line />} />
+            <Route path="/admin/tourcontrol" element={<TourControl />} />
+            <Route path="/admin/category" element={<Category />} />
+            <Route path="/admin/voucher" element={<Voucher />} />
+            <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
+            <Route path="/admin/delegation" element={<Delegation />} />
+            <Route path="/admin/settings" element={<Setting />} />
+            <Route path="/admin/hotel" element={<Hotel />} />
+            <Route path="/admin/qlhotel" element={<QLHotel />} />
+            <Route path="/admin/review" element={<Review />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Routes>
-        ) : isAdminPath ? (
-          <div className="app">
-            <Sidebar isSidebar={isSidebar} />
-            <main className="content">
-              <Topbar setIsSidebar={setIsSidebar} />
-              <Routes>
-                <Route path="/admin/dashboard" element={<Dashboard />} />
-                <Route path="/admin/team" element={<Team />} />
-                <Route path="/admin/contacts" element={<Contacts />} />
-                <Route path="/admin/invoices" element={<InvoicesAdmin />} />
-                <Route path="/admin/form" element={<Form />} />
-                <Route path="/admin/bar" element={<Bar />} />
-                <Route path="/admin/pie" element={<Pie />} />
-                <Route path="/admin/line" element={<Line />} />
-                <Route path="/admin/tourcontrol" element={<TourControl />} />
-                <Route path="/admin/category" element={<Category />} />
-                <Route path="/admin/voucher" element={<Voucher />} />
-                <Route path="/admin/rightsgroup" element={<Rightsgroup />} />
-                <Route path="/admin/delegation" element={<Delegation />} />
-                <Route path="/admin/settings" element={<Setting />} />
-                <Route path="/admin/hotel" element={<Hotel />} />
-                <Route path="/admin/qlhotel" element={<QLHotel />} />
-                <Route path="/admin/review" element={<Review />} />
-                <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              </Routes>
-            </main>
-          </div>
-        ) : (
-          shouldWrap ? (
-            <AuthProvider>
-              <Header />
-              {clientRoutes}
-              <Chatbox />
-              <Footer />
-            </AuthProvider>
-          ) : (
-            <AuthProvider>
-              {clientRoutes}
-            </AuthProvider>
-          )
-        )}
-      </ThemeProvider>
-    </ColorModeContext.Provider>
+        </AdminContent>
+      ) : (
+        <ClientContent shouldWrap={shouldWrap}>{clientRoutes}</ClientContent>
+      )}
+    </>
   );
 };
 

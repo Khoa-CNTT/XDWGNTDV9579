@@ -2,18 +2,18 @@ import api from "../../utils/api";
 
 const BASE_URL = "http://localhost:3000/api/v1/admin/settings";
 
-// Lấy thông tin tài khoản qua /accounts và lọc theo _id
+// Lấy thông tin web 
 export const getAdminInfo = async (id) => {
     try {
         const response = await api.get(`${BASE_URL}`);
         console.log("getAdminInfo response:", JSON.stringify(response.data, null, 2));
         const account = response.data.find(acc => acc._id === id);
         if (!account) {
-            throw new Error("Không tìm thấy tài khoản với ID: " + id);
+            throw new Error("Không tìm thấy website với ID: " + id);
         }
         return {
             code: 200,
-            message: "Lấy thông tin tài khoản thành công",
+            message: "Lấy thông tin website thành công",
             data: account
         };
     } catch (error) {
@@ -26,7 +26,7 @@ export const getAdminInfo = async (id) => {
     }
 };
 
-// Cập nhật thông tin tài khoản
+// Cập nhật thông tin website
 export const updateAdminInfo = async (id, formData) => {
     try {
         const response = await api.patch(`${BASE_URL}/edit/${id}`, formData, {
