@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Box, Button, Typography, IconButton, useTheme, Paper, InputBase, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { Box, Button, Typography, IconButton, useTheme, Paper, InputBase, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { tokens } from "../../theme";
@@ -11,12 +11,14 @@ import { getContactDetail } from "../contacts/ContactsApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
 
 const Reviews = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
-    const isNonMobile = useMediaQuery("(min-width:600px)");
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const { adminToken } = useAdminAuth();
     const navigate = useNavigate();
     const [hotels, setHotels] = useState([]);
@@ -31,8 +33,19 @@ const Reviews = () => {
         pageSize: 5,
     });
     const [rowCount, setRowCount] = useState(0);
+    const [selectedReview, setSelectedReview] = useState(null);
+    const [openModal, setOpenModal] = useState(false);
+    const [openDeleteModal, setOpenDeleteModal] = useState(false);
+    const [reviewToDelete, setReviewToDelete] = useState(null);
+    const [viewedReviews, setViewedReviews] = useState(() => {
+        const saved = localStorage.getItem("viewedReviews");
+        return saved ? JSON.parse(saved) : {};
+    });
 
-    // Lấy danh sách khách sạn
+    useEffect(() => {
+        localStorage.setItem("viewedReviews", JSON.stringify(viewedReviews));
+    }, [viewedReviews]);
+
     const fetchHotels = async () => {
         setLoading(true);
         try {
@@ -62,7 +75,6 @@ const Reviews = () => {
         }
     };
 
-    // Lấy tổng số đánh giá
     const fetchTotalReviews = async (hotelId) => {
         try {
             const response = await getHotelReviews(hotelId, {
@@ -78,7 +90,6 @@ const Reviews = () => {
         }
     };
 
-    // Lấy thông tin người dùng dựa trên user_id
     const fetchUserDetails = async (userId) => {
         if (userCache[userId]) {
             return userCache[userId];
@@ -100,7 +111,6 @@ const Reviews = () => {
         }
     };
 
-    // Lấy danh sách đánh giá và thông tin người dùng
     const fetchReviews = async (hotelId) => {
         if (!hotelId) return;
         setLoading(true);
@@ -120,6 +130,7 @@ const Reviews = () => {
                             ...review,
                             userData,
                             stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                            viewed: !!viewedReviews[review._id],
                         };
                     })
                 );
@@ -181,13 +192,14 @@ const Reviews = () => {
                         ...review,
                         userData,
                         stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                        viewed: !!viewedReviews[review._id],
                     };
                 })
             );
             setReviews(reviewsWithUsers);
         };
         updateFilteredReviews();
-    }, [searchText, allReviews]);
+    }, [searchText, allReviews, viewedReviews]);
 
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
@@ -197,21 +209,57 @@ const Reviews = () => {
     };
 
     const handleDelete = async (reviewId) => {
-        if (window.confirm("Bạn có chắc muốn xóa đánh giá này?")) {
-            try {
-                const response = await deleteReview(reviewId, adminToken);
-                if (response.code === 200) {
-                    setReviews(reviews.filter(review => review._id !== reviewId));
-                    setAllReviews(allReviews.filter(review => review._id !== reviewId));
-                    setRowCount(rowCount - 1);
-                    toast.success("Xóa đánh giá thành công!", { position: "top-right" });
-                } else {
-                    toast.error(response.message || "Xóa đánh giá thất bại!", { position: "top-right" });
-                }
-            } catch (err) {
-                toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", { position: "top-right" });
+        try {
+            const response = await deleteReview(reviewId, adminToken);
+            if (response.code === 200) {
+                setReviews(reviews.filter(review => review._id !== reviewId));
+                setAllReviews(allReviews.filter(review => review._id !== reviewId));
+                setRowCount(rowCount - 1);
+                setViewedReviews(prev => {
+                    const newViewed = { ...prev };
+                    delete newViewed[reviewId];
+                    return newViewed;
+                });
+                toast.success("Xóa đánh giá thành công!", { position: "top-right" });
+            } else {
+                toast.error(response.message || "Xóa đánh giá thất bại!", { position: "top-right" });
             }
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", { position: "top-right" });
         }
+    };
+
+    const handleOpenDeleteModal = (reviewId) => {
+        setReviewToDelete(reviewId);
+        setOpenDeleteModal(true);
+    };
+
+    const handleCloseDeleteModal = () => {
+        setOpenDeleteModal(false);
+        setReviewToDelete(null);
+    };
+
+    const handleConfirmDelete = () => {
+        if (reviewToDelete) {
+            handleDelete(reviewToDelete);
+            handleCloseDeleteModal();
+        }
+    };
+
+    const handleViewReview = (review) => {
+        setSelectedReview(review);
+        setOpenModal(true);
+        if (!viewedReviews[review._id]) {
+            setViewedReviews(prev => ({
+                ...prev,
+                [review._id]: true
+            }));
+        }
+    };
+
+    const handleCloseModal = () => {
+        setOpenModal(false);
+        setSelectedReview(null);
     };
 
     const handleSearch = (e) => {
@@ -226,47 +274,72 @@ const Reviews = () => {
         {
             field: "stt",
             headerName: "STT",
-            flex: 0.5,
+            flex: isMobile ? 0.3 : 0.5,
+            hide: isMobile,
             renderCell: ({ row }) => row.stt,
         },
         {
             field: "user_id",
             headerName: "Người dùng",
-            flex: 1,
+            flex: isMobile ? 0.8 : 1,
             renderCell: ({ row }) => row.userData?.username || "N/A",
         },
         {
             field: "email",
             headerName: "Email",
-            flex: 1,
+            flex: isMobile ? 0.8 : 1,
+            hide: isMobile,
             renderCell: ({ row }) => row.userData?.email || "N/A",
         },
         {
             field: "rating",
             headerName: "Điểm đánh giá",
-            flex: 0.7,
+            flex: isMobile ? 0.5 : 0.7,
             renderCell: ({ row }) => `${row.rating}/5`,
         },
         {
             field: "comment",
             headerName: "Bình luận",
-            flex: 2,
+            flex: isMobile ? 1.5 : 2,
             renderCell: ({ row }) => row.comment || "Không có bình luận",
         },
         {
             field: "createdAt",
             headerName: "Ngày tạo",
-            flex: 1,
+            flex: isMobile ? 0.8 : 1,
+            hide: isMobile,
             renderCell: ({ row }) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
+        },
+        {
+            field: "viewed",
+            headerName: "Đã xem",
+            flex: isMobile ? 0.5 : 0.7,
+            renderCell: ({ row }) => (
+                <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                    {row.viewed ? <VisibilityIcon color="success" /> : <VisibilityOffIcon color="error" />}
+                </Box>
+            ),
         },
         {
             field: "actions",
             headerName: "Hành động",
-            flex: 0.7,
+            flex: isMobile ? 0.8 : 1,
             renderCell: ({ row }) => (
-                <Box sx={{ display: "flex", gap: 1, mt: "9px" }}>
+                <Box sx={{ display: "flex", gap: 1, mt: "25px" }}>
                     <IconButton
-                        onClick={() => handleDelete(row._id)}
+                        onClick={() => handleViewReview(row)}
+                        sx={{
+                            backgroundColor: colors.blueAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.blueAccent[600],
+                            },
+                        }}
+                    >
+                        <VisibilityIcon />
+                    </IconButton>
+                    <IconButton
+                        onClick={() => handleOpenDeleteModal(row._id)}
                         sx={{
                             backgroundColor: colors.redAccent[500],
                             color: "white",
@@ -283,142 +356,274 @@ const Reviews = () => {
     ];
 
     return (
-        <Box m="20px">
-            <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-                limit={3}
-            />
-            <Header title="QUẢN LÝ ĐÁNH GIÁ" />
-            <Box display="flex" justifyContent="space-between" mb="20px" gap={2}>
-                <FormControl sx={{ minWidth: 200 }}>
-                    <InputLabel id="hotel-select-label">Chọn khách sạn</InputLabel>
-                    <Select
-                        labelId="hotel-select-label"
-                        value={selectedHotel?._id || ""}
-                        label="Chọn khách sạn"
-                        onChange={handleHotelChange}
-                        disabled={loading}
-                    >
-                        <MenuItem value="">
-                            <em>{loading ? "Đang tải..." : "Chọn khách sạn"}</em>
-                        </MenuItem>
-                        {hotels.map((hotel) => (
-                            <MenuItem key={hotel._id} value={hotel._id}>
-                                {hotel.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <Paper
-                    component="form"
-                    sx={{
-                        p: "2px 4px",
-                        display: "flex",
-                        alignItems: "center",
-                        width: 300,
-                        backgroundColor: colors.primary[400],
-                    }}
-                    onSubmit={handleSearch}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2, m: "20px" }}>
+            <Box sx={{ gridColumn: 'span 12' }}>
+                <ToastContainer
+                    position="top-right"
+                    autoClose={5000}
+                    hideProgressBar={false}
+                    newestOnTop={false}
+                    closeOnClick
+                    rtl={false}
+                    pauseOnFocusLoss
+                    draggable
+                    pauseOnHover
+                    theme="light"
+                    limit={3}
+                />
+                <Header title="QUẢN LÝ ĐÁNH GIÁ" />
+                <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    mb="20px"
+                    gap={2}
+                    flexWrap={isMobile ? "wrap" : "nowrap"}
                 >
-                    <InputBase
-                        sx={{ ml: 1, flex: 1 }}
-                        placeholder="Tìm kiếm theo bình luận"
-                        value={searchText}
-                        onChange={(e) => setSearchText(e.target.value)}
-                    />
-                    <IconButton type="submit" sx={{ p: "10px" }}>
-                        <SearchIcon />
-                    </IconButton>
-                </Paper>
-            </Box>
-            <Box
-                m="40px 0 0 0"
-                height="75vh"
-                sx={{
-                    "& .MuiDataGrid-root": {
-                        border: "none",
-                    },
-                    "& .MuiDataGrid-cell": {
-                        borderBottom: "none",
-                    },
-                    "& .MuiDataGrid-columnHeaders": {
-                        backgroundColor: colors.blueAccent[700],
-                        borderBottom: "none",
-                        color: colors.grey[100],
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                    },
-                    "& .MuiDataGrid-columnHeader": {
-                        backgroundColor: colors.blueAccent[700],
-                        color: colors.grey[100],
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                    },
-                    "& .MuiDataGrid-columnHeaderTitle": {
-                        color: colors.grey[100],
-                        fontWeight: "bold",
-                    },
-                    "& .MuiDataGrid-virtualScroller": {
-                        backgroundColor: colors.primary[400],
-                    },
-                    "& .MuiDataGrid-footerContainer": {
-                        borderTop: "none",
-                        backgroundColor: colors.blueAccent[700],
-                    },
-                    "& .MuiCheckbox-root": {
-                        color: `${colors.greenAccent[200]} !important`,
-                    },
-                }}
-            >
-                {loading ? (
-                    <Typography variant="h6" align="center" mt={4}>
-                        Đang tải...
-                    </Typography>
-                ) : hotels.length === 0 ? (
-                    <Box textAlign="center" mt={4}>
-                        <Typography variant="h6">
-                            Không có khách sạn nào để hiển thị
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => navigate("/loginadmin")}
-                            sx={{ mt: 2 }}
+                    <FormControl sx={{ minWidth: isMobile ? "100%" : 200 }}>
+                        <InputLabel
+                            id="hotel-select-label"
+                            sx={{ color: "black" }}
                         >
-                            Đăng nhập lại
-                        </Button>
-                    </Box>
-                ) : !selectedHotel?._id ? (
-                    <Typography variant="h6" align="center" mt={4}>
-                        Vui lòng chọn một khách sạn để xem đánh giá
-                    </Typography>
-                ) : reviews.length === 0 ? (
-                    <Typography variant="h6" align="center" mt={4}>
-                        Không có đánh giá nào để hiển thị
-                    </Typography>
-                ) : (
-                    <DataGrid
-                        rows={reviews}
-                        columns={columns}
-                        getRowId={(row) => row._id}
-                        pagination
-                        paginationMode="server"
-                        rowCount={rowCount}
-                        paginationModel={paginationModel}
-                        onPaginationModelChange={setPaginationModel}
-                        pageSizeOptions={[5, 10, 20]}
-                    />
-                )}
+                            Chọn khách sạn
+                        </InputLabel>
+                        <Select
+                            labelId="hotel-select-label"
+                            value={selectedHotel?._id || ""}
+                            label="Chọn khách sạn"
+                            onChange={handleHotelChange}
+                            disabled={loading}
+                            sx={{
+                                backgroundColor: colors.primary[400],
+                                color: colors.grey[100],
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                    borderColor: colors.grey[300],
+                                },
+                                "&:hover .MuiOutlinedInput-notchedOutline": {
+                                    borderColor: colors.grey[100],
+                                },
+                                "& .MuiSvgIcon-root": {
+                                    color: colors.grey[100],
+                                },
+                                "& .MuiInputBase-input": {
+                                    padding: "10px 14px",
+                                },
+                            }}
+                        >
+                            <MenuItem value="">
+                                <em>{loading ? "Đang tải..." : ""}</em> {/* Xóa chữ "Chọn khách sạn" */}
+                            </MenuItem>
+                            {hotels.map((hotel) => (
+                                <MenuItem key={hotel._id} value={hotel._id}>
+                                    {hotel.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <Paper
+                        component="form"
+                        sx={{
+                            p: "2px 4px",
+                            display: "flex",
+                            alignItems: "center",
+                            width: isMobile ? "100%" : 300,
+                            backgroundColor: colors.primary[400],
+                        }}
+                        onSubmit={handleSearch}
+                    >
+                        <InputBase
+                            sx={{ ml: 1, flex: 1, color: colors.grey[100] }}
+                            placeholder="Tìm kiếm theo bình luận"
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                        />
+                        <IconButton type="submit" sx={{ p: "10px", color: colors.grey[100] }}>
+                            <SearchIcon />
+                        </IconButton>
+                    </Paper>
+                </Box>
+                <Box
+                    height="75vh"
+                    sx={{
+                        width: "100%",
+                        overflowX: "auto",
+                        "& .MuiDataGrid-root": {
+                            border: "none",
+                            width: "100%",
+                            minWidth: isMobile ? "800px" : "100%",
+                        },
+                        "& .MuiDataGrid-main": {
+                            width: "100%",
+                        },
+                        "& .MuiDataGrid-cell": {
+                            borderBottom: "none",
+                        },
+                        "& .MuiDataGrid-columnHeaders": {
+                            backgroundColor: colors.blueAccent[700],
+                            borderBottom: "none",
+                            color: colors.grey[100],
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                            position: "sticky",
+                            top: 0,
+                            zIndex: 1,
+                        },
+                        "& .MuiDataGrid-columnHeader": {
+                            backgroundColor: colors.blueAccent[700],
+                            color: colors.grey[100],
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                        },
+                        "& .MuiDataGrid-columnHeaderTitle": {
+                            color: colors.grey[100],
+                            fontWeight: "bold",
+                        },
+                        "& .MuiDataGrid-virtualScroller": {
+                            backgroundColor: colors.primary[400],
+                        },
+                        "& .MuiDataGrid-footerContainer": {
+                            borderTop: "none",
+                            backgroundColor: colors.blueAccent[700],
+                        },
+                        "& .MuiCheckbox-root": {
+                            color: `${colors.greenAccent[200]} !important`,
+                        },
+                    }}
+                >
+                    {loading ? (
+                        <Typography variant="h6" align="center" mt={4}>
+                            Đang tải...
+                        </Typography>
+                    ) : hotels.length === 0 ? (
+                        <Box textAlign="center" mt={4}>
+                            <Typography variant="h6">
+                                Không có khách sạn nào để hiển thị
+                            </Typography>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => navigate("/loginadmin")}
+                                sx={{ mt: 2 }}
+                            >
+                                Đăng nhập lại
+                            </Button>
+                        </Box>
+                    ) : !selectedHotel?._id ? (
+                        <Typography variant="h6" align="center" mt={4}>
+                            Vui lòng chọn một khách sạn để xem đánh giá
+                        </Typography>
+                    ) : reviews.length === 0 ? (
+                        <Typography variant="h6" align="center" mt={4}>
+                            Không có đánh giá nào để hiển thị
+                        </Typography>
+                    ) : (
+                        <DataGrid
+                            rows={reviews}
+                            columns={columns}
+                            getRowId={(row) => row._id}
+                            pagination
+                            paginationMode="server"
+                            rowCount={rowCount}
+                            paginationModel={paginationModel}
+                            onPaginationModelChange={setPaginationModel}
+                            pageSizeOptions={[5, 10, 20]}
+                            getRowHeight={() => 80}
+                            sx={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }}
+                        />
+                    )}
+                </Box>
             </Box>
+            <Dialog
+                open={openModal}
+                onClose={handleCloseModal}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.5rem", textAlign: "center" }}>
+                    Chi tiết đánh giá
+                </DialogTitle>
+                <DialogContent>
+                    {selectedReview && (
+                        <Box sx={{ p: 2 }}>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Người dùng:</span> {selectedReview.userData?.username || "N/A"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Email:</span> {selectedReview.userData?.email || "N/A"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Điểm đánh giá:</span> {selectedReview.rating}/5
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Bình luận:</span> {selectedReview.comment || "Không có bình luận"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Ngày tạo:</span> {new Date(selectedReview.createdAt).toLocaleDateString("vi-VN")}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Trạng thái:</span> {selectedReview.viewed ? "Đã xem" : "Chưa xem"}
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleCloseModal}
+                        sx={{
+                            backgroundColor: colors.redAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.redAccent[600],
+                            },
+                        }}
+                    >
+                        Đóng
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={openDeleteModal}
+                onClose={handleCloseDeleteModal}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.25rem", textAlign: "center" }}>
+                    Xác nhận xóa
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ fontSize: "1.1rem" }}>
+                        Bạn có chắc chắn muốn xóa đánh giá này?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ gap: 2 }}>
+                    <Button
+                        onClick={handleCloseDeleteModal}
+                        sx={{
+                            backgroundColor: colors.grey[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.grey[600],
+                            },
+                        }}
+                    >
+                        Đóng
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        sx={{
+                            backgroundColor: colors.redAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.redAccent[600],
+                            },
+                        }}
+                    >
+                        Xóa
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

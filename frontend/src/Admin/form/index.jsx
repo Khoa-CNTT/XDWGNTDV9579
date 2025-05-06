@@ -279,7 +279,7 @@ const Form = () => {
               <Avatar
                 src={adminInfo.avatar}
                 alt="Admin Avatar"
-                sx={{ width: 150, height: 150, mb: 2 }}
+                sx={{ width: 150, height: 150, mb: 2, borderRadius: "50%", border: "2px solid" }}
               />
               <input
                 accept="image/*"

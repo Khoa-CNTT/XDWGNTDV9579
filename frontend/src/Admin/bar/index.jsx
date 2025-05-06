@@ -277,7 +277,15 @@ const BarChart = ({ isDashboard = false }) => {
                 />
               </>
             )}
-            <Button variant="contained" onClick={handleResetFilters}>
+
+            <Button
+              sx={{
+                ml: 1,
+                backgroundColor: "white"
+              }}
+              variant="outlined"
+              onClick={handleResetFilters}
+            >
               Đặt lại
             </Button>
           </Box>

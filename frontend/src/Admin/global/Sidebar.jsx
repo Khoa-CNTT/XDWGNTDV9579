@@ -1,4 +1,3 @@
-// import { useState, useEffect } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -90,6 +89,8 @@ const Sidebar = () => {
         "& .pro-menu-item.active": {
           color: "#6870fa !important",
         },
+        boxShadow: "5px 0 10px rgba(0, 0, 0, 0.2)", // Adjusted shadow to cast to the right
+        zIndex: 2,
       }}
     >
       <ProSidebar collapsed={isCollapsed}>
@@ -128,7 +129,7 @@ const Sidebar = () => {
                   width="100px"
                   height="100px"
                   src={settings.logo || "https://images.seeklogo.com/logo-png/39/1/go-travel-logo-png_seeklogo-399837.png"}
-                  style={{ cursor: "pointer", borderRadius: "50%" }}
+                  style={{ cursor: "pointer", borderRadius: "50%", border: "2px solid" }}
                 />
               </Box>
               <Box textAlign="center">

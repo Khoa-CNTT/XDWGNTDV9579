@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Box, Button, IconButton, Typography, useTheme } from "@mui/material";
+import { Box, Button, IconButton, Typography, useTheme, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { tokens } from "../../theme";
 import { mockTransactions } from "../../components/data/mockData";
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
@@ -29,10 +29,29 @@ const Dashboard = () => {
     toursToday: 0,
     totalHotels: 0,
     revenueToday: 0,
+    revenueThisMonth: 0,
   });
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+
+  const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
+  const months = [
+    { value: 1, label: "Tháng 1" },
+    { value: 2, label: "Tháng 2" },
+    { value: 3, label: "Tháng 3" },
+    { value: 4, label: "Tháng 4" },
+    { value: 5, label: "Tháng 5" },
+    { value: 6, label: "Tháng 6" },
+    { value: 7, label: "Tháng 7" },
+    { value: 8, label: "Tháng 8" },
+    { value: 9, label: "Tháng 9" },
+    { value: 10, label: "Tháng 10" },
+    { value: 11, label: "Tháng 11" },
+    { value: 12, label: "Tháng 12" },
+  ];
 
   // Fetch user details for reviews
   const fetchUserDetails = async (userId, userCache) => {
@@ -42,11 +61,10 @@ const Dashboard = () => {
     try {
       const response = await getContactDetail(userId, adminToken);
       if (response.code === 200 && response.data) {
-        const userData = {
+        return {
           username: response.data.username || response.data.fullName || "N/A",
           email: response.data.email || "N/A",
         };
-        return userData;
       }
       return { username: "N/A", email: "N/A" };
     } catch (err) {
@@ -77,6 +95,36 @@ const Dashboard = () => {
         .filter(invoice => new Date(invoice.createdAt).toISOString().split("T")[0] === today)
         .reduce((sum, invoice) => sum + (invoice.totalPrice || 0), 0);
 
+      // Calculate monthly revenue for selected month and year
+      let tourRevenueThisMonth = 0;
+      let hotelRevenueThisMonth = 0;
+      invoicesData
+        .filter(invoice => {
+          const invoiceDate = new Date(invoice.createdAt);
+          return (
+            invoiceDate.getFullYear() === selectedYear &&
+            invoiceDate.getMonth() + 1 === selectedMonth
+          );
+        })
+        .forEach((invoice) => {
+          if (invoice.tours?.length > 0) {
+            invoice.tours.forEach((tour) => {
+              const stock = tour.timeStarts?.[0]?.stock || 0;
+              tourRevenueThisMonth += (tour.price || 0) * stock;
+            });
+          }
+          if (invoice.hotels?.length > 0) {
+            invoice.hotels.forEach((hotel) => {
+              if (hotel.rooms?.length > 0) {
+                hotel.rooms.forEach((room) => {
+                  hotelRevenueThisMonth += (room.price || 0) * (room.quantity || 0);
+                });
+              }
+            });
+          }
+        });
+      const revenueThisMonth = tourRevenueThisMonth + hotelRevenueThisMonth;
+
       // Fetch hotels
       const hotelsData = await getHotels(adminToken);
       const totalHotels = Array.isArray(hotelsData.data) ? hotelsData.data.length : 0;
@@ -99,7 +147,7 @@ const Dashboard = () => {
       for (const hotel of hotelsData.data) {
         const reviews = await getHotelReviews(hotel._id, {
           page: 1,
-          limit: 10, // Fetch enough to sort and take top 5
+          limit: 10,
           sortKey: "createdAt",
           sortValue: "desc",
         }, adminToken);
@@ -134,6 +182,7 @@ const Dashboard = () => {
         toursToday,
         totalHotels,
         revenueToday,
+        revenueThisMonth,
       });
       setRecentUsers(recentUsersData);
       setRecentReviews(resolvedReviews);
@@ -151,7 +200,7 @@ const Dashboard = () => {
     } else {
       toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
     }
-  }, [adminToken]);
+  }, [adminToken, selectedYear, selectedMonth]);
 
   // Columns for Recent Users DataGrid
   const userColumns = [
@@ -175,7 +224,7 @@ const Dashboard = () => {
     <Box m="20px">
       {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Header title="BẢNG ĐIỀU KHIỂN" subtitle="Tổng quan cho admin" />
+        <Header title="Dashboard" />
         <Box>
           <Button
             sx={{
@@ -187,7 +236,7 @@ const Dashboard = () => {
             }}
           >
             <DownloadOutlined sx={{ mr: "10px" }} />
-            Tải báo cáo
+            Tải báo cáo doanh thu tháng này
           </Button>
         </Box>
       </Box>
@@ -214,7 +263,7 @@ const Dashboard = () => {
             increase={`+${stats.newUsersToday} hôm nay`}
             icon={
               <PersonAddIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize: "30px" }}
               />
             }
           />
@@ -233,7 +282,7 @@ const Dashboard = () => {
             increase={`+${stats.toursToday} hôm nay`}
             icon={
               <TourIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize: "30px" }}
               />
             }
           />
@@ -252,7 +301,7 @@ const Dashboard = () => {
             increase=""
             icon={
               <HotelIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize: "30px" }}
               />
             }
           />
@@ -271,7 +320,7 @@ const Dashboard = () => {
             increase=""
             icon={
               <MonetizationOnIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.greenAccent[600], fontSize: "30px" }}
               />
             }
           />
@@ -282,6 +331,7 @@ const Dashboard = () => {
           gridColumn="span 8"
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
+          sx={{ overflow: "hidden" }}
         >
           <Box
             mt="25px"
@@ -289,8 +339,10 @@ const Dashboard = () => {
             display="flex"
             justifyContent="space-between"
             alignItems="center"
+            flexWrap="wrap"
+            gap={2}
           >
-            <Box>
+            <Box display="flex" flexDirection="column">
               <Typography
                 variant="h5"
                 fontWeight="600"
@@ -303,19 +355,42 @@ const Dashboard = () => {
                 fontWeight="bold"
                 color={colors.greenAccent[500]}
               >
-                {(stats.revenueToday * 30 / 1000).toLocaleString()}K VNĐ
+                {(stats.revenueThisMonth / 1000000).toLocaleString()}M VNĐ
               </Typography>
             </Box>
-            <Box>
-              <IconButton>
-                <DownloadOutlined
-                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                />
-              </IconButton>
+            <Box display="flex" gap={2} alignItems="center">
+              <FormControl sx={{ minWidth: 100 }}>
+                <InputLabel>Tháng</InputLabel>
+                <Select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  label="Tháng"
+                >
+                  {months.map((month) => (
+                    <MenuItem key={month.value} value={month.value}>
+                      {month.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl sx={{ minWidth: 100 }}>
+                <InputLabel>Năm</InputLabel>
+                <Select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  label="Năm"
+                >
+                  {years.map((year) => (
+                    <MenuItem key={year} value={year}>
+                      {year}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
           </Box>
-          <Box height="250px" m="-20px 0 0 0">
-            <LineChart isDashboard={true} />
+          <Box height="200px" mt="10px" sx={{ width: "100%", overflow: "hidden" }}>
+            <LineChart isDashboard={true} selectedYear={selectedYear} selectedMonth={selectedMonth} />
           </Box>
         </Box>
         <Box

@@ -150,7 +150,7 @@ const InvoicesControl = () => {
     setStartDate("");
     setEndDate("");
     setInvoices(allInvoices);
-    toast.success("Đã reset tìm kiếm theo ngày!");
+    toast.success("Đã đặt lại tìm kiếm theo ngày!");
   };
 
   // Mở modal chi tiết
@@ -308,7 +308,6 @@ const InvoicesControl = () => {
           >
             <MenuItem value="pending">Chờ xử lý</MenuItem>
             <MenuItem value="confirmed">Đã xác nhận</MenuItem>
-            <MenuItem value="cancelled">Đã hủy</MenuItem>
           </TextField>
         </Box>
       ),
@@ -476,11 +475,14 @@ const InvoicesControl = () => {
                   Tìm kiếm
                 </Button>
                 <Button
+                  sx={{
+                    ml: 1,
+                    backgroundColor: "white"
+                  }}
                   variant="outlined"
-                  color="error"
                   onClick={handleResetDateSearch}
                 >
-                  Reset
+                  Đặt lại
                 </Button>
               </Box>
             </Box>
