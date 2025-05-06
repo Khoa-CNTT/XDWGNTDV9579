@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Box, Button, Typography, IconButton, useTheme, Paper, InputBase, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { Box, Button, Typography, IconButton, useTheme, Paper, InputBase, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { tokens } from "../../theme";
@@ -11,6 +11,8 @@ import { getContactDetail } from "../contacts/ContactsApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
 
 const Reviews = () => {
@@ -31,6 +33,20 @@ const Reviews = () => {
         pageSize: 5,
     });
     const [rowCount, setRowCount] = useState(0);
+    const [selectedReview, setSelectedReview] = useState(null);
+    const [openModal, setOpenModal] = useState(false);
+    const [openDeleteModal, setOpenDeleteModal] = useState(false);
+    const [reviewToDelete, setReviewToDelete] = useState(null);
+    const [viewedReviews, setViewedReviews] = useState(() => {
+        // Load viewed reviews from localStorage
+        const saved = localStorage.getItem("viewedReviews");
+        return saved ? JSON.parse(saved) : {};
+    });
+
+    // Save viewed reviews to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem("viewedReviews", JSON.stringify(viewedReviews));
+    }, [viewedReviews]);
 
     // Lấy danh sách khách sạn
     const fetchHotels = async () => {
@@ -120,6 +136,7 @@ const Reviews = () => {
                             ...review,
                             userData,
                             stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                            viewed: !!viewedReviews[review._id],
                         };
                     })
                 );
@@ -181,13 +198,14 @@ const Reviews = () => {
                         ...review,
                         userData,
                         stt: index + 1 + paginationModel.page * paginationModel.pageSize,
+                        viewed: !!viewedReviews[review._id],
                     };
                 })
             );
             setReviews(reviewsWithUsers);
         };
         updateFilteredReviews();
-    }, [searchText, allReviews]);
+    }, [searchText, allReviews, viewedReviews]);
 
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
@@ -197,21 +215,58 @@ const Reviews = () => {
     };
 
     const handleDelete = async (reviewId) => {
-        if (window.confirm("Bạn có chắc muốn xóa đánh giá này?")) {
-            try {
-                const response = await deleteReview(reviewId, adminToken);
-                if (response.code === 200) {
-                    setReviews(reviews.filter(review => review._id !== reviewId));
-                    setAllReviews(allReviews.filter(review => review._id !== reviewId));
-                    setRowCount(rowCount - 1);
-                    toast.success("Xóa đánh giá thành công!", { position: "top-right" });
-                } else {
-                    toast.error(response.message || "Xóa đánh giá thất bại!", { position: "top-right" });
-                }
-            } catch (err) {
-                toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", { position: "top-right" });
+        try {
+            const response = await deleteReview(reviewId, adminToken);
+            if (response.code === 200) {
+                setReviews(reviews.filter(review => review._id !== reviewId));
+                setAllReviews(allReviews.filter(review => review._id !== reviewId));
+                setRowCount(rowCount - 1);
+                // Remove from viewedReviews
+                setViewedReviews(prev => {
+                    const newViewed = { ...prev };
+                    delete newViewed[reviewId];
+                    return newViewed;
+                });
+                toast.success("Xóa đánh giá thành công!", { position: "top-right" });
+            } else {
+                toast.error(response.message || "Xóa đánh giá thất bại!", { position: "top-right" });
             }
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", { position: "top-right" });
         }
+    };
+
+    const handleOpenDeleteModal = (reviewId) => {
+        setReviewToDelete(reviewId);
+        setOpenDeleteModal(true);
+    };
+
+    const handleCloseDeleteModal = () => {
+        setOpenDeleteModal(false);
+        setReviewToDelete(null);
+    };
+
+    const handleConfirmDelete = () => {
+        if (reviewToDelete) {
+            handleDelete(reviewToDelete);
+            handleCloseDeleteModal();
+        }
+    };
+
+    const handleViewReview = (review) => {
+        setSelectedReview(review);
+        setOpenModal(true);
+        if (!viewedReviews[review._id]) {
+            setViewedReviews(prev => ({
+                ...prev,
+                [review._id]: true
+            }));
+        }
+    };
+
+    const handleCloseModal = () => {
+        setOpenModal(false);
+        setSelectedReview(null);
     };
 
     const handleSearch = (e) => {
@@ -260,13 +315,35 @@ const Reviews = () => {
             renderCell: ({ row }) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
         },
         {
+            field: "viewed",
+            headerName: "Đã xem",
+            flex: 0.7,
+            renderCell: ({ row }) => (
+                <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                    {row.viewed ? <VisibilityIcon color="success" /> : <VisibilityOffIcon color="error" />}
+                </Box>
+            ),
+        },
+        {
             field: "actions",
             headerName: "Hành động",
-            flex: 0.7,
+            flex: 1,
             renderCell: ({ row }) => (
                 <Box sx={{ display: "flex", gap: 1, mt: "9px" }}>
                     <IconButton
-                        onClick={() => handleDelete(row._id)}
+                        onClick={() => handleViewReview(row)}
+                        sx={{
+                            backgroundColor: colors.blueAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.blueAccent[600],
+                            },
+                        }}
+                    >
+                        <VisibilityIcon />
+                    </IconButton>
+                    <IconButton
+                        onClick={() => handleOpenDeleteModal(row._id)}
                         sx={{
                             backgroundColor: colors.redAccent[500],
                             color: "white",
@@ -419,6 +496,95 @@ const Reviews = () => {
                     />
                 )}
             </Box>
+            <Dialog
+                open={openModal}
+                onClose={handleCloseModal}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.5rem", textAlign: "center" }}>
+                    Chi tiết đánh giá
+                </DialogTitle>
+                <DialogContent>
+                    {selectedReview && (
+                        <Box sx={{ p: 2 }}>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Người dùng:</span> {selectedReview.userData?.username || "N/A"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Email:</span> {selectedReview.userData?.email || "N/A"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Điểm đánh giá:</span> {selectedReview.rating}/5
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Bình luận:</span> {selectedReview.comment || "Không có bình luận"}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Ngày tạo:</span> {new Date(selectedReview.createdAt).toLocaleDateString("vi-VN")}
+                            </Typography>
+                            <Typography variant="body1" sx={{ mb: 1 }}>
+                                <span style={{ fontWeight: "bold" }}>Trạng thái:</span> {selectedReview.viewed ? "Đã xem" : "Chưa xem"}
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleCloseModal}
+                        sx={{
+                            backgroundColor: colors.redAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.redAccent[600],
+                            },
+                        }}
+                    >
+                        Đóng
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={openDeleteModal}
+                onClose={handleCloseDeleteModal}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.25rem", textAlign: "center" }}>
+                    Xác nhận xóa
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ fontSize: "1.1rem" }}>
+                        Bạn có chắc chắn muốn xóa đánh giá này?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ gap: 2 }}>
+                    <Button
+                        onClick={handleCloseDeleteModal}
+                        sx={{
+                            backgroundColor: colors.grey[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.grey[600],
+                            },
+                        }}
+                    >
+                       Đóng
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        sx={{
+                            backgroundColor: colors.redAccent[500],
+                            color: "white",
+                            "&:hover": {
+                                backgroundColor: colors.redAccent[600],
+                            },
+                        }}
+                    >
+                        Xóa
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
