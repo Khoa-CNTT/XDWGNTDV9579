@@ -21,7 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 
 const TourDetails = () => {
-  const { slugTour } = useParams();
+  const { slugTour: tourId } = useParams();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -29,17 +29,27 @@ const TourDetails = () => {
   const [category, setCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTimeDepart, setSelectedTimeDepart] = useState(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
+    if (!tourId || tourId === "undefined") {
+      toast.error("ID tour không hợp lệ! Chuyển về trang Tours.");
+      navigate("/tours");
+      return;
+    }
+
     document.title = "Tours Details - GoTravel";
     window.scrollTo(0, 0);
     fetchTourDetails();
-  }, [slugTour]);
+  }, [tourId, navigate]);
 
   const fetchTourDetails = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/tours/detail/${slugTour}`);
+      const response = await api.get(`/tours/detail/${tourId}`);
+      if (!response.data || !response.data._id) {
+        throw new Error("Dữ liệu tour không hợp lệ");
+      }
       const tourData = response.data;
       tourData.images = tourData.images.map((img) => ({
         original: img,
@@ -84,16 +94,37 @@ const TourDetails = () => {
       return;
     }
 
+    if (quantity <= 0) {
+      toast.error("Số lượng phải lớn hơn 0!");
+      return;
+    }
+
+    const selectedTime = tour.timeStarts.find(
+      (time) => new Date(time.timeDepart).getTime() === new Date(selectedTimeDepart).getTime()
+    );
+    if (!selectedTime) {
+      toast.error("Thời gian khởi hành không hợp lệ!");
+      return;
+    }
+
+    if (quantity > selectedTime.stock) {
+      toast.error(`Số lượng vượt quá số chỗ còn lại (${selectedTime.stock})!`);
+      return;
+    }
+
+    const cartItem = {
+      _id: tour._id,
+      timeDepart: new Date(selectedTimeDepart).toISOString(),
+      quantity: parseInt(quantity),
+    };
+
     try {
-      await addToCart("tour", {
-        tourId: tour._id,
-        quantity: 1,
-        timeDepart: selectedTimeDepart, // Gửi thêm timeDepart cho API
-      });
-      navigate("/cart"); // Điều hướng đến trang giỏ hàng
+      await addToCart("tour", cartItem);
+      toast.success("Đã thêm tour vào giỏ hàng!");
+      navigate("/cart");
     } catch (error) {
-      console.error("Lỗi khi thêm tour vào giỏ hàng:", error);
-      toast.error(error.message || "Không thể thêm tour vào giỏ hàng! Vui lòng thử lại.");
+      console.error("Lỗi khi thêm tour vào giỏ hàng:", error.response?.data || error);
+      toast.error(error.response?.data?.message || "Không thể thêm tour vào giỏ hàng! Vui lòng thử lại.");
     }
   };
 
@@ -148,53 +179,63 @@ const TourDetails = () => {
 
                   <Tab.Content className="mt-4">
                     <Tab.Pane eventKey="1">
-                      <div className="tour_details">
-                        <h1 className="font-bold mb-2 h3 border-bottom pb-2">Tổng quan</h1>
-                        <p className="body-text">{tour.information}</p>
+                      <div className="tour_details-section overview-section">
+                        <h1 className="section-title">Tổng quan</h1>
+                        <p className="section-content">{tour.information}</p>
 
                         {category && (
-                          <>
-                            <h5 className="font-bold mb-2 h5 mt-3">Danh mục</h5>
-                            <ListGroup>
-                              <ListGroup.Item className="border-0 pt-0 body-text">
-                                <NavLink to={`/tours/${category.slug}`}>
-                                  {category.title}
-                                </NavLink>
+                          <div className="category-section">
+                            <h5 className="section-subtitle">Danh mục</h5>
+                            <ListGroup className="category-list">
+                              <ListGroup.Item className="category-item border-0 pt-0 body-text">
+                                {category.title}
                               </ListGroup.Item>
                             </ListGroup>
-                          </>
+                          </div>
                         )}
 
-                        <h5 className="font-bold mb-2 h5 mt-3">Thông tin tour</h5>
-                        <ListGroup>
-                          <ListGroup.Item className="border-0 pt-0 body-text">
-                            <strong>Mã tour:</strong> {tour.code}
-                          </ListGroup.Item>
-                          <ListGroup.Item className="border-0 pt-0 body-text">
-                            <strong>Thời gian khởi hành:</strong>{" "}
-                            <Form.Select
-                              value={selectedTimeDepart || ""}
-                              onChange={(e) => setSelectedTimeDepart(e.target.value)}
-                              className="d-inline-block w-auto"
-                            >
-                              {tour.timeStarts && tour.timeStarts.length > 0 ? (
-                                tour.timeStarts.map((time, index) => (
-                                  <option key={index} value={time.timeDepart}>
-                                    {new Date(time.timeDepart).toLocaleDateString("vi-VN")} (Còn {time.stock} chỗ)
-                                  </option>
-                                ))
-                              ) : (
-                                <option value="">Chưa có ngày</option>
-                              )}
-                            </Form.Select>
-                          </ListGroup.Item>
-                        </ListGroup>
+                        <div className="tour-info-section">
+                          <h5 className="section-subtitle">Thông tin tour</h5>
+                          <ListGroup className="tour-info-list">
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Mã tour:</strong> {tour.code}
+                            </ListGroup.Item>
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Thời gian khởi hành:</strong>{" "}
+                              <Form.Select
+                                value={selectedTimeDepart || ""}
+                                onChange={(e) => setSelectedTimeDepart(e.target.value)}
+                                className="d-inline-block w-auto tour-info-select"
+                              >
+                                {tour.timeStarts && tour.timeStarts.length > 0 ? (
+                                  tour.timeStarts.map((time, index) => (
+                                    <option key={index} value={time.timeDepart}>
+                                      {new Date(time.timeDepart).toLocaleDateString("vi-VN")} (Còn {time.stock} chỗ)
+                                    </option>
+                                  ))
+                                ) : (
+                                  <option value="">Chưa có ngày</option>
+                                )}
+                              </Form.Select>
+                            </ListGroup.Item>
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Số lượng:</strong>{" "}
+                              <Form.Control
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => setQuantity(e.target.value)}
+                                min="1"
+                                className="d-inline-block w-auto"
+                              />
+                            </ListGroup.Item>
+                          </ListGroup>
+                        </div>
                       </div>
                     </Tab.Pane>
 
                     <Tab.Pane eventKey="2">
-                      <div className="tour_details">
-                        <h1 className="font-bold mb-2 h3 border-bottom pb-2">Lịch trình</h1>
+                      <div className="tour_details-section schedule-section">
+                        <h1 className="section-title">Lịch trình</h1>
                         <Accordion defaultActiveKey="0" className="mt-4">
                           {tour.schedule.split("\n").map((item, index) => (
                             <Accordion.Item eventKey={index.toString()} key={index} className="mb-4">
@@ -209,24 +250,28 @@ const TourDetails = () => {
                     </Tab.Pane>
 
                     <Tab.Pane eventKey="3">
-                      <div className="tour_details">
-                        <h1 className="font-bold fw-bold mb-2 h3 border-bottom pb-2">
+                      <div className="tour_details-section inclusion-section">
+                        <h1 className="section-title">
                           Bao gồm và loại trừ
                         </h1>
-                        <h5 className="font-bold mb-3 h5 mt-3">Bao gồm</h5>
-                        <ListGroup.Item className="border-0 pt-0 body-text d-flex align-items-center">
-                          <i className="bi bi-check-lg me-2 text-success h4 m-0"></i> Chưa có thông tin
-                        </ListGroup.Item>
-                        <h5 className="font-bold mb-3 h5 mt-3">Loại trừ</h5>
-                        <ListGroup.Item className="border-0 pt-0 body-text d-flex align-items-center">
-                          <i className="bi bi-x-lg me-2 text-danger h5 m-0"></i> Chưa có thông tin
-                        </ListGroup.Item>
+                        <h5 className="section-subtitle mt-3">Bao gồm</h5>
+                        <ListGroup className="inclusion-list">
+                          <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
+                            <i className="bi bi-check-lg me-2 text-success h4 m-0"></i> Chưa có thông tin
+                          </ListGroup.Item>
+                        </ListGroup>
+                        <h5 className="section-subtitle mt-3">Loại trừ</h5>
+                        <ListGroup className="inclusion-list">
+                          <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
+                            <i className="bi bi-x-lg me-2 text-danger h5 m-0"></i> Chưa có thông tin
+                          </ListGroup.Item>
+                        </ListGroup>
                       </div>
                     </Tab.Pane>
 
                     <Tab.Pane eventKey="4">
-                      <div className="tour_details">
-                        <h1 className="font-bold mb-4 h3 border-bottom pb-2">Vị trí</h1>
+                      <div className="tour_details-section location-section">
+                        <h1 className="section-title">Vị trí</h1>
                         <iframe
                           src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1010296.398675619!2d114.41207770371561!3d-8.453560368052777!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd141d3e8100fa1%3A0x24910fb14b24e690!2sBali%2C%20Indonesia!5e0!3m2!1sen!2sin!4v1724581274620!5m2!1sen!2sin"
                           width="100%"
@@ -255,35 +300,11 @@ const TourDetails = () => {
                         )}
 
                         <button
-                          className="primaryBtn w-100 d-flex justify-content-center fw-bold"
+                          className="btn btn-primary w-100 mt-3"
                           onClick={handleAddToCart}
                         >
                           Đặt Tour
                         </button>
-                      </Card.Body>
-                    </Card>
-
-                    <Card className="card-info p-2 shadow-sm">
-                      <Card.Body>
-                        <h1 className="font-bold mb-2 h3">Cần giúp đỡ?</h1>
-                        <ListGroup>
-                          <ListGroup.Item className="border-0">
-                            <i className="bi bi-telephone me-1"></i> Gọi cho chúng tôi{" "}
-                            <strong>+84 779407905</strong>
-                          </ListGroup.Item>
-                          <ListGroup.Item className="border-0">
-                            <i className="bi bi-alarm me-1"></i> Thời gian: <strong>8AM to 7PM</strong>
-                          </ListGroup.Item>
-                          <ListGroup.Item className="border-0">
-                            <strong>
-                              <i className="bi bi-headset me-1"></i> Hãy để chúng tôi gọi bạn
-                            </strong>
-                          </ListGroup.Item>
-                          <ListGroup.Item className="border-0">
-                            <i className="bi bi-calendar-check me-1"></i>{" "}
-                            <strong>Đặt lịch hẹn</strong>
-                          </ListGroup.Item>
-                        </ListGroup>
                       </Card.Body>
                     </Card>
                   </aside>

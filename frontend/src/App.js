@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
 import { CartProvider } from "./context/CartContext";
+import ChangePassword from "./pages/ChangePassword/ChangePassword"; // Import component mới
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -152,7 +153,7 @@ const AppContent = () => {
       <Route path="/contact-us" element={<Contact />} />
       <Route path="/tours" element={<Tours />} />
       <Route path="/tours/category/:slugCategory" element={<Tours />} />
-      <Route path="/tour-details/:SlugTour" element={<TourDetails />} />
+      <Route path="/tours/detail/:slugTour" element={<TourDetails />} />
       <Route
         path="/booking"
         element={
@@ -189,6 +190,14 @@ const AppContent = () => {
         element={
           <PrivateRoute>
             <Invoicess />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/change-password" // Thêm route mới
+        element={
+          <PrivateRoute>
+            <ChangePassword />
           </PrivateRoute>
         }
       />

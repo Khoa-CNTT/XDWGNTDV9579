@@ -1,214 +1,237 @@
-import React, { useState, useEffect } from "react";
-import CartItem from "./CartItem";
-import CartForm from "./CartForm";
+import React from "react";
+import { Container, Row, Col, Button, Table, Alert, Form } from "react-bootstrap";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import api from "../../utils/api";
-import { toast } from "react-toastify";
-import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import CartForm from "./CartForm";
 import "./cart.css";
 
 const CartPage = () => {
-  const [cart, setCart] = useState({ tours: [], hotels: [], totalPrice: 0 });
-  const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
-  const { fetchCartCount } = useCart();
+  const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    document.title = "Giỏ hàng - GoTravel";
-    window.scrollTo(0, 0);
-    fetchCart();
-  }, [user]);
+  const cartItems = [
+    ...cart.tours.flatMap((tour) =>
+      tour.timeStarts.map((time) => ({
+        type: "tour",
+        id: `${tour.tour_id}-${time.timeDepart}`,
+        tour_id: tour.tour_id,
+        timeDepart: time.timeDepart,
+        quantity: time.quantity || 1,
+        title: tour.tourInfo?.title || "Tên tour không xác định",
+        price: tour.priceNew || tour.tourInfo?.price || 0,
+        image: tour.tourInfo?.images?.[0]?.original || "/path/to/fallback-image.jpg",
+      }))
+    ),
+    ...cart.hotels.flatMap((hotel) =>
+      hotel.rooms.map((room) => ({
+        type: "room",
+        id: `${hotel.hotel_id}-${room.room_id}`,
+        hotel_id: hotel.hotel_id,
+        room_id: room.room_id,
+        quantity: room.quantity || 1,
+        checkIn: room.checkIn,
+        checkOut: room.checkOut,
+        title: `${hotel.hotelInfo?.name || "Khách sạn không xác định"} - ${
+          room.roomInfo?.name || "Phòng không xác định"
+        }`,
+        price: room.roomInfo?.price || room.price || 0,
+        image:
+          room.roomInfo?.images?.[0] ||
+          hotel.hotelInfo?.images?.[0] ||
+          "/path/to/fallback-image.jpg",
+      }))
+    ),
+  ];
 
-  const fetchCart = async () => {
-    if (!user) {
-      setCart({ tours: [], hotels: [], totalPrice: 0 });
-      return;
-    }
-    setLoading(true);
+  const calculatedTotalPrice = cartItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+  const totalPrice =
+    cart.totalPrice !== undefined && cart.totalPrice !== null
+      ? cart.totalPrice
+      : calculatedTotalPrice;
+
+  const handleQuantityChange = async (item, newQuantity) => {
+    if (newQuantity < 1) return;
     try {
-      const response = await api.get("/carts");
-      if (response.status === 200) { // Kiểm tra status thay vì data.code
-        setCart(response.data);
-        await fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể tải giỏ hàng!");
-        setCart({ tours: [], hotels: [], totalPrice: 0 });
-      }
+      await updateQuantity(
+        item.type,
+        item.type === "tour"
+          ? { id: item.tour_id, timeDepart: item.timeDepart }
+          : { hotel_id: item.hotel_id, room_id: item.room_id },
+        newQuantity
+      );
     } catch (error) {
-      console.error("Lỗi khi lấy giỏ hàng:", error);
-      toast.error(error.response?.data?.message || "Không thể tải giỏ hàng!");
-      setCart({ tours: [], hotels: [], totalPrice: 0 });
-    } finally {
-      setLoading(false);
+      // Lỗi đã được xử lý trong updateQuantity
     }
   };
 
-  const updateTourQuantity = async (tourId, timeDepart, quantity) => {
-    if (quantity < 1) {
-      toast.error("Số lượng phải lớn hơn 0!");
-      return;
-    }
+  const handleRemoveItem = async (item) => {
     try {
-      const response = await api.patch(`/carts/update/${tourId}`, null, {
-        params: { timeDepart, quantity },
-      });
-      if (response.data.code === 200) {
-        setCart(response.data.data);
-        toast.success("Cập nhật số lượng tour thành công!");
-        await fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể cập nhật số lượng!");
-      }
+      await removeFromCart(
+        item.type,
+        item.type === "tour" ? item.tour_id : item.hotel_id,
+        item.type === "room" ? item.room_id : undefined
+      );
     } catch (error) {
-      console.error("Lỗi khi cập nhật số lượng tour:", error);
-      toast.error(error.response?.data?.message || "Không thể cập nhật số lượng!");
-    }
-  };
-
-  const updateRoomQuantity = async (hotelId, roomId, quantity) => {
-    if (quantity < 1) {
-      toast.error("Số lượng phải lớn hơn 0!");
-      return;
-    }
-    try {
-      const response = await api.patch(`/carts/updateRoom/${hotelId}/${roomId}`, null, {
-        params: { quantity },
-      });
-      if (response.data.code === 200) {
-        setCart(response.data.data);
-        toast.success("Cập nhật số lượng phòng thành công!");
-        await fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể cập nhật số lượng!");
-      }
-    } catch (error) {
-      console.error("Lỗi khi cập nhật số lượng phòng:", error);
-      toast.error(error.response?.data?.message || "Không thể cập nhật số lượng!");
-    }
-  };
-
-  const removeTour = async (tourId) => {
-    try {
-      const response = await api.patch(`/carts/delete/${tourId}`);
-      if (response.data.code === 200) {
-        setCart(response.data.data);
-        toast.success("Xóa tour khỏi giỏ hàng thành công!");
-        await fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể xóa tour!");
-      }
-    } catch (error) {
-      console.error("Lỗi khi xóa tour:", error);
-      toast.error(error.response?.data?.message || "Không thể xóa tour!");
-    }
-  };
-
-  const removeRoom = async (hotelId, roomId) => {
-    try {
-      const response = await api.patch(`/carts/deleteHotel/${hotelId}/${roomId}`);
-      if (response.data.code === 200) {
-        setCart(response.data.data);
-        toast.success("Xóa phòng khỏi giỏ hàng thành công!");
-        await fetchCartCount();
-      } else {
-        toast.error(response.data.message || "Không thể xóa phòng!");
-      }
-    } catch (error) {
-      console.error("Lỗi khi xóa phòng:", error);
-      toast.error(error.response?.data?.message || "Không thể xóa phòng!");
+      // Lỗi đã được xử lý trong removeFromCart
     }
   };
 
   return (
-    <section className="cart-section">
-      <Container className="cart-container">
-        <Breadcrumbs title="Giỏ Hàng" pagename="Giỏ Hàng" />
-        <Row>
-          <Col lg={8}>
-            <div className="cart-table-container">
-              {loading ? (
-                <div style={{ textAlign: "center", padding: "20px" }}>
-                  <Spinner animation="border" variant="primary" />
-                  <p>Đang tải giỏ hàng...</p>
-                </div>
-              ) : cart.tours.length === 0 && cart.hotels.length === 0 ? (
-                <p style={{ textAlign: "center", color: "#7f8c8d", padding: "20px" }}>
-                  Giỏ hàng của bạn đang trống!
-                </p>
-              ) : (
-                <table className="cart-table">
+    <>
+      <Breadcrumbs title="Giỏ hàng" pagename="Giỏ hàng" />
+      <section className="cart_page py-5">
+        <Container>
+          {cartItems.length === 0 ? (
+            <Alert variant="info">Giỏ hàng của bạn đang trống.</Alert>
+          ) : (
+            <Row>
+              <Col lg={8}>
+                <h4 className="mb-3">Danh sách tour</h4>
+                <Table responsive className="cart-table">
                   <thead>
                     <tr>
-                      <th>Ảnh</th>
-                      <th>Tiêu đề</th>
-                      <th>Thời gian khởi hành</th>
+                      <th>Sản phẩm</th>
                       <th>Giá</th>
                       <th>Số lượng</th>
-                      <th>Tổng tiền</th>
-                      <th>Hành động</th>
+                      <th>Tổng</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cart.tours.flatMap((item) =>
-                      item.timeStarts.map((time, index) => (
-                        <CartItem
-                          key={`${item.tour_id}-${time.timeDepart}`}
-                          item={{
-                            id: item.tour_id,
-                            timeDepart: time.timeDepart,
-                            name: item.tourInfo.title,
-                            price: item.priceNew,
-                            quantity: time.quantity,
-                            image: item.tourInfo.images[0] || "",
-                            discount: item.tourInfo.discount || 0,
-                          }}
-                          updateQuantity={(id, qty) =>
-                            updateTourQuantity(item.tour_id, time.timeDepart, qty)
-                          }
-                          removeItem={() => removeTour(item.tour_id)}
-                        />
-                      ))
-                    )}
-                    {cart.hotels.flatMap((hotel) =>
-                      hotel.rooms.map((room) => (
-                        <CartItem
-                          key={`${hotel.hotel_id}-${room.room_id}`}
-                          item={{
-                            id: `${hotel.hotel_id}-${room.room_id}`,
-                            name: `${hotel.hotelInfo.name} - ${room.roomInfo.name}`,
-                            price: room.price,
-                            quantity: room.quantity,
-                            image: room.roomInfo.images[0] || "",
-                            discount: 0,
-                          }}
-                          updateQuantity={(id, qty) =>
-                            updateRoomQuantity(hotel.hotel_id, room.room_id, qty)
-                          }
-                          removeItem={() => removeRoom(hotel.hotel_id, room.room_id)}
-                        />
-                      ))
-                    )}
+                    {cartItems
+                      .filter((item) => item.type === "tour")
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="cart-item-info">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="cart-item-image"
+                              />
+                              <div>
+                                <h5>{item.title}</h5>
+                                <p>
+                                  Thời gian khởi hành:{" "}
+                                  {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.price.toLocaleString()} VNĐ</td>
+                          <td>
+                            <Form.Control
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChange(item, parseInt(e.target.value))
+                              }
+                              min="1"
+                              style={{ width: "80px" }}
+                              disabled={isLoading}
+                            />
+                          </td>
+                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                          <td>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <i className="bi bi-spinner bi-spin"></i>
+                              ) : (
+                                "Xóa"
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
-                </table>
-              )}
-            </div>
-          </Col>
+                </Table>
 
-          <Col lg={4}>
-            <div className="order-summary">
-              <h3>Tóm tắt đơn hàng</h3>
-              <div className="summary-item">
-                <span>Tổng tiền hàng:</span>
-                <span>{cart.totalPrice.toLocaleString()} VNĐ</span>
-              </div>
-            </div>
-            <CartForm totalPrice={cart.totalPrice} />
-          </Col>
-        </Row>
-      </Container>
-    </section>
+                <h4 className="mt-4 mb-3">Danh sách phòng</h4>
+                <Table responsive className="cart-table">
+                  <thead>
+                    <tr>
+                      <th>Sản phẩm</th>
+                      <th>Giá</th>
+                      <th>Số lượng</th>
+                      <th>Tổng</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems
+                      .filter((item) => item.type === "room")
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="cart-item-info">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="cart-item-image"
+                              />
+                              <div>
+                                <h5>{item.title}</h5>
+                                <p>
+                                  Check-in: {new Date(item.checkIn).toLocaleDateString("vi-VN")}
+                                </p>
+                                <p>
+                                  Check-out:{" "}
+                                  {new Date(item.checkOut).toLocaleDateString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.price.toLocaleString()} VNĐ</td>
+                          <td>
+                            <Form.Control
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChange(item, parseInt(e.target.value))
+                              }
+                              min="1"
+                              style={{ width: "80px" }}
+                              disabled={isLoading}
+                            />
+                          </td>
+                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                          <td>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <i className="bi bi-spinner bi-spin"></i>
+                              ) : (
+                                "Xóa"
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </Table>
+              </Col>
+              <Col lg={4}>
+                <CartForm totalPrice={totalPrice} />
+              </Col>
+            </Row>
+          )}
+        </Container>
+      </section>
+    </>
   );
 };
 

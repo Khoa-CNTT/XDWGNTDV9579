@@ -91,8 +91,16 @@ const AdvanceSearch = () => {
     setSearchQuery(suggestion.name);
     setSuggestions([]);
     if (searchTab === "tour") {
-      navigate("/tours", { state: { tours: [suggestion] } });
+      if (!suggestion.slug) {
+        toast.error("Không tìm thấy thông tin tour!");
+        return;
+      }
+      navigate(`/tours/detail/${suggestion.slug}`);
     } else {
+      if (!suggestion._id) {
+        toast.error("Không tìm thấy thông tin khách sạn!");
+        return;
+      }
       navigate(`/hotels/${suggestion._id}`);
     }
   };

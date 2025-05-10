@@ -55,7 +55,6 @@ const HotelDetails = () => {
         setHotel(response.data.hotel);
         setRooms(response.data.rooms);
 
-        // Lấy đánh giá cho từng phòng
         const reviewsData = {};
         let hasError = false;
         for (const room of response.data.rooms) {
@@ -95,6 +94,7 @@ const HotelDetails = () => {
   const handleAddToCart = async (roomId, quantity) => {
     if (!user) {
       toast.error("Vui lòng đăng nhập để đặt phòng!");
+      navigate("/login");
       return;
     }
 
@@ -116,10 +116,11 @@ const HotelDetails = () => {
         checkIn,
         checkOut,
       });
+      toast.success("Đã thêm phòng vào giỏ hàng!");
       navigate("/cart");
     } catch (error) {
       console.error("Lỗi khi thêm phòng vào giỏ hàng:", error);
-      toast.error(error.message || "Không thể thêm vào giỏ hàng!");
+      toast.error(error.response?.data?.message || "Không thể thêm vào giỏ hàng!");
     }
   };
 

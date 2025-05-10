@@ -4,62 +4,53 @@ import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
 import Header from "../../components/Common/Header/Header";
+import { useCart } from "../../context/CartContext";
 import "./cart.css";
 
 const PaymentReturn = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { fetchCart, clearCart, isLoading } = useCart();
   const [paymentStatus, setPaymentStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
     document.title = "Payment Return - GoTravel";
     window.scrollTo(0, 0);
     fetchPaymentStatus();
-    fetchCartCount();
   }, []);
 
   const fetchPaymentStatus = async () => {
     const query = new URLSearchParams(location.search);
-    const queryParams = Object.fromEntries(query.entries());
+    const vnp_TxnRef = query.get("vnp_TxnRef");
+    const vnp_ResponseCode = query.get("vnp_ResponseCode");
 
-    if (!queryParams.vnp_TxnRef || !queryParams.vnp_ResponseCode) {
+    if (!vnp_TxnRef || !vnp_ResponseCode) {
       setPaymentStatus({ success: false, message: "Thông tin thanh toán không hợp lệ!" });
-      setLoading(false);
       return;
     }
 
     try {
-      const response = await api.get("/checkout/success", {
-        params: queryParams,
-      });
+      const response = await api.get(`/api/v1/checkout/success${location.search}`);
       if (response.data.code === 200) {
-        setPaymentStatus({ success: true, message: "Thanh toán thành công!", order: response.data.order });
+        setPaymentStatus({
+          success: true,
+          message: "Thanh toán thành công!",
+          order: response.data.order,
+        });
+        await clearCart(); // Xóa giỏ hàng sau khi thanh toán thành công
+        await fetchCart(); // Đồng bộ giỏ hàng
       } else {
-        setPaymentStatus({ success: false, message: response.data.message || "Thanh toán thất bại!" });
+        setPaymentStatus({
+          success: false,
+          message: response.data.message || "Thanh toán thất bại!",
+        });
       }
     } catch (error) {
       console.error("Lỗi khi kiểm tra trạng thái thanh toán:", error);
-      setPaymentStatus({ success: false, message: "Có lỗi xảy ra khi kiểm tra trạng thái thanh toán!" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCartCount = async () => {
-    try {
-      const response = await api.get("/carts");
-      if (response.status === 200) {
-        const totalQuantity = response.data.tours.reduce((total, item) =>
-          total + item.timeStarts.reduce((sum, time) => sum + time.quantity, 0), 0) +
-          response.data.hotels.reduce((total, hotel) =>
-            total + hotel.rooms.reduce((sum, room) => sum + room.quantity, 0), 0);
-        setCartCount(totalQuantity);
-      }
-    } catch (error) {
-      console.error("Không thể tải số lượng giỏ hàng:", error);
-      setCartCount(0); // Nếu lỗi, đặt cartCount về 0
+      setPaymentStatus({
+        success: false,
+        message: "Có lỗi xảy ra khi kiểm tra trạng thái thanh toán!",
+      });
     }
   };
 
@@ -75,27 +66,52 @@ const PaymentReturn = () => {
 
   return (
     <>
-      <Header cartCount={cartCount} />
+      <Header />
       <section className="payment-return-section">
         <Container>
-          {loading ? (
+          {isLoading ? (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <Spinner animation="border" variant="primary" />
               <p className="mt-3">Đang kiểm tra trạng thái thanh toán...</p>
             </div>
           ) : (
-            <Card className="card">
+            <Card className="payment-card">
               <Card.Body>
                 <h2 className={paymentStatus?.success ? "success" : "error"}>
-                  {paymentStatus?.success ? "Thanh toán thành công!" : "Thanh toán thất bại!"}
+                  {paymentStatus?.success
+                    ? "Thanh toán thành công!"
+                    : "Thanh toán thất bại!"}
                 </h2>
                 <p>{paymentStatus?.message}</p>
+                {paymentStatus?.success && paymentStatus.order && (
+                  <div className="order-details">
+                    <h4>Thông tin đơn hàng</h4>
+                    <p>
+                      <strong>Mã đơn hàng:</strong> {paymentStatus.order.orderCode}
+                    </p>
+                    <p>
+                      <strong>Tổng tiền:</strong>{" "}
+                      {paymentStatus.order.totalPrice.toLocaleString()} VNĐ
+                    </p>
+                    <p>
+                      <strong>Trạng thái:</strong> {paymentStatus.order.status}
+                    </p>
+                  </div>
+                )}
                 <div className="d-flex justify-content-center gap-3">
-                  <Button variant="primary" onClick={handleContinueShopping}>
+                  <Button
+                    variant="primary"
+                    onClick={handleContinueShopping}
+                    disabled={isLoading}
+                  >
                     Tiếp tục mua sắm
                   </Button>
                   {paymentStatus?.success && (
-                    <Button variant="success" onClick={handleViewInvoice}>
+                    <Button
+                      variant="success"
+                      onClick={handleViewInvoice}
+                      disabled={isLoading}
+                    >
                       Xem hóa đơn
                     </Button>
                   )}

@@ -3,27 +3,26 @@ import { Form, Button, Spinner } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
 import api from "../../utils/api";
 import "./cart.css";
 
 const CartForm = ({ totalPrice }) => {
   const { user } = useAuth();
+  const { cart, checkout, fetchCart, clearCart, isLoading } = useCart(); // Thêm `cart` vào đây
   const navigate = useNavigate();
   const [voucherCode, setVoucherCode] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [customer, setCustomer] = useState({
-    name: "",
-    email: "",
+    fullName: "",
     phone: "",
-    note: "", // Thêm trường note
+    note: "",
   });
-  const [errors, setErrors] = useState({ name: "", email: "", phone: "", note: "" });
+  const [errors, setErrors] = useState({ fullName: "", phone: "", note: "" });
 
   useEffect(() => {
     if (user) {
       setCustomer({
-        name: user.fullName || "", // Sử dụng fullName từ user
-        email: user.email || "",
+        fullName: user.fullName || "",
         phone: user.phone || "",
         note: "",
       });
@@ -31,19 +30,11 @@ const CartForm = ({ totalPrice }) => {
   }, [user]);
 
   const validateForm = () => {
-    const newErrors = { name: "", email: "", phone: "", note: "" };
+    const newErrors = { fullName: "", phone: "", note: "" };
     let isValid = true;
 
-    if (!customer.name.trim()) {
-      newErrors.name = "Vui lòng nhập họ và tên!";
-      isValid = false;
-    }
-
-    if (!customer.email.trim()) {
-      newErrors.email = "Vui lòng nhập email!";
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(customer.email)) {
-      newErrors.email = "Email không hợp lệ!";
+    if (!customer.fullName.trim()) {
+      newErrors.fullName = "Vui lòng nhập họ và tên!";
       isValid = false;
     }
 
@@ -66,8 +57,13 @@ const CartForm = ({ totalPrice }) => {
       return;
     }
 
-    if (totalPrice === 0) {
+    if (!cart.tours.length && !cart.hotels.length) {
       toast.error("Giỏ hàng trống, không thể thanh toán!");
+      return;
+    }
+
+    if (totalPrice === 0) {
+      toast.error("Tổng tiền bằng 0, không thể thanh toán!");
       return;
     }
 
@@ -76,34 +72,41 @@ const CartForm = ({ totalPrice }) => {
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      // Bước 1: Tạo đơn hàng
-      const orderResponse = await api.post("/checkout/order", {
-        fullName: customer.name,
+      await fetchCart(); // Đồng bộ giỏ hàng trước khi thanh toán
+
+      // Tạo đơn hàng
+      const orderData = {
+        fullName: customer.fullName,
         phone: customer.phone,
         note: customer.note,
-        voucherCode: voucherCode || undefined, // Chỉ gửi nếu có voucherCode
-      });
+        voucherCode: voucherCode || undefined,
+      };
 
-      if (orderResponse.data.status === "200") { // API trả về status thay vì code
-        const orderId = orderResponse.data.order._id;
+      const orderResponse = await api.post("/api/v1/checkout/order", orderData);
+      const orderId = orderResponse.data.order._id;
 
-        // Bước 2: Tạo URL thanh toán VNPay
-        const paymentResponse = await api.post(`/checkout/payment/${orderId}`);
-        if (paymentResponse.data.paymentUrl) {
-          window.location.href = paymentResponse.data.paymentUrl;
-        } else {
-          toast.error("Không thể tạo URL thanh toán!");
-        }
+      if (!orderId) {
+        throw new Error("Không thể tạo đơn hàng!");
+      }
+
+      // Tạo URL thanh toán VNPay
+      const paymentResponse = await api.post(`/api/v1/checkout/payment/${orderId}`);
+      const paymentUrl = paymentResponse.data.paymentUrl;
+
+      if (paymentUrl) {
+        await clearCart(); // Xóa giỏ hàng trước khi chuyển hướng
+        window.location.href = paymentUrl; // Chuyển hướng đến VNPay
       } else {
-        toast.error(orderResponse.data.message || "Không thể tạo đơn hàng!");
+        await clearCart(); // Xóa giỏ hàng nếu không cần thanh toán
+        toast.success("Đặt hàng thành công nhưng không cần thanh toán!");
+        navigate("/payment-success");
       }
     } catch (error) {
-      console.error("Lỗi khi tạo đơn hàng hoặc URL thanh toán:", error);
-      toast.error(error.response?.data?.message || "Có lỗi xảy ra khi tạo đơn hàng!");
-    } finally {
-      setIsSubmitting(false);
+      console.error("Lỗi khi thanh toán:", error.response?.data || error);
+      toast.error(
+        error.response?.data?.message || error.message || "Có lỗi xảy ra khi tạo đơn hàng!"
+      );
     }
   };
 
@@ -121,29 +124,14 @@ const CartForm = ({ totalPrice }) => {
           <Form.Label>Họ và tên</Form.Label>
           <Form.Control
             type="text"
-            name="name"
-            value={customer.name}
+            name="fullName"
+            value={customer.fullName}
             onChange={handleInputChange}
             placeholder="Nhập họ và tên"
-            isInvalid={!!errors.name}
+            isInvalid={!!errors.fullName}
+            disabled={isLoading}
           />
-          <Form.Control.Feedback type="invalid">
-            {errors.name}
-          </Form.Control.Feedback>
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Email</Form.Label>
-          <Form.Control
-            type="email"
-            name="email"
-            value={customer.email}
-            onChange={handleInputChange}
-            placeholder="Nhập email"
-            isInvalid={!!errors.email}
-          />
-          <Form.Control.Feedback type="invalid">
-            {errors.email}
-          </Form.Control.Feedback>
+          <Form.Control.Feedback type="invalid">{errors.fullName}</Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Số điện thoại</Form.Label>
@@ -154,10 +142,9 @@ const CartForm = ({ totalPrice }) => {
             onChange={handleInputChange}
             placeholder="Nhập số điện thoại"
             isInvalid={!!errors.phone}
+            disabled={isLoading}
           />
-          <Form.Control.Feedback type="invalid">
-            {errors.phone}
-          </Form.Control.Feedback>
+          <Form.Control.Feedback type="invalid">{errors.phone}</Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Ghi chú</Form.Label>
@@ -169,10 +156,9 @@ const CartForm = ({ totalPrice }) => {
             onChange={handleInputChange}
             placeholder="Nhập ghi chú (nếu có)"
             isInvalid={!!errors.note}
+            disabled={isLoading}
           />
-          <Form.Control.Feedback type="invalid">
-            {errors.note}
-          </Form.Control.Feedback>
+          <Form.Control.Feedback type="invalid">{errors.note}</Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Mã giảm giá</Form.Label>
@@ -181,10 +167,9 @@ const CartForm = ({ totalPrice }) => {
             placeholder="Nhập mã giảm giá"
             value={voucherCode}
             onChange={(e) => setVoucherCode(e.target.value)}
+            disabled={isLoading}
           />
-          <small className="text-muted">
-            Mã giảm giá sẽ được áp dụng khi tạo đơn hàng.
-          </small>
+          <small className="text-muted">Mã giảm giá sẽ được áp dụng khi tạo đơn hàng.</small>
         </Form.Group>
         <div className="cart-summary-details mb-3">
           <div className="d-flex justify-content-between fw-bold">
@@ -196,13 +181,9 @@ const CartForm = ({ totalPrice }) => {
           variant="primary"
           className="w-100"
           onClick={handleCheckout}
-          disabled={isSubmitting}
+          disabled={isLoading}
         >
-          {isSubmitting ? (
-            <Spinner animation="border" size="sm" />
-          ) : (
-            "Thanh toán với VNPay"
-          )}
+          {isLoading ? <Spinner animation="border" size="sm" /> : "Thanh toán"}
         </Button>
       </Form>
     </div>

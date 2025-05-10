@@ -7,8 +7,10 @@ import "../Header/header.css";
 
 const Header = () => {
   const [open, setOpen] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
+  const [showServicesDropdown, setShowServicesDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const servicesDropdownRef = useRef(null);
+  const userDropdownRef = useRef(null);
   const { user, logout } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
@@ -24,8 +26,11 @@ const Header = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
+      if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(event.target)) {
+        setShowServicesDropdown(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setShowUserDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -34,11 +39,18 @@ const Header = () => {
 
   const handleLogout = async () => {
     await logout();
-    setShowDropdown(false);
+    setShowUserDropdown(false);
   };
 
   const toggleMenu = () => setOpen(!open);
-  const toggleDropdown = () => setShowDropdown(!showDropdown);
+  const toggleServicesDropdown = () => setShowServicesDropdown(!showServicesDropdown);
+  const toggleUserDropdown = () => setShowUserDropdown(!showUserDropdown);
+
+  const handleNavLinkClick = () => {
+    setOpen(false);
+    setShowServicesDropdown(false);
+    setShowUserDropdown(false);
+  };
 
   return (
     <header className="header-section">
@@ -64,35 +76,38 @@ const Header = () => {
 
             <Offcanvas.Body>
               <Nav className="justify-content-end flex-grow-1 pe-3">
-                <NavLink className="nav-link" to="/" onClick={() => setOpen(false)}>
+                <NavLink className="nav-link" to="/" onClick={handleNavLinkClick}>
                   Trang chủ
                 </NavLink>
-                <NavLink className="nav-link" to="/about-us" onClick={() => setOpen(false)}>
+                <NavLink className="nav-link" to="/about-us" onClick={handleNavLinkClick}>
                   Về chúng tôi
                 </NavLink>
-                <NavLink className="nav-link" to="/tours" onClick={() => setOpen(false)}>
-                  Tours
-                </NavLink>
-                <NavDropdown title="Dịch vụ" id="services-dropdown">
+                <NavDropdown
+                  title="Dịch vụ"
+                  id="services-dropdown"
+                  show={showServicesDropdown}
+                  onToggle={toggleServicesDropdown}
+                  ref={servicesDropdownRef}
+                >
                   <NavLink
                     className="nav-link text-dark"
                     to="/hotel-services"
-                    onClick={() => setOpen(false)}
+                    onClick={handleNavLinkClick}
                   >
                     Dịch vụ khách sạn
                   </NavLink>
                 </NavDropdown>
-                <NavLink className="nav-link" to="/categories" onClick={() => setOpen(false)}>
-                  Danh mục
+                <NavLink className="nav-link" to="/categories" onClick={handleNavLinkClick}>
+                  Danh mục Tour
                 </NavLink>
-                <NavLink className="nav-link" to="/gallery" onClick={() => setOpen(false)}>
+                <NavLink className="nav-link" to="/gallery" onClick={handleNavLinkClick}>
                   Thư viện
                 </NavLink>
-                <NavLink className="nav-link" to="/contact-us" onClick={() => setOpen(false)}>
+                <NavLink className="nav-link" to="/contact-us" onClick={handleNavLinkClick}>
                   Liên hệ
                 </NavLink>
                 {user?.role === "admin" && (
-                  <NavLink className="nav-link" to="/dashboard" onClick={() => setOpen(false)}>
+                  <NavLink className="nav-link" to="/dashboard" onClick={handleNavLinkClick}>
                     Dashboard
                   </NavLink>
                 )}
@@ -107,8 +122,8 @@ const Header = () => {
             </NavLink>
 
             {user ? (
-              <div className={`user-section ${showDropdown ? "show-dropdown" : ""}`} ref={dropdownRef}>
-                <div className="user-info" onClick={toggleDropdown}>
+              <div className={`user-section ${showUserDropdown ? "show-dropdown" : ""}`} ref={userDropdownRef}>
+                <div className="user-info" onClick={toggleUserDropdown}>
                   <img
                     src={
                       user.avatar ||
@@ -118,15 +133,15 @@ const Header = () => {
                     className="user-avatar rounded-circle"
                   />
                   <span className="user-name ms-2">{user.fullName}</span>
-                  <i className={`bi bi-chevron-${showDropdown ? "up" : "down"} ms-1`}></i>
+                  <i className={`bi bi-chevron-${showUserDropdown ? "up" : "down"} ms-1`}></i>
                 </div>
-                {showDropdown && (
+                {showUserDropdown && (
                   <div className="user-dropdown">
                     <div
                       className="dropdown-item"
                       onClick={() => {
                         navigate("/profile");
-                        setShowDropdown(false);
+                        setShowUserDropdown(false);
                       }}
                     >
                       Thông tin cá nhân
@@ -135,10 +150,19 @@ const Header = () => {
                       className="dropdown-item"
                       onClick={() => {
                         navigate("/invoices");
-                        setShowDropdown(false);
+                        setShowUserDropdown(false);
                       }}
                     >
                       Hóa đơn
+                    </div>
+                    <div
+                      className="dropdown-item"
+                      onClick={() => {
+                        navigate("/change-password");
+                        setShowUserDropdown(false);
+                      }}
+                    >
+                      Đổi mật khẩu
                     </div>
                     <div className="dropdown-item" onClick={handleLogout}>
                       Đăng xuất
@@ -152,7 +176,6 @@ const Header = () => {
                 <span className="login-text">Đăng nhập</span>
               </NavLink>
             )}
-
             <NavLink className="primaryBtn d-none d-sm-inline-block" to="/booking">
               Đặt vé ngay
             </NavLink>
