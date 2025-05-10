@@ -13,6 +13,10 @@ import {
     FormControlLabel,
     Checkbox,
     FormGroup,
+    InputBase,
+    Paper,
+    IconButton,
+    Pagination,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -21,6 +25,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import SearchIcon from "@mui/icons-material/Search";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -31,6 +36,7 @@ import {
     getRightsGroupDetail,
 } from "./RightsgroupApi";
 import { useAdminAuth } from "../../context/AdminContext";
+import { useNavigate } from "react-router-dom";
 
 // Ánh xạ tên hiển thị cho quyền
 const PERMISSION_DISPLAY_NAMES = {
@@ -71,7 +77,7 @@ const PERMISSION_DISPLAY_NAMES = {
     order_edit: "Sửa danh sách đơn tour",
     order_delete: "Xoá danh sách đơn tour",
     review_view: "Xem danh sách review",
-    review_delete: "Xem danh sách review",
+    review_delete: "Xóa danh sách review",
     general: "Cài đặt chung",
 };
 
@@ -122,9 +128,14 @@ const RightsGroupControl = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const { adminToken } = useAdminAuth();
+    const navigate = useNavigate();
     const [rightsGroups, setRightsGroups] = useState([]);
+    const [allRightsGroups, setAllRightsGroups] = useState([]);
+    const [searchText, setSearchText] = useState("");
     const [open, setOpen] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
+    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+    const [deleteRightsGroupId, setDeleteRightsGroupId] = useState(null);
     const [isEdit, setIsEdit] = useState(false);
     const [currentId, setCurrentId] = useState(null);
     const [currentRightsGroup, setCurrentRightsGroup] = useState(null);
@@ -135,29 +146,49 @@ const RightsGroupControl = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limitItems = 10;
 
-    // Lấy danh sách nhóm quyền
-    const fetchRightsGroups = async (search = "") => {
+    const fetchRightsGroups = async (page = 1) => {
         setLoading(true);
         try {
-            const data = await getRightsGroups({ title: search });
-            const formattedData = Array.isArray(data)
-                ? data.map((item, index) => ({
+            const response = await getRightsGroups({
+                page,
+                limit: limitItems,
+                sortKey: "createdAt",
+                sortValue: "desc",
+            });
+            console.log("fetchRightsGroups response:", response);
+            if (response && Array.isArray(response.roles)) {
+                const formattedData = response.roles.map((item, index) => ({
                     ...item,
                     id: item._id,
-                    stt: index + 1,
-                }))
-                : [];
-            setRightsGroups(formattedData);
-            console.log("RightsGroups loaded:", formattedData);
-            if (formattedData.length === 0) {
-                toast.info("Không có nhóm quyền nào để hiển thị!", { position: "top-right" });
+                    stt: index + 1 + (page - 1) * limitItems,
+                }));
+                setAllRightsGroups(formattedData);
+                setRightsGroups(formattedData);
+                setTotalPages(response.totalPage || 1);
+                if (formattedData.length === 0) {
+                    toast.info("Không có nhóm quyền nào để hiển thị!", { position: "top-right" });
+                }
+            } else {
+                setError("Dữ liệu nhóm quyền không hợp lệ!");
+                toast.error("Dữ liệu nhóm quyền không hợp lệ!", { position: "top-right" });
+                setRightsGroups([]);
+                setAllRightsGroups([]);
+                setTotalPages(1);
             }
         } catch (err) {
             const errorMessage = err.response?.data?.message || "Không thể tải danh sách nhóm quyền!";
             setError(errorMessage);
             toast.error(errorMessage, { position: "top-right" });
             console.error("Fetch rights groups error:", err.response?.data);
+            if (err.response?.status === 401) {
+                toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+                localStorage.removeItem("adminToken");
+                navigate("/loginadmin");
+            }
         } finally {
             setLoading(false);
         }
@@ -165,18 +196,28 @@ const RightsGroupControl = () => {
 
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
-        console.log("adminToken in RightsGroupControl:", token);
         if (token) {
-            fetchRightsGroups();
+            fetchRightsGroups(currentPage);
         } else {
             toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
             setTimeout(() => {
-                window.location.href = "/loginadmin";
+                navigate("/loginadmin");
             }, 2000);
         }
-    }, [adminToken]);
+    }, [adminToken, navigate, currentPage]);
 
-    // Mở modal thêm mới
+    useEffect(() => {
+        const filteredRightsGroups = allRightsGroups.filter((group) =>
+            (group.title?.toLowerCase() || "").includes(searchText.toLowerCase()) ||
+            (group.description?.toLowerCase() || "").includes(searchText.toLowerCase())
+        );
+        setRightsGroups(filteredRightsGroups);
+    }, [searchText, allRightsGroups]);
+
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+    };
+
     const handleOpen = () => {
         setIsEdit(false);
         setNewRightsGroup({
@@ -188,7 +229,6 @@ const RightsGroupControl = () => {
         setOpen(true);
     };
 
-    // Mở modal chỉnh sửa
     const handleEdit = (rightsGroup) => {
         setIsEdit(true);
         setCurrentId(rightsGroup._id);
@@ -201,17 +241,11 @@ const RightsGroupControl = () => {
         setOpen(true);
     };
 
-    // Mở modal chi tiết
     const handleOpenDetail = async (rightsGroup) => {
         setLoading(true);
         try {
-            const data = await getRightsGroupDetail(rightsGroup._id);
-            setCurrentRightsGroup(data);
-            setNewRightsGroup({
-                title: data.title || "",
-                description: data.description || "",
-                permissions: data.permissions || [],
-            });
+            const response = await getRightsGroupDetail(rightsGroup._id);
+            setCurrentRightsGroup(response);
             setOpenDetail(true);
         } catch (err) {
             const errorMessage = err.response?.data?.message || "Không thể tải chi tiết nhóm quyền!";
@@ -232,7 +266,16 @@ const RightsGroupControl = () => {
         setCurrentRightsGroup(null);
     };
 
-    // Thêm nhóm quyền
+    const handleOpenDeleteConfirm = (id) => {
+        setDeleteRightsGroupId(id);
+        setOpenDeleteConfirm(true);
+    };
+
+    const handleCloseDeleteConfirm = () => {
+        setOpenDeleteConfirm(false);
+        setDeleteRightsGroupId(null);
+    };
+
     const handleAdd = async () => {
         if (!newRightsGroup.title || !newRightsGroup.description) {
             setError("Vui lòng điền đầy đủ thông tin!");
@@ -242,7 +285,7 @@ const RightsGroupControl = () => {
         try {
             const response = await createRightsGroup(newRightsGroup);
             if (response.code === 200) {
-                fetchRightsGroups();
+                fetchRightsGroups(currentPage);
                 handleClose();
                 toast.success("Thêm nhóm quyền thành công!", { position: "top-right" });
             } else {
@@ -262,7 +305,6 @@ const RightsGroupControl = () => {
         }
     };
 
-    // Cập nhật nhóm quyền
     const handleUpdate = async () => {
         if (!newRightsGroup.title || !newRightsGroup.description) {
             setError("Vui lòng điền đầy đủ thông tin!");
@@ -272,7 +314,7 @@ const RightsGroupControl = () => {
         try {
             const response = await updateRightsGroup(currentId, newRightsGroup);
             if (response.code === 200) {
-                fetchRightsGroups();
+                fetchRightsGroups(currentPage);
                 handleClose();
                 toast.success("Cập nhật nhóm quyền thành công!", { position: "top-right" });
             } else {
@@ -292,29 +334,27 @@ const RightsGroupControl = () => {
         }
     };
 
-    // Xóa nhóm quyền
-    const handleDelete = async (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa nhóm quyền này?")) {
-            setLoading(true);
-            try {
-                const response = await deleteRightsGroup(id);
-                if (response.code === 200) {
-                    fetchRightsGroups();
-                    toast.success("Xóa nhóm quyền thành công!", { position: "top-right" });
-                } else {
-                    toast.error(response.message || "Xóa nhóm quyền thất bại!", { position: "top-right" });
-                }
-            } catch (err) {
-                const errorMessage = err.response?.data?.message || "Xóa nhóm quyền thất bại!";
-                toast.error(errorMessage, { position: "top-right" });
-                console.error("Delete rights group error:", err.response?.data);
-            } finally {
-                setLoading(false);
+    const handleConfirmDelete = async () => {
+        if (!deleteRightsGroupId) return;
+        setLoading(true);
+        try {
+            const response = await deleteRightsGroup(deleteRightsGroupId);
+            if (response.code === 200) {
+                fetchRightsGroups(currentPage);
+                toast.success("Xóa nhóm quyền thành công!", { position: "top-right" });
+            } else {
+                toast.error(response.message || "Xóa nhóm quyền thất bại!", { position: "top-right" });
             }
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || "Xóa nhóm quyền thất bại!";
+            toast.error(errorMessage, { position: "top-right" });
+            console.error("Delete rights group error:", err.response?.data);
+        } finally {
+            setLoading(false);
+            handleCloseDeleteConfirm();
         }
     };
 
-    // Xử lý thay đổi quyền
     const handlePermissionChange = (event) => {
         const permission = event.target.name;
         setNewRightsGroup((prev) => ({
@@ -325,7 +365,6 @@ const RightsGroupControl = () => {
         }));
     };
 
-    // Xử lý chọn tất cả quyền
     const handleSelectAllPermissions = (event) => {
         if (event.target.checked) {
             setNewRightsGroup((prev) => ({
@@ -340,7 +379,6 @@ const RightsGroupControl = () => {
         }
     };
 
-    // Kiểm tra xem tất cả quyền đã được chọn hay chưa
     const isAllPermissionsSelected = () => {
         return AVAILABLE_PERMISSIONS.every((permission) =>
             newRightsGroup.permissions.includes(permission)
@@ -386,7 +424,7 @@ const RightsGroupControl = () => {
                         color="error"
                         size="small"
                         startIcon={<DeleteIcon />}
-                        onClick={() => handleDelete(params.row._id)}
+                        onClick={() => handleOpenDeleteConfirm(params.row._id)}
                     >
                         Xóa
                     </Button>
@@ -410,15 +448,34 @@ const RightsGroupControl = () => {
                 theme="light"
                 limit={3}
             />
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-                <Box sx={{ gridColumn: 'span 12' }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+                <Box sx={{ gridColumn: "span 12" }}>
                     <Box display="flex" justifyContent="space-between" mb={2}>
                         <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
                             Quản lý nhóm quyền
                         </Typography>
                         <Box display="flex" gap={2}>
-
+                            <Paper
+                                component="form"
+                                sx={{
+                                    p: "2px 4px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    width: 300,
+                                    backgroundColor: colors.primary[400],
+                                }}
+                                onSubmit={(e) => e.preventDefault()}
+                            >
+                                <InputBase
+                                    sx={{ ml: 1, flex: 1 }}
+                                    placeholder="Tìm kiếm nhóm quyền (tiêu đề, mô tả)"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                />
+                                <IconButton sx={{ p: "10px" }}>
+                                    <SearchIcon />
+                                </IconButton>
+                            </Paper>
                             <Button
                                 variant="contained"
                                 color="success"
@@ -430,8 +487,7 @@ const RightsGroupControl = () => {
                         </Box>
                     </Box>
                 </Box>
-
-                <Box sx={{ gridColumn: 'span 12' }}>
+                <Box sx={{ gridColumn: "span 12" }}>
                     <Box
                         height="75vh"
                         sx={{
@@ -468,6 +524,10 @@ const RightsGroupControl = () => {
                             "& .MuiDataGrid-footerContainer": {
                                 borderTop: "none",
                                 backgroundColor: colors.blueAccent[700],
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "10px",
                             },
                             "& .MuiCheckbox-root": {
                                 color: `${colors.greenAccent[200]} !important`,
@@ -478,24 +538,36 @@ const RightsGroupControl = () => {
                             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                                 <CircularProgress />
                             </Box>
+                        ) : rightsGroups.length === 0 ? (
+                            <Typography variant="h6" align="center" mt={4}>
+                                Không có nhóm quyền nào để hiển thị
+                            </Typography>
                         ) : (
-                            <DataGrid
-                                rows={rightsGroups}
-                                columns={columns}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10, 20]}
-                                disableSelectionOnClick
-                                getRowHeight={() => 60}
-                                sx={{
-                                    width: "100%",
-                                }}
-                            />
+                            <>
+                                <DataGrid
+                                    rows={rightsGroups}
+                                    columns={columns}
+                                    getRowId={(row) => row._id}
+                                    pagination={false}
+                                    getRowHeight={() => 60}
+                                    sx={{
+                                        width: "100%",
+                                    }}
+                                    hideFooter={true}
+                                />
+                                <Box display="flex" justifyContent="center" mt={2}>
+                                    <Pagination
+                                        count={totalPages}
+                                        page={currentPage}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                    />
+                                </Box>
+                            </>
                         )}
                     </Box>
                 </Box>
             </Box>
-
-            {/* Modal thêm mới/chỉnh sửa */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle
                     sx={{
@@ -545,7 +617,7 @@ const RightsGroupControl = () => {
                             }
                             label=""
                         />
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>Quyền :</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>Quyền:</Typography>
                     </Box>
                     <FormControl component="fieldset">
                         <FormGroup>
@@ -592,8 +664,6 @@ const RightsGroupControl = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Modal chi tiết */}
             <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="sm" fullWidth>
                 <DialogTitle
                     sx={{
@@ -608,19 +678,17 @@ const RightsGroupControl = () => {
                     {currentRightsGroup ? (
                         <Box>
                             <Typography variant="h5">
-                                <span style={{ fontWeight: "bold" }}>Tiêu đề: </span>
-                                {currentRightsGroup.title || "N/A"}
+                                <strong>Tiêu đề:</strong> {currentRightsGroup.title || "N/A"}
                             </Typography>
                             <Typography variant="h5">
-                                <span style={{ fontWeight: "bold" }}>Mô tả: </span>
-                                {currentRightsGroup.description || "N/A"}
+                                <strong>Mô tả:</strong> {currentRightsGroup.description || "N/A"}
                             </Typography>
                             <Typography variant="h5" mt={1} mb={1} sx={{ fontWeight: 700 }}>
-                                Quyền :
+                                Quyền:
                             </Typography>
-                            {newRightsGroup.permissions.length > 0 ? (
+                            {currentRightsGroup.permissions && currentRightsGroup.permissions.length > 0 ? (
                                 <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                                    {newRightsGroup.permissions.map((permission) => (
+                                    {currentRightsGroup.permissions.map((permission) => (
                                         <Typography component="li" key={permission}>
                                             {PERMISSION_DISPLAY_NAMES[permission] || permission}
                                         </Typography>
@@ -642,6 +710,39 @@ const RightsGroupControl = () => {
                         sx={{ fontWeight: "bold" }}
                     >
                         Đóng
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm} maxWidth="xs" fullWidth>
+                <DialogTitle
+                    sx={{
+                        fontWeight: "bold",
+                        fontSize: "1.3rem",
+                        textAlign: "center",
+                    }}
+                >
+                    Xác nhận xóa nhóm quyền
+                </DialogTitle>
+                <DialogContent>
+                    <Typography>Bạn có chắc chắn muốn xóa nhóm quyền này không?</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleCloseDeleteConfirm}
+                        color="primary"
+                        variant="contained"
+                        sx={{ fontWeight: "bold" }}
+                    >
+                        Hủy
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        color="error"
+                        variant="contained"
+                        sx={{ fontWeight: "bold" }}
+                        disabled={loading}
+                    >
+                        {loading ? <CircularProgress size={24} /> : "Xóa"}
                     </Button>
                 </DialogActions>
             </Dialog>

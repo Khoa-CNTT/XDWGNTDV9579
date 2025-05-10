@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Button,
@@ -16,6 +16,7 @@ import {
     Select,
     InputLabel,
     FormControl,
+    Pagination,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -45,9 +46,11 @@ const TourControl = () => {
     const colors = tokens(theme.palette.mode);
     const { adminToken } = useAdminAuth();
     const [tours, setTours] = useState([]);
-    const [allTours, setAllTours] = useState([]);
     const [categories, setCategories] = useState([]);
     const [searchText, setSearchText] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [sortOption, setSortOption] = useState("none");
+    const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
     const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
@@ -73,8 +76,12 @@ const TourControl = () => {
         schedule: "",
     });
     const [loading, setLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState("");
     const [selectedDates, setSelectedDates] = useState({});
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limitItems = 10;
 
     // Gộp các ngày khởi hành trùng lặp và cộng tổng số lượng
     const mergeDuplicateDates = (timeStarts) => {
@@ -88,7 +95,7 @@ const TourControl = () => {
                 } else {
                     merged[dateKey] = {
                         timeDepart,
-                        stock: parseInt(stock) || 0
+                        stock: parseInt(stock) || 0,
                     };
                 }
             }
@@ -97,28 +104,64 @@ const TourControl = () => {
         return Object.values(merged);
     };
 
+    // Chuẩn hóa từ khóa tìm kiếm
+    const normalizeSearchText = (text) => {
+        return text
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    };
+
     // Lấy danh sách danh mục
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         try {
             const data = await getCategories();
             console.log("Categories from API:", data);
-            setCategories(data);
-            return data;
+            const categoryList = Array.isArray(data.categories) ? data.categories : [];
+            setCategories(categoryList);
+            return categoryList;
         } catch (err) {
             toast.error("Không thể tải danh sách danh mục!", { position: "top-right" });
             console.error("Fetch categories error:", err);
             return [];
         }
-    };
+    }, []);
 
     // Lấy danh sách tour
-    const fetchTours = async (categoriesData) => {
-        setLoading(true);
-        try {
-            const data = await getTours();
-            console.log("Tours from API:", data);
-            const formattedData = Array.isArray(data)
-                ? data.map((item, index) => {
+    const fetchTours = useCallback(
+        async (categoriesData, page = 1, searchQuery = "", status = "all", sortKey = "", sortValue = "") => {
+            setLoading(true);
+            try {
+                const params = { page, limit: limitItems };
+                if (searchQuery) {
+                    params.search = searchQuery;
+                }
+                if (status !== "all") {
+                    params.status = status;
+                }
+                if (sortKey && sortValue) {
+                    params.sortKey = sortKey;
+                    params.sortValue = sortValue;
+                }
+                console.log("Fetch tours with params:", params);
+                const data = await getTours(params);
+                console.log("Tours from API:", data);
+
+                if (!data || !data.toursObject || !Array.isArray(data.toursObject)) {
+                    console.warn("Dữ liệu tour không hợp lệ hoặc rỗng:", data);
+                    setTours([]);
+                    setTotalPages(1);
+                    toast.info(
+                        searchQuery
+                            ? `Không tìm thấy tour nào với từ khóa "${searchText}"!`
+                            : "Không có tour nào để hiển thị!",
+                        { position: "top-right" }
+                    );
+                    return;
+                }
+
+                const formattedData = data.toursObject.map((item, index) => {
                     const category = categoriesData.find((cat) => cat._id === item.category_id);
                     console.log(`Tour ${item.title}: category_id=${item.category_id}, matched category=`, category);
                     if (!category) {
@@ -128,7 +171,7 @@ const TourControl = () => {
                     return {
                         ...item,
                         id: item._id,
-                        stt: index + 1,
+                        stt: (page - 1) * limitItems + index + 1,
                         status: tourStatus,
                         price_special: item.price_special,
                         timeStarts: item.timeStarts || [],
@@ -137,67 +180,320 @@ const TourControl = () => {
                         tempStock: item.timeStarts[0]?.stock || item.stock,
                         categoryName: category ? category.title : "Không tìm thấy danh mục",
                     };
-                })
-                : [];
-            setAllTours(formattedData);
-            setTours(formattedData);
-            const initialSelectedDates = {};
-            formattedData.forEach((tour) => {
-                initialSelectedDates[tour._id] = tour.timeStarts[0]?.timeDepart || null;
-            });
-            setSelectedDates(initialSelectedDates);
-            if (formattedData.length === 0) {
-                toast.info("Không có tour nào để hiển thị!", { position: "top-right" });
+                });
+
+                setTours(formattedData);
+                setTotalPages(data.totalPage || 1);
+
+                const initialSelectedDates = {};
+                formattedData.forEach((tour) => {
+                    initialSelectedDates[tour._id] = tour.timeStarts[0]?.timeDepart || null;
+                });
+                setSelectedDates(initialSelectedDates);
+
+                if (formattedData.length === 0) {
+                    toast.info(
+                        searchQuery
+                            ? `Không tìm thấy tour nào với từ khóa "${searchText}"!`
+                            : "Không có tour nào để hiển thị!",
+                        { position: "top-right" }
+                    );
+                }
+            } catch (err) {
+                const errorMessage = err.response?.data?.message || "Không thể tải danh sách tour!";
+                setError(errorMessage);
+                toast.error(errorMessage, { position: "top-right" });
+                console.error("Fetch tours error:", err);
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            const errorMessage = err.response?.data?.message || "Không thể tải danh sách tour!";
-            setError(errorMessage);
-            toast.error(errorMessage, { position: "top-right" });
-            console.error("Fetch tours error:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+        [limitItems]
+    );
 
-    // Hàm làm mới toàn bộ dữ liệu
-    const refreshData = async () => {
-        console.log("Starting to refresh data...");
-        const fetchedCategories = await fetchCategories();
-        if (fetchedCategories.length > 0) {
-            console.log("Categories fetched, fetching tours...");
-            await fetchTours(fetchedCategories);
-            console.log("Tours fetched.");
-        } else {
-            toast.warn("Không có danh mục nào, vui lòng tạo danh mục trước!", { position: "top-right" });
-        }
-    };
+    // Hàm làm mới dữ liệu tour
+    const refreshTours = useCallback(
+        async (page = 1, searchQuery = "", status = statusFilter, sortKey = "", sortValue = "") => {
+            console.log("Refreshing tours with searchQuery:", searchQuery);
+            const normalizedQuery = normalizeSearchText(searchQuery);
+            await fetchTours(categories, page, normalizedQuery, status, sortKey, sortValue);
+        },
+        [categories, fetchTours, statusFilter]
+    );
 
+    // Khởi tạo dữ liệu khi component mount
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
         if (token) {
-            refreshData();
+            fetchCategories().then((fetchedCategories) => {
+                fetchTours(fetchedCategories, currentPage);
+            });
         } else {
             toast.error("Vui lòng điền đầy đủ thông tin để tiếp tục!", { position: "top-right" });
             setTimeout(() => {
                 window.location.href = "/loginadmin";
             }, 2000);
         }
-    }, [adminToken]);
+    }, [adminToken, fetchCategories, fetchTours]);
+
+    // Xử lý thay đổi bộ lọc trạng thái
+    const handleStatusFilterChange = (event) => {
+        setStatusFilter(event.target.value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        switch (sortOption) {
+            case "price_asc":
+                sortKey = "price";
+                sortValue = "asc";
+                break;
+            case "price_desc":
+                sortKey = "price";
+                sortValue = "desc";
+                break;
+            case "code_asc":
+                sortKey = "code";
+                sortValue = "asc";
+                break;
+            case "code_desc":
+                sortKey = "code";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            case "discount_asc":
+                sortKey = "discount";
+                sortValue = "asc";
+                break;
+            case "discount_desc":
+                sortKey = "discount";
+                sortValue = "desc";
+                break;
+            case "stock_asc":
+                sortKey = "stock";
+                sortValue = "asc";
+                break;
+            case "stock_desc":
+                sortKey = "stock";
+                sortValue = "desc";
+                break;
+            case "timeDepart_asc":
+                sortKey = "timeDepart";
+                sortValue = "asc";
+                break;
+            case "timeDepart_desc":
+                sortKey = "timeDepart";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        refreshTours(1, searchText, event.target.value, sortKey, sortValue);
+    };
+
+    // Xử lý thay đổi sắp xếp
+    const handleSortChange = (event) => {
+        const value = event.target.value;
+        setSortOption(value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        switch (value) {
+            case "price_asc":
+                sortKey = "price";
+                sortValue = "asc";
+                break;
+            case "price_desc":
+                sortKey = "price";
+                sortValue = "desc";
+                break;
+            case "code_asc":
+                sortKey = "code";
+                sortValue = "asc";
+                break;
+            case "code_desc":
+                sortKey = "code";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            case "discount_asc":
+                sortKey = "discount";
+                sortValue = "asc";
+                break;
+            case "discount_desc":
+                sortKey = "discount";
+                sortValue = "desc";
+                break;
+            case "stock_asc":
+                sortKey = "stock";
+                sortValue = "asc";
+                break;
+            case "stock_desc":
+                sortKey = "stock";
+                sortValue = "desc";
+                break;
+            case "timeDepart_asc":
+                sortKey = "timeDepart";
+                sortValue = "asc";
+                break;
+            case "timeDepart_desc":
+                sortKey = "timeDepart";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        refreshTours(1, searchText, statusFilter, sortKey, sortValue);
+        if (sortKey) {
+            setSortModel([{ field: sortKey === "price" ? "price_special" : sortKey, sort: sortValue }]);
+        } else {
+            setSortModel([]);
+        }
+    };
 
     // Xử lý tìm kiếm
-    useEffect(() => {
-        const filteredTours = allTours.filter((tour) =>
-            tour.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setTours(filteredTours);
-    }, [searchText, allTours]);
-
-    const handleSearch = (e) => {
+    const handleSearch = async (e) => {
         e.preventDefault();
-        const filteredTours = allTours.filter((tour) =>
-            tour.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setTours(filteredTours);
+        setIsSearching(true);
+        try {
+            setCurrentPage(1);
+            let sortKey = "";
+            let sortValue = "";
+            switch (sortOption) {
+                case "price_asc":
+                    sortKey = "price";
+                    sortValue = "asc";
+                    break;
+                case "price_desc":
+                    sortKey = "price";
+                    sortValue = "desc";
+                    break;
+                case "code_asc":
+                    sortKey = "code";
+                    sortValue = "asc";
+                    break;
+                case "code_desc":
+                    sortKey = "code";
+                    sortValue = "desc";
+                    break;
+                case "title_asc":
+                    sortKey = "title";
+                    sortValue = "asc";
+                    break;
+                case "title_desc":
+                    sortKey = "title";
+                    sortValue = "desc";
+                    break;
+                case "discount_asc":
+                    sortKey = "discount";
+                    sortValue = "asc";
+                    break;
+                case "discount_desc":
+                    sortKey = "discount";
+                    sortValue = "desc";
+                    break;
+                case "stock_asc":
+                    sortKey = "stock";
+                    sortValue = "asc";
+                    break;
+                case "stock_desc":
+                    sortKey = "stock";
+                    sortValue = "desc";
+                    break;
+                case "timeDepart_asc":
+                    sortKey = "timeDepart";
+                    sortValue = "asc";
+                    break;
+                case "timeDepart_desc":
+                    sortKey = "timeDepart";
+                    sortValue = "desc";
+                    break;
+                default:
+                    break;
+            }
+            const normalizedValue = normalizeSearchText(searchText);
+            await refreshTours(1, normalizedValue, statusFilter, sortKey, sortValue);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Xử lý thay đổi văn bản tìm kiếm
+    const handleSearchTextChange = (e) => {
+        setSearchText(e.target.value);
+    };
+
+    // Xử lý thay đổi trang
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+        let sortKey = "";
+        let sortValue = "";
+        switch (sortOption) {
+            case "price_asc":
+                sortKey = "price";
+                sortValue = "asc";
+                break;
+            case "price_desc":
+                sortKey = "price";
+                sortValue = "desc";
+                break;
+            case "code_asc":
+                sortKey = "code";
+                sortValue = "asc";
+                break;
+            case "code_desc":
+                sortKey = "code";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            case "discount_asc":
+                sortKey = "discount";
+                sortValue = "asc";
+                break;
+            case "discount_desc":
+                sortKey = "discount";
+                sortValue = "desc";
+                break;
+            case "stock_asc":
+                sortKey = "stock";
+                sortValue = "asc";
+                break;
+            case "stock_desc":
+                sortKey = "stock";
+                sortValue = "desc";
+                break;
+            case "timeDepart_asc":
+                sortKey = "timeDepart";
+                sortValue = "asc";
+                break;
+            case "timeDepart_desc":
+                sortKey = "timeDepart";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        refreshTours(value, searchText, statusFilter, sortKey, sortValue);
     };
 
     // Mở modal thêm mới
@@ -239,7 +535,7 @@ const TourControl = () => {
             category_id: tour.category_id || "",
             timeStarts: tour.timeStarts.map((item) => ({
                 timeDepart: formatDate(item.timeDepart),
-                stock: item.stock.toString()
+                stock: item.stock.toString(),
             })),
             status: tour.status || "active",
             images: tour.images || [],
@@ -258,7 +554,7 @@ const TourControl = () => {
             const category = categories.find((cat) => cat._id === response.tour.category_id);
             setCurrentTour({
                 ...response.tour,
-                status: category && category.status === "inactive" ? "inactive" : response.tour.status
+                status: category && category.status === "inactive" ? "inactive" : response.tour.status,
             });
             setOpenDetail(true);
         } catch (err) {
@@ -337,7 +633,6 @@ const TourControl = () => {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
         }
-        // Validate all timeStarts entries
         const invalidTimeStarts = newTour.timeStarts.some(
             (time) => !time.timeDepart || !time.stock || isNaN(parseInt(time.stock)) || parseInt(time.stock) < 0
         );
@@ -358,18 +653,15 @@ const TourControl = () => {
             formData.append("information", newTour.information || "");
             formData.append("schedule", newTour.schedule);
 
-            // Gộp các ngày khởi hành trùng lặp
             const mergedTimeStarts = mergeDuplicateDates(newTour.timeStarts);
             console.log("Merged timeStarts:", mergedTimeStarts);
 
-            // Gửi timeStarts đã gộp
             mergedTimeStarts.forEach((time, index) => {
                 formData.append(`timeStarts[${index}][timeDepart]`, time.timeDepart);
                 formData.append(`timeStarts[${index}][stock]`, time.stock);
                 console.log(`timeStarts[${index}]:`, { timeDepart: time.timeDepart, stock: time.stock });
             });
 
-            // Gửi images
             if (newTour.images.length > 0) {
                 newTour.images.forEach((image, index) => {
                     if (image instanceof File) {
@@ -386,7 +678,7 @@ const TourControl = () => {
             console.log("FormData to send:", Object.fromEntries(formData));
             const response = await createTour(formData);
             if (response.code === 200) {
-                await refreshData();
+                await refreshTours(currentPage);
                 handleClose();
                 toast.success("Thêm tour thành công!", { position: "top-right" });
             } else {
@@ -408,7 +700,6 @@ const TourControl = () => {
 
     // Cập nhật tour
     const handleUpdate = async () => {
-        // Validate required fields
         if (
             !newTour.title ||
             !newTour.price ||
@@ -419,7 +710,6 @@ const TourControl = () => {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
         }
-        // Validate all timeStarts entries
         const invalidTimeStarts = newTour.timeStarts.some(
             (time) => !time.timeDepart || !time.stock || isNaN(parseInt(time.stock)) || parseInt(time.stock) < 0
         );
@@ -454,7 +744,7 @@ const TourControl = () => {
             console.log("FormData to send:", Object.fromEntries(formData));
             const response = await updateTour(currentId, formData);
             if (response.code === 200) {
-                await refreshData();
+                await refreshTours(currentPage);
                 handleClose();
                 toast.success("Cập nhật tour thành công!", { position: "top-right" });
             } else {
@@ -483,14 +773,12 @@ const TourControl = () => {
                 throw new Error("Tour không tồn tại!");
             }
 
-            // Tạo mảng timeStarts mới với stock đã cập nhật
             const updatedTimeStarts = tour.timeStarts.map((time) =>
                 time.timeDepart === selectedDate
                     ? { ...time, stock: parseInt(newStock) }
                     : time
             );
 
-            // Chuẩn bị dữ liệu gửi lên server
             const formData = new FormData();
             formData.append("title", tour.title);
             formData.append("price", parseFloat(tour.price));
@@ -514,7 +802,6 @@ const TourControl = () => {
             console.log("FormData for stock update:", Object.fromEntries(formData));
             const response = await updateTour(tourId, formData);
             if (response.code === 200) {
-                // Cập nhật state tours
                 setTours((prev) =>
                     prev.map((t) =>
                         t._id === tourId
@@ -529,7 +816,6 @@ const TourControl = () => {
                 );
                 toast.success("Cập nhật số lượng thành công!", { position: "top-right" });
             } else {
-                // Khôi phục tempStock nếu API thất bại
                 setTours((prev) =>
                     prev.map((t) =>
                         t._id === tourId
@@ -540,7 +826,6 @@ const TourControl = () => {
                 toast.error(response.message || "Cập nhật số lượng thất bại!", { position: "top-right" });
             }
         } catch (err) {
-            // Khôi phục tempStock nếu có lỗi
             setTours((prev) =>
                 prev.map((t) =>
                     t._id === tourId
@@ -574,12 +859,11 @@ const TourControl = () => {
         }
     };
 
-    // Xác nhận cập nhật stock khi nhấn Enter hoặc mất focus
+    // Xác nhận cập nhật stock
     const commitStockChange = (tourId, selectedDate, value) => {
         if (value !== "" && !isNaN(parseInt(value)) && parseInt(value) >= 0) {
             updateTourStock(tourId, selectedDate, parseInt(value));
         } else if (value === "") {
-            // Nếu để trống, khôi phục giá trị ban đầu
             setTours((prev) =>
                 prev.map((t) =>
                     t._id === tourId
@@ -598,7 +882,7 @@ const TourControl = () => {
         try {
             const response = await deleteTour(deleteTourId);
             if (response.code === 200) {
-                await refreshData();
+                await refreshTours(currentPage);
                 toast.success("Xóa tour thành công!", { position: "top-right" });
             } else {
                 toast.error(response.message || "Xóa tour thất bại!", { position: "top-right" });
@@ -625,7 +909,7 @@ const TourControl = () => {
             const newStatus = currentStatus === "active" ? "inactive" : "active";
             const response = await changeTourStatus(id, newStatus);
             if (response.code === 200) {
-                await refreshData();
+                await refreshTours(currentPage);
                 toast.success(
                     `Thay đổi trạng thái thành ${newStatus === "active" ? "Hoạt động" : "Tạm ngưng"}!`,
                     { position: "top-right" }
@@ -665,6 +949,11 @@ const TourControl = () => {
 
     // Lọc danh mục hiển thị trong Select
     const getFilteredCategories = () => {
+        if (!Array.isArray(categories)) {
+            console.warn("categories is not an array:", categories);
+            return [];
+        }
+
         if (isEdit && newTour.category_id) {
             const currentCategory = categories.find((cat) => cat._id === newTour.category_id);
             const activeCategories = categories.filter((cat) => cat.status === "active");
@@ -683,6 +972,7 @@ const TourControl = () => {
             field: "images",
             headerName: "Hình ảnh",
             flex: 0.8,
+            sortable: false,
             renderCell: (params) => (
                 <Box
                     sx={{
@@ -751,6 +1041,7 @@ const TourControl = () => {
             field: "timeStarts",
             headerName: "Ngày khởi hành",
             flex: 1,
+            sortable: false,
             renderCell: (params) => {
                 const tour = params.row;
                 return (
@@ -804,6 +1095,7 @@ const TourControl = () => {
             field: "actions",
             headerName: "Hành động",
             flex: 1.6,
+            sortable: false,
             renderCell: (params) => (
                 <Box display="flex" gap={1} sx={{ alignItems: "center", height: "100%" }}>
                     <Button
@@ -854,7 +1146,7 @@ const TourControl = () => {
                 closeOnClick
                 rtl={false}
                 pauseOnFocusLoss
-                draggable
+                dragging
                 pauseOnHover
                 theme="light"
                 limit={3}
@@ -867,6 +1159,54 @@ const TourControl = () => {
                             Quản lý tour
                         </Typography>
                         <Box display="flex" gap={2}>
+                            <FormControl sx={{ width: 150 }}>
+                                <InputLabel>Sắp xếp</InputLabel>
+                                <Select
+                                    value={sortOption}
+                                    onChange={handleSortChange}
+                                    label="Sắp xếp"
+                                    sx={{
+                                        backgroundColor: colors.primary[400],
+                                    }}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                maxHeight: 250,
+                                                overflowY: "auto",
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <MenuItem value="none">Không sắp xếp</MenuItem>
+                                    <MenuItem value="code_asc">Mã tour: Tăng dần</MenuItem>
+                                    <MenuItem value="code_desc">Mã tour: Giảm dần</MenuItem>
+                                    <MenuItem value="title_asc">Tiêu đề: Tăng dần</MenuItem>
+                                    <MenuItem value="title_desc">Tiêu đề: Giảm dần</MenuItem>
+                                    <MenuItem value="price_asc">Giá: Tăng dần</MenuItem>
+                                    <MenuItem value="price_desc">Giá: Giảm dần</MenuItem>
+                                    <MenuItem value="discount_asc">Giảm giá: Tăng dần</MenuItem>
+                                    <MenuItem value="discount_desc">Giảm giá: Giảm dần</MenuItem>
+                                    <MenuItem value="stock_asc">Số lượng: Tăng dần</MenuItem>
+                                    <MenuItem value="stock_desc">Số lượng: Giảm dần</MenuItem>
+                                    <MenuItem value="timeDepart_asc">Ngày khởi hành: Tăng dần</MenuItem>
+                                    <MenuItem value="timeDepart_desc">Ngày khởi hành: Giảm dần</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl sx={{ width: 150 }}>
+                                <InputLabel>Lọc trạng thái</InputLabel>
+                                <Select
+                                    value={statusFilter}
+                                    onChange={handleStatusFilterChange}
+                                    label="Trạng thái"
+                                    sx={{
+                                        backgroundColor: colors.primary[400],
+                                    }}
+                                >
+                                    <MenuItem value="all">Tất cả</MenuItem>
+                                    <MenuItem value="active">Hoạt động</MenuItem>
+                                    <MenuItem value="inactive">Tạm ngưng</MenuItem>
+                                </Select>
+                            </FormControl>
                             <Paper
                                 component="form"
                                 sx={{
@@ -882,10 +1222,10 @@ const TourControl = () => {
                                     sx={{ ml: 1, flex: 1 }}
                                     placeholder="Tìm kiếm tour (theo tiêu đề)"
                                     value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
+                                    onChange={handleSearchTextChange}
                                 />
-                                <IconButton type="submit" sx={{ p: "10px" }}>
-                                    <SearchIcon />
+                                <IconButton type="submit" sx={{ p: "10px" }} disabled={isSearching}>
+                                    {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
                                 </IconButton>
                             </Paper>
                             <Button
@@ -930,9 +1270,10 @@ const TourControl = () => {
                             "& .MuiDataGrid-footerContainer": {
                                 borderTop: "none",
                                 backgroundColor: colors.blueAccent[700],
-                            },
-                            "& .MuiCheckbox-root": {
-                                color: `${colors.greenAccent[200]} !important`,
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "10px",
                             },
                         }}
                     >
@@ -941,21 +1282,71 @@ const TourControl = () => {
                                 <CircularProgress />
                             </Box>
                         ) : (
-                            <DataGrid
-                                rows={tours}
-                                columns={columns}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10, 20]}
-                                disableSelectionOnClick
-                                getRowHeight={() => 80}
-                                sx={{ width: "100%" }}
-                            />
+                            <>
+                                <DataGrid
+                                    rows={tours}
+                                    columns={columns}
+                                    disableSelectionOnClick
+                                    getRowHeight={() => 80}
+                                    sx={{ width: "100%" }}
+                                    pagination={false}
+                                    hideFooter={true}
+                                    sortingMode="server"
+                                    sortModel={sortModel}
+                                    onSortModelChange={(newSortModel) => {
+                                        setSortModel(newSortModel);
+                                        if (newSortModel.length > 0) {
+                                            const { field, sort } = newSortModel[0];
+                                            let sortKey = "";
+                                            let sortOptionValue = "";
+                                            switch (field) {
+                                                case "code":
+                                                    sortKey = "code";
+                                                    sortOptionValue = sort === "asc" ? "code_asc" : "code_desc";
+                                                    break;
+                                                case "title":
+                                                    sortKey = "title";
+                                                    sortOptionValue = sort === "asc" ? "title_asc" : "title_desc";
+                                                    break;
+                                                case "price_special":
+                                                    sortKey = "price";
+                                                    sortOptionValue = sort === "asc" ? "price_asc" : "price_desc";
+                                                    break;
+                                                case "discount":
+                                                    sortKey = "discount";
+                                                    sortOptionValue = sort === "asc" ? "discount_asc" : "discount_desc";
+                                                    break;
+                                                case "selectedStock":
+                                                    sortKey = "stock";
+                                                    sortOptionValue = sort === "asc" ? "stock_asc" : "stock_desc";
+                                                    break;
+                                                default:
+                                                    break;
+                                            }
+                                            if (sortKey) {
+                                                setSortOption(sortOptionValue);
+                                                refreshTours(1, searchText, statusFilter, sortKey, sort);
+                                            }
+                                        } else {
+                                            setSortOption("none");
+                                            refreshTours(1, searchText, statusFilter);
+                                        }
+                                    }}
+                                />
+                                <Box display="flex" justifyContent="center" mt={2}>
+                                    <Pagination
+                                        count={totalPages}
+                                        page={currentPage}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                    />
+                                </Box>
+                            </>
                         )}
                     </Box>
                 </Box>
             </Box>
 
-            {/* Modal thêm mới/chỉnh sửa */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle
                     sx={{
@@ -1025,9 +1416,12 @@ const TourControl = () => {
                                     const updatedTimes = [...newTour.timeStarts];
                                     updatedTimes[index].timeDepart = e.target.value;
                                     setNewTour({ ...newTour, timeStarts: updatedTimes });
-                                    const sameDateCount = updatedTimes.filter(t => t.timeDepart === e.target.value).length;
+                                    const sameDateCount = updatedTimes.filter((t) => t.timeDepart === e.target.value)
+                                        .length;
                                     if (sameDateCount > 1) {
-                                        toast.warn("Ngày khởi hành bị trùng, số lượng sẽ được cộng lại!", { position: "top-right" });
+                                        toast.warn("Ngày khởi hành bị trùng, số lượng sẽ được cộng lại!", {
+                                            position: "top-right",
+                                        });
                                     }
                                 }}
                                 required
@@ -1160,7 +1554,6 @@ const TourControl = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Modal chi tiết */}
             <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="xs" fullWidth>
                 <DialogTitle
                     sx={{
@@ -1193,7 +1586,8 @@ const TourControl = () => {
                             <Typography variant="h6">
                                 <strong>Danh mục:</strong>
                                 <span style={{ marginLeft: "8px" }}>
-                                    {categories.find((cat) => cat._id === currentTour.category_id)?.title || "Không xác định"}
+                                    {categories.find((cat) => cat._id === currentTour.category_id)?.title ||
+                                        "Không xác định"}
                                 </span>
                             </Typography>
                             <Typography variant="h6">
@@ -1218,7 +1612,8 @@ const TourControl = () => {
                                 <ul>
                                     {currentTour.timeStarts.map((time, index) => (
                                         <li key={index}>
-                                            {new Date(time.timeDepart).toLocaleDateString("vi-VN")} - Số lượng: {time.stock}
+                                            {new Date(time.timeDepart).toLocaleDateString("vi-VN")} - Số lượng:{" "}
+                                            {time.stock}
                                         </li>
                                     ))}
                                 </ul>
@@ -1254,7 +1649,6 @@ const TourControl = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Modal xác nhận xóa */}
             <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm} maxWidth="xs" fullWidth>
                 <DialogTitle
                     sx={{
@@ -1289,13 +1683,7 @@ const TourControl = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Dialog xem hình ảnh to */}
-            <Dialog
-                open={openImageDialog}
-                onClose={handleCloseImageDialog}
-                maxWidth="md"
-                fullWidth
-            >
+            <Dialog open={openImageDialog} onClose={handleCloseImageDialog} maxWidth="md" fullWidth>
                 <DialogContent sx={{ p: 0, position: "relative" }}>
                     <Box
                         component="img"

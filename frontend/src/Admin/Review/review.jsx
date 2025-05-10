@@ -1,5 +1,22 @@
-import { useState, useEffect } from "react";
-import { Box, Button, Typography, IconButton, useTheme, Paper, InputBase, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { useState, useEffect, useCallback } from "react";
+import {
+    Box,
+    Button,
+    Typography,
+    IconButton,
+    useTheme,
+    Paper,
+    InputBase,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Pagination,
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { tokens } from "../../theme";
@@ -14,6 +31,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
+import { debounce } from "lodash";
 
 const Reviews = () => {
     const theme = useTheme();
@@ -24,15 +42,14 @@ const Reviews = () => {
     const [hotels, setHotels] = useState([]);
     const [selectedHotel, setSelectedHotel] = useState(null);
     const [reviews, setReviews] = useState([]);
-    const [allReviews, setAllReviews] = useState([]);
     const [searchText, setSearchText] = useState("");
+    const [sortOption, setSortOption] = useState("none");
+    const [sortModel, setSortModel] = useState([]);
     const [loading, setLoading] = useState(false);
     const [userCache, setUserCache] = useState({});
-    const [paginationModel, setPaginationModel] = useState({
-        page: 0,
-        pageSize: 5,
-    });
-    const [rowCount, setRowCount] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limitItems = 10;
     const [selectedReview, setSelectedReview] = useState(null);
     const [openModal, setOpenModal] = useState(false);
     const [openDeleteModal, setOpenDeleteModal] = useState(false);
@@ -50,6 +67,7 @@ const Reviews = () => {
         setLoading(true);
         try {
             const response = await getHotels(adminToken);
+            console.log("fetchHotels response:", response);
             if (response.code === 200 && Array.isArray(response.data)) {
                 setHotels(response.data);
                 if (response.data.length === 0) {
@@ -58,12 +76,16 @@ const Reviews = () => {
                     setSelectedHotel(response.data[0]);
                 }
             } else {
-                toast.error(response.message || "Không thể tải danh sách khách sạn!", { position: "top-right" });
+                toast.error(response.message || "Không thể tải danh sách khách sạn!", {
+                    position: "top-right",
+                });
                 setHotels([]);
             }
         } catch (err) {
             console.error("Error fetching hotels:", err);
-            toast.error(err.response?.data?.message || "Không thể tải danh sách khách sạn!", { position: "top-right" });
+            toast.error(err.response?.data?.message || "Không thể tải danh sách khách sạn!", {
+                position: "top-right",
+            });
             if (err.response?.status === 401) {
                 toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
                 localStorage.removeItem("adminToken");
@@ -72,21 +94,6 @@ const Reviews = () => {
             setHotels([]);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchTotalReviews = async (hotelId) => {
-        try {
-            const response = await getHotelReviews(hotelId, {
-                page: 1,
-                limit: 9999,
-                sortKey: "createdAt",
-                sortValue: "desc",
-            }, adminToken);
-            return Array.isArray(response) ? response.length : 0;
-        } catch (err) {
-            console.error("Error fetching total reviews:", err);
-            return 0;
         }
     };
 
@@ -111,56 +118,77 @@ const Reviews = () => {
         }
     };
 
-    const fetchReviews = async (hotelId) => {
-        if (!hotelId) return;
-        setLoading(true);
-        try {
-            const response = await getHotelReviews(hotelId, {
-                page: paginationModel.page + 1,
-                limit: paginationModel.pageSize,
-                sortKey: "createdAt",
-                sortValue: "desc",
-            }, adminToken);
-            if (Array.isArray(response)) {
-                setAllReviews(response);
-                const reviewsWithUsers = await Promise.all(
-                    response.map(async (review, index) => {
-                        const userData = await fetchUserDetails(review.user_id);
-                        return {
-                            ...review,
-                            userData,
-                            stt: index + 1 + paginationModel.page * paginationModel.pageSize,
-                            viewed: !!viewedReviews[review._id],
-                        };
-                    })
-                );
-                setReviews(reviewsWithUsers);
-                const total = await fetchTotalReviews(hotelId);
-                setRowCount(total);
-                if (response.length === 0) {
-                    toast.info("Không có đánh giá nào để hiển thị!", { position: "top-right" });
+    const fetchReviews = useCallback(
+        async (hotelId, page = 1, search = "", sortKey = "", sortValue = "") => {
+            if (!hotelId) return;
+            setLoading(true);
+            try {
+                const params = { page, limit: limitItems };
+                if (search) params.search = search;
+                if (sortKey && sortValue) {
+                    params.sortKey = sortKey;
+                    params.sortValue = sortValue;
                 }
-            } else {
-                toast.error("Dữ liệu đánh giá không hợp lệ!", { position: "top-right" });
+                console.log("Fetching reviews with params:", params);
+                const response = await getHotelReviews(hotelId, params, adminToken);
+                console.log("fetchReviews response:", response);
+                if (response && Array.isArray(response.reviews)) {
+                    const totalRecords = response.totalRecords || response.reviews.length;
+                    const reviewsWithUsers = await Promise.all(
+                        response.reviews.map(async (review, index) => {
+                            const userData = await fetchUserDetails(review.user_id);
+                            let stt;
+                            if (sortKey === "_id" && sortValue === "desc") {
+                                stt = totalRecords - ((page - 1) * limitItems + index);
+                            } else {
+                                stt = (page - 1) * limitItems + index + 1;
+                            }
+                            return {
+                                ...review,
+                                id: review._id,
+                                userData,
+                                stt,
+                                viewed: !!viewedReviews[review._id],
+                            };
+                        })
+                    );
+                    setReviews(reviewsWithUsers);
+                    setTotalPages(response.totalPage || 1);
+                    if (reviewsWithUsers.length === 0) {
+                        toast.info("Không có đánh giá nào để hiển thị!", { position: "top-right" });
+                    }
+                } else {
+                    toast.error("Dữ liệu đánh giá không hợp lệ!", { position: "top-right" });
+                    setReviews([]);
+                    setTotalPages(1);
+                }
+            } catch (err) {
+                console.error("Error fetching reviews:", err);
+                toast.error(err.response?.data?.message || "Không thể tải danh sách đánh giá!", {
+                    position: "top-right",
+                });
+                if (err.response?.status === 401) {
+                    toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+                    localStorage.removeItem("adminToken");
+                    navigate("/loginadmin");
+                }
                 setReviews([]);
-                setAllReviews([]);
-                setRowCount(0);
+                setTotalPages(1);
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            console.error("Error fetching reviews:", err);
-            toast.error(err.response?.data?.message || "Không thể tải danh sách đánh giá!", { position: "top-right" });
-            if (err.response?.status === 401) {
-                toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
-                localStorage.removeItem("adminToken");
-                navigate("/loginadmin");
-            }
-            setReviews([]);
-            setAllReviews([]);
-            setRowCount(0);
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+        [adminToken, viewedReviews, limitItems, navigate]
+    );
+
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((hotelId, value, sortKey, sortValue) => {
+            setCurrentPage(1);
+            fetchReviews(hotelId, 1, value, sortKey, sortValue);
+        }, 500),
+        [fetchReviews]
+    );
 
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
@@ -176,46 +204,453 @@ const Reviews = () => {
 
     useEffect(() => {
         if (selectedHotel?._id) {
-            fetchReviews(selectedHotel._id);
+            let sortKey = "";
+            let sortValue = "";
+            if (sortOption !== "none") {
+                switch (sortOption) {
+                    case "stt_asc":
+                        sortKey = "_id";
+                        sortValue = "asc";
+                        break;
+                    case "stt_desc":
+                        sortKey = "_id";
+                        sortValue = "desc";
+                        break;
+                    case "username_asc":
+                        sortKey = "user_id";
+                        sortValue = "asc";
+                        break;
+                    case "username_desc":
+                        sortKey = "user_id";
+                        sortValue = "desc";
+                        break;
+                    case "email_asc":
+                        sortKey = "user_id";
+                        sortValue = "asc";
+                        break;
+                    case "email_desc":
+                        sortKey = "user_id";
+                        sortValue = "desc";
+                        break;
+                    case "rating_asc":
+                        sortKey = "rating";
+                        sortValue = "asc";
+                        break;
+                    case "rating_desc":
+                        sortKey = "rating";
+                        sortValue = "desc";
+                        break;
+                    case "comment_asc":
+                        sortKey = "comment";
+                        sortValue = "asc";
+                        break;
+                    case "comment_desc":
+                        sortKey = "comment";
+                        sortValue = "desc";
+                        break;
+                    case "createdAt_asc":
+                        sortKey = "createdAt";
+                        sortValue = "asc";
+                        break;
+                    case "createdAt_desc":
+                        sortKey = "createdAt";
+                        sortValue = "desc";
+                        break;
+                    default:
+                        sortKey = "createdAt";
+                        sortValue = "desc";
+                        break;
+                }
+            }
+            fetchReviews(selectedHotel._id, currentPage, searchText, sortKey, sortValue);
         }
-    }, [selectedHotel, paginationModel]);
-
-    useEffect(() => {
-        const filteredReviews = allReviews.filter((review) =>
-            review.comment?.toLowerCase().includes(searchText.toLowerCase())
-        );
-        const updateFilteredReviews = async () => {
-            const reviewsWithUsers = await Promise.all(
-                filteredReviews.map(async (review, index) => {
-                    const userData = await fetchUserDetails(review.user_id);
-                    return {
-                        ...review,
-                        userData,
-                        stt: index + 1 + paginationModel.page * paginationModel.pageSize,
-                        viewed: !!viewedReviews[review._id],
-                    };
-                })
-            );
-            setReviews(reviewsWithUsers);
-        };
-        updateFilteredReviews();
-    }, [searchText, allReviews, viewedReviews]);
+    }, [selectedHotel, fetchReviews]);
 
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
         const hotel = hotels.find((h) => h._id === hotelId) || null;
         setSelectedHotel(hotel);
-        setPaginationModel({ ...paginationModel, page: 0 });
+        setCurrentPage(1);
+        setSearchText("");
+        let sortKey = "";
+        let sortValue = "";
+        if (sortOption !== "none") {
+            switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
+                case "username_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "username_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "email_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "email_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "rating_asc":
+                    sortKey = "rating";
+                    sortValue = "asc";
+                    break;
+                case "rating_desc":
+                    sortKey = "rating";
+                    sortValue = "desc";
+                    break;
+                case "comment_asc":
+                    sortKey = "comment";
+                    sortValue = "asc";
+                    break;
+                case "comment_desc":
+                    sortKey = "comment";
+                    sortValue = "desc";
+                    break;
+                case "createdAt_asc":
+                    sortKey = "createdAt";
+                    sortValue = "asc";
+                    break;
+                case "createdAt_desc":
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+                default:
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+            }
+        }
+        fetchReviews(hotelId, 1, "", sortKey, sortValue);
+    };
+
+    const handleSearchTextChange = (e) => {
+        const value = e.target.value;
+        setSearchText(value);
+        let sortKey = "";
+        let sortValue = "";
+        if (sortOption !== "none") {
+            switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
+                case "username_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "username_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "email_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "email_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "rating_asc":
+                    sortKey = "rating";
+                    sortValue = "asc";
+                    break;
+                case "rating_desc":
+                    sortKey = "rating";
+                    sortValue = "desc";
+                    break;
+                case "comment_asc":
+                    sortKey = "comment";
+                    sortValue = "asc";
+                    break;
+                case "comment_desc":
+                    sortKey = "comment";
+                    sortValue = "desc";
+                    break;
+                case "createdAt_asc":
+                    sortKey = "createdAt";
+                    sortValue = "asc";
+                    break;
+                case "createdAt_desc":
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+                default:
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+            }
+        }
+        debouncedSearch(selectedHotel?._id, value, sortKey, sortValue);
+    };
+
+    const handleSortChange = (event) => {
+        const value = event.target.value;
+        setSortOption(value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        let sortField = "";
+        if (value !== "none") {
+            switch (value) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    sortField = "stt";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    sortField = "stt";
+                    break;
+                case "username_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    sortField = "user_id";
+                    break;
+                case "username_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    sortField = "user_id";
+                    break;
+                case "email_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    sortField = "email";
+                    break;
+                case "email_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    sortField = "email";
+                    break;
+                case "rating_asc":
+                    sortKey = "rating";
+                    sortValue = "asc";
+                    sortField = "rating";
+                    break;
+                case "rating_desc":
+                    sortKey = "rating";
+                    sortValue = "desc";
+                    sortField = "rating";
+                    break;
+                case "comment_asc":
+                    sortKey = "comment";
+                    sortValue = "asc";
+                    sortField = "comment";
+                    break;
+                case "comment_desc":
+                    sortKey = "comment";
+                    sortValue = "desc";
+                    sortField = "comment";
+                    break;
+                case "createdAt_asc":
+                    sortKey = "createdAt";
+                    sortValue = "asc";
+                    sortField = "createdAt";
+                    break;
+                case "createdAt_desc":
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    sortField = "createdAt";
+                    break;
+                default:
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    sortField = "createdAt";
+                    break;
+            }
+            setSortModel([{ field: sortField, sort: sortValue }]);
+        } else {
+            setSortModel([]);
+        }
+        fetchReviews(selectedHotel?._id, 1, searchText, sortKey, sortValue);
+    };
+
+    const handleSortModelChange = (newSortModel) => {
+        setSortModel(newSortModel);
+        setCurrentPage(1);
+        if (newSortModel.length > 0) {
+            const { field, sort } = newSortModel[0];
+            let sortKey = "";
+            let sortOptionValue = "";
+            switch (field) {
+                case "stt":
+                    sortKey = "_id";
+                    sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+                    break;
+                case "user_id":
+                    sortKey = "user_id";
+                    sortOptionValue = sort === "asc" ? "username_asc" : "username_desc";
+                    break;
+                case "email":
+                    sortKey = "user_id";
+                    sortOptionValue = sort === "asc" ? "email_asc" : "email_desc";
+                    break;
+                case "rating":
+                    sortKey = "rating";
+                    sortOptionValue = sort === "asc" ? "rating_asc" : "rating_desc";
+                    break;
+                case "comment":
+                    sortKey = "comment";
+                    sortOptionValue = sort === "asc" ? "comment_asc" : "comment_desc";
+                    break;
+                case "createdAt":
+                    sortKey = "createdAt";
+                    sortOptionValue = sort === "asc" ? "createdAt_asc" : "createdAt_desc";
+                    break;
+                default:
+                    break;
+            }
+            if (sortKey) {
+                setSortOption(sortOptionValue);
+                fetchReviews(selectedHotel?._id, 1, searchText, sortKey, sort);
+            }
+        } else {
+            setSortOption("none");
+            fetchReviews(selectedHotel?._id, 1, searchText);
+        }
+    };
+
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+        let sortKey = "";
+        let sortValue = "";
+        if (sortOption !== "none") {
+            switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
+                case "username_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "username_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "email_asc":
+                    sortKey = "user_id";
+                    sortValue = "asc";
+                    break;
+                case "email_desc":
+                    sortKey = "user_id";
+                    sortValue = "desc";
+                    break;
+                case "rating_asc":
+                    sortKey = "rating";
+                    sortValue = "asc";
+                    break;
+                case "rating_desc":
+                    sortKey = "rating";
+                    sortValue = "desc";
+                    break;
+                case "comment_asc":
+                    sortKey = "comment";
+                    sortValue = "asc";
+                    break;
+                case "comment_desc":
+                    sortKey = "comment";
+                    sortValue = "desc";
+                    break;
+                case "createdAt_asc":
+                    sortKey = "createdAt";
+                    sortValue = "asc";
+                    break;
+                case "createdAt_desc":
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+                default:
+                    sortKey = "createdAt";
+                    sortValue = "desc";
+                    break;
+            }
+        }
+        fetchReviews(selectedHotel?._id, value, searchText, sortKey, sortValue);
     };
 
     const handleDelete = async (reviewId) => {
         try {
             const response = await deleteReview(reviewId, adminToken);
             if (response.code === 200) {
-                setReviews(reviews.filter(review => review._id !== reviewId));
-                setAllReviews(allReviews.filter(review => review._id !== reviewId));
-                setRowCount(rowCount - 1);
-                setViewedReviews(prev => {
+                let sortKey = "";
+                let sortValue = "";
+                if (sortOption !== "none") {
+                    switch (sortOption) {
+                        case "stt_asc":
+                            sortKey = "_id";
+                            sortValue = "asc";
+                            break;
+                        case "stt_desc":
+                            sortKey = "_id";
+                            sortValue = "desc";
+                            break;
+                        case "username_asc":
+                            sortKey = "user_id";
+                            sortValue = "asc";
+                            break;
+                        case "username_desc":
+                            sortKey = "user_id";
+                            sortValue = "desc";
+                            break;
+                        case "email_asc":
+                            sortKey = "user_id";
+                            sortValue = "asc";
+                            break;
+                        case "email_desc":
+                            sortKey = "user_id";
+                            sortValue = "desc";
+                            break;
+                        case "rating_asc":
+                            sortKey = "rating";
+                            sortValue = "asc";
+                            break;
+                        case "rating_desc":
+                            sortKey = "rating";
+                            sortValue = "desc";
+                            break;
+                        case "comment_asc":
+                            sortKey = "comment";
+                            sortValue = "asc";
+                            break;
+                        case "comment_desc":
+                            sortKey = "comment";
+                            sortValue = "desc";
+                            break;
+                        case "createdAt_asc":
+                            sortKey = "createdAt";
+                            sortValue = "asc";
+                            break;
+                        case "createdAt_desc":
+                            sortKey = "createdAt";
+                            sortValue = "desc";
+                            break;
+                        default:
+                            sortKey = "createdAt";
+                            sortValue = "desc";
+                            break;
+                    }
+                }
+                fetchReviews(selectedHotel?._id, currentPage, searchText, sortKey, sortValue);
+                setViewedReviews((prev) => {
                     const newViewed = { ...prev };
                     delete newViewed[reviewId];
                     return newViewed;
@@ -225,7 +660,9 @@ const Reviews = () => {
                 toast.error(response.message || "Xóa đánh giá thất bại!", { position: "top-right" });
             }
         } catch (err) {
-            toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", { position: "top-right" });
+            toast.error(err.response?.data?.message || "Xóa đánh giá thất bại!", {
+                position: "top-right",
+            });
         }
     };
 
@@ -250,9 +687,9 @@ const Reviews = () => {
         setSelectedReview(review);
         setOpenModal(true);
         if (!viewedReviews[review._id]) {
-            setViewedReviews(prev => ({
+            setViewedReviews((prev) => ({
                 ...prev,
-                [review._id]: true
+                [review._id]: true,
             }));
         }
     };
@@ -262,26 +699,20 @@ const Reviews = () => {
         setSelectedReview(null);
     };
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        const filteredReviews = allReviews.filter((review) =>
-            review.comment?.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setReviews(filteredReviews);
-    };
-
     const columns = [
         {
             field: "stt",
             headerName: "STT",
             flex: isMobile ? 0.3 : 0.5,
             hide: isMobile,
+            sortable: true,
             renderCell: ({ row }) => row.stt,
         },
         {
             field: "user_id",
             headerName: "Người dùng",
             flex: isMobile ? 0.8 : 1,
+            sortable: true,
             renderCell: ({ row }) => row.userData?.username || "N/A",
         },
         {
@@ -289,18 +720,21 @@ const Reviews = () => {
             headerName: "Email",
             flex: isMobile ? 0.8 : 1,
             hide: isMobile,
+            sortable: true,
             renderCell: ({ row }) => row.userData?.email || "N/A",
         },
         {
             field: "rating",
             headerName: "Điểm đánh giá",
             flex: isMobile ? 0.5 : 0.7,
-            renderCell: ({ row }) => `${row.rating}/5`,
+            sortable: true,
+            renderCell: ({ row }) => `${row.rating || 0}/5`,
         },
         {
             field: "comment",
             headerName: "Bình luận",
             flex: isMobile ? 1.5 : 2,
+            sortable: true,
             renderCell: ({ row }) => row.comment || "Không có bình luận",
         },
         {
@@ -308,12 +742,17 @@ const Reviews = () => {
             headerName: "Ngày tạo",
             flex: isMobile ? 0.8 : 1,
             hide: isMobile,
-            renderCell: ({ row }) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
+            sortable: true,
+            renderCell: ({ row }) => {
+                const date = new Date(row.createdAt);
+                return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString("vi-VN");
+            },
         },
         {
             field: "viewed",
             headerName: "Đã xem",
             flex: isMobile ? 0.5 : 0.7,
+            sortable: false,
             renderCell: ({ row }) => (
                 <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
                     {row.viewed ? <VisibilityIcon color="success" /> : <VisibilityOffIcon color="error" />}
@@ -324,6 +763,7 @@ const Reviews = () => {
             field: "actions",
             headerName: "Hành động",
             flex: isMobile ? 0.8 : 1,
+            sortable: false,
             renderCell: ({ row }) => (
                 <Box sx={{ display: "flex", gap: 1, mt: "25px" }}>
                     <IconButton
@@ -356,8 +796,8 @@ const Reviews = () => {
     ];
 
     return (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2, m: "20px" }}>
-            <Box sx={{ gridColumn: 'span 12' }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2, m: "20px" }}>
+            <Box sx={{ gridColumn: "span 12" }}>
                 <ToastContainer
                     position="top-right"
                     autoClose={5000}
@@ -379,193 +819,246 @@ const Reviews = () => {
                     gap={2}
                     flexWrap={isMobile ? "wrap" : "nowrap"}
                 >
-                    <FormControl sx={{ minWidth: isMobile ? "100%" : 200 }}>
-                        <InputLabel
-                            id="hotel-select-label"
-                            sx={{ color: "black" }}
-                        >
-                            Chọn khách sạn
-                        </InputLabel>
-                        <Select
-                            labelId="hotel-select-label"
-                            value={selectedHotel?._id || ""}
-                            label="Chọn khách sạn"
-                            onChange={handleHotelChange}
-                            disabled={loading}
-                            sx={{
-                                backgroundColor: colors.primary[400],
-                                color: colors.grey[100],
-                                "& .MuiOutlinedInput-notchedOutline": {
-                                    borderColor: colors.grey[300],
-                                },
-                                "&:hover .MuiOutlinedInput-notchedOutline": {
-                                    borderColor: colors.grey[100],
-                                },
-                                "& .MuiSvgIcon-root": {
+                    <Box display="flex" gap={2} flexWrap={isMobile ? "wrap" : "nowrap"} width={isMobile ? "100%" : "auto"}>
+                        <FormControl sx={{ minWidth: isMobile ? "100%" : 200 }}>
+                            <InputLabel id="hotel-select-label" sx={{ color: "black" }}>
+                                Chọn khách sạn
+                            </InputLabel>
+                            <Select
+                                labelId="hotel-select-label"
+                                value={selectedHotel?._id || ""}
+                                label="Chọn khách sạn"
+                                onChange={handleHotelChange}
+                                disabled={loading}
+                                sx={{
+                                    backgroundColor: colors.primary[400],
                                     color: colors.grey[100],
-                                },
-                                "& .MuiInputBase-input": {
-                                    padding: "10px 14px",
-                                },
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: colors.grey[300],
+                                    },
+                                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: colors.grey[100],
+                                    },
+                                    "& .MuiSvgIcon-root": {
+                                        color: colors.grey[100],
+                                    },
+                                    "& .MuiInputBase-input": {
+                                        padding: "10px 14px",
+                                    },
+                                }}
+                            >
+                                {hotels.length === 0 && (
+                                    <MenuItem value="">
+                                        <em>{loading ? "Đang tải..." : "Không có khách sạn"}</em>
+                                    </MenuItem>
+                                )}
+                                {hotels.map((hotel) => (
+                                    <MenuItem key={hotel._id} value={hotel._id}>
+                                        {hotel.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                    <Box display="flex" gap={2} flexWrap={isMobile ? "wrap" : "nowrap"} width={isMobile ? "100%" : "auto"}>
+                        <FormControl sx={{ minWidth: isMobile ? "100%" : 200 }}>
+                            <InputLabel id="sort-select-label" sx={{ color: "black" }}>
+                                Sắp xếp
+                            </InputLabel>
+                            <Select
+                                labelId="sort-select-label"
+                                value={sortOption}
+                                label="Sắp xếp"
+                                onChange={handleSortChange}
+                                sx={{
+                                    backgroundColor: colors.primary[400],
+                                    color: colors.grey[100],
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: colors.grey[300],
+                                    },
+                                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: colors.grey[100],
+                                    },
+                                    "& .MuiSvgIcon-root": {
+                                        color: colors.grey[100],
+                                    },
+                                    "& .MuiInputBase-input": {
+                                        padding: "10px 14px",
+                                    },
+                                }}
+                            >
+                                <MenuItem value="none">Không sắp xếp</MenuItem>
+                                <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                                <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                                <MenuItem value="username_asc">Người dùng: Tăng dần</MenuItem>
+                                <MenuItem value="username_desc">Người dùng: Giảm dần</MenuItem>
+                                <MenuItem value="email_asc">Email: Tăng dần</MenuItem>
+                                <MenuItem value="email_desc">Email: Giảm dần</MenuItem>
+                                <MenuItem value="rating_asc">Điểm đánh giá: Tăng dần</MenuItem>
+                                <MenuItem value="rating_desc">Điểm đánh giá: Giảm dần</MenuItem>
+                                <MenuItem value="comment_asc">Bình luận: Tăng dần</MenuItem>
+                                <MenuItem value="comment_desc">Bình luận: Giảm dần</MenuItem>
+                                <MenuItem value="createdAt_asc">Ngày tạo: Tăng dần</MenuItem>
+                                <MenuItem value="createdAt_desc">Ngày tạo: Giảm dần</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <Paper
+                            component="form"
+                            sx={{
+                                p: "2px 4px",
+                                display: "flex",
+                                alignItems: "center",
+                                width: isMobile ? "100%" : 300,
+                                backgroundColor: colors.primary[400],
+                            }}
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSearchTextChange({ target: { value: searchText } });
                             }}
                         >
-                            <MenuItem value="">
-                                <em>{loading ? "Đang tải..." : ""}</em> {/* Xóa chữ "Chọn khách sạn" */}
-                            </MenuItem>
-                            {hotels.map((hotel) => (
-                                <MenuItem key={hotel._id} value={hotel._id}>
-                                    {hotel.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <Paper
-                        component="form"
-                        sx={{
-                            p: "2px 4px",
-                            display: "flex",
-                            alignItems: "center",
-                            width: isMobile ? "100%" : 300,
-                            backgroundColor: colors.primary[400],
-                        }}
-                        onSubmit={handleSearch}
-                    >
-                        <InputBase
-                            sx={{ ml: 1, flex: 1, color: colors.grey[100] }}
-                            placeholder="Tìm kiếm theo bình luận"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                        />
-                        <IconButton type="submit" sx={{ p: "10px", color: colors.grey[100] }}>
-                            <SearchIcon />
-                        </IconButton>
-                    </Paper>
+                            <InputBase
+                                sx={{ ml: 1, flex: 1, color: colors.grey[100] }}
+                                placeholder="Tìm kiếm theo bình luận"
+                                value={searchText}
+                                onChange={handleSearchTextChange}
+                            />
+                            <IconButton sx={{ p: "10px", color: colors.grey[100] }} type="submit">
+                                <SearchIcon />
+                            </IconButton>
+                        </Paper>
+                    </Box>
                 </Box>
                 <Box
-                    height="75vh"
                     sx={{
                         width: "100%",
                         overflowX: "auto",
-                        "& .MuiDataGrid-root": {
-                            border: "none",
-                            width: "100%",
-                            minWidth: isMobile ? "800px" : "100%",
-                        },
-                        "& .MuiDataGrid-main": {
-                            width: "100%",
-                        },
-                        "& .MuiDataGrid-cell": {
-                            borderBottom: "none",
-                        },
-                        "& .MuiDataGrid-columnHeaders": {
-                            backgroundColor: colors.blueAccent[700],
-                            borderBottom: "none",
-                            color: colors.grey[100],
-                            fontSize: "14px",
-                            fontWeight: "bold",
-                            position: "sticky",
-                            top: 0,
-                            zIndex: 1,
-                        },
-                        "& .MuiDataGrid-columnHeader": {
-                            backgroundColor: colors.blueAccent[700],
-                            color: colors.grey[100],
-                            fontSize: "14px",
-                            fontWeight: "bold",
-                        },
-                        "& .MuiDataGrid-columnHeaderTitle": {
-                            color: colors.grey[100],
-                            fontWeight: "bold",
-                        },
-                        "& .MuiDataGrid-virtualScroller": {
-                            backgroundColor: colors.primary[400],
-                        },
-                        "& .MuiDataGrid-footerContainer": {
-                            borderTop: "none",
-                            backgroundColor: colors.blueAccent[700],
-                        },
-                        "& .MuiCheckbox-root": {
-                            color: `${colors.greenAccent[200]} !important`,
-                        },
                     }}
                 >
-                    {loading ? (
-                        <Typography variant="h6" align="center" mt={4}>
-                            Đang tải...
-                        </Typography>
-                    ) : hotels.length === 0 ? (
-                        <Box textAlign="center" mt={4}>
-                            <Typography variant="h6">
-                                Không có khách sạn nào để hiển thị
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={() => navigate("/loginadmin")}
-                                sx={{ mt: 2 }}
-                            >
-                                Đăng nhập lại
-                            </Button>
-                        </Box>
-                    ) : !selectedHotel?._id ? (
-                        <Typography variant="h6" align="center" mt={4}>
-                            Vui lòng chọn một khách sạn để xem đánh giá
-                        </Typography>
-                    ) : reviews.length === 0 ? (
-                        <Typography variant="h6" align="center" mt={4}>
-                            Không có đánh giá nào để hiển thị
-                        </Typography>
-                    ) : (
-                        <DataGrid
-                            rows={reviews}
-                            columns={columns}
-                            getRowId={(row) => row._id}
-                            pagination
-                            paginationMode="server"
-                            rowCount={rowCount}
-                            paginationModel={paginationModel}
-                            onPaginationModelChange={setPaginationModel}
-                            pageSizeOptions={[5, 10, 20]}
-                            getRowHeight={() => 80}
-                            sx={{
+                    <Box
+                        height="70vh"
+                        sx={{
+                            "& .MuiDataGrid-root": {
+                                border: "none",
                                 width: "100%",
-                                boxSizing: "border-box",
-                            }}
-                        />
-                    )}
+                                minWidth: isMobile ? "800px" : "100%",
+                            },
+                            "& .MuiDataGrid-main": {
+                                width: "100%",
+                            },
+                            "& .MuiDataGrid-cell": {
+                                borderBottom: "none",
+                            },
+                            "& .MuiDataGrid-columnHeaders": {
+                                backgroundColor: colors.blueAccent[700],
+                                borderBottom: "none",
+                                color: colors.grey[100],
+                                fontSize: "14px",
+                                fontWeight: "bold",
+                                position: "sticky",
+                                top: 0,
+                                zIndex: 1,
+                            },
+                            "& .MuiDataGrid-columnHeader": {
+                                backgroundColor: colors.blueAccent[700],
+                                color: colors.grey[100],
+                                fontSize: "14px",
+                                fontWeight: "bold",
+                            },
+                            "& .MuiDataGrid-columnHeaderTitle": {
+                                color: colors.grey[100],
+                                fontWeight: "bold",
+                            },
+                            "& .MuiDataGrid-virtualScroller": {
+                                backgroundColor: colors.primary[400],
+                            },
+                            "& .MuiCheckbox-root": {
+                                color: `${colors.greenAccent[200]} !important`,
+                            },
+                        }}
+                    >
+                        {loading ? (
+                            <Typography variant="h6" align="center" mt={4}>
+                                Đang tải...
+                            </Typography>
+                        ) : hotels.length === 0 ? (
+                            <Box textAlign="center" mt={4}>
+                                <Typography variant="h6">Không có khách sạn nào để hiển thị</Typography>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => navigate("/loginadmin")}
+                                    sx={{ mt: 2 }}
+                                >
+                                    Đăng nhập lại
+                                </Button>
+                            </Box>
+                        ) : !selectedHotel?._id ? (
+                            <Typography variant="h6" align="center" mt={4}>
+                                Vui lòng chọn một khách sạn để xem đánh giá
+                            </Typography>
+                        ) : reviews.length === 0 ? (
+                            <Typography variant="h6" align="center" mt={4}>
+                                Không có đánh giá nào để hiển thị
+                            </Typography>
+                        ) : (
+                            <DataGrid
+                                rows={reviews}
+                                columns={columns}
+                                getRowId={(row) => row._id}
+                                pagination={false}
+                                getRowHeight={() => 80}
+                                sx={{
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                                hideFooter={true}
+                                sortingMode="server"
+                                sortModel={sortModel}
+                                onSortModelChange={handleSortModelChange}
+                            />
+                        )}
+                    </Box>
                 </Box>
+                {reviews.length > 0 && (
+                    <Box display="flex" justifyContent="center" mt={2}>
+                        <Pagination
+                            count={totalPages}
+                            page={currentPage}
+                            onChange={handlePageChange}
+                            color="primary"
+                        />
+                    </Box>
+                )}
             </Box>
-            <Dialog
-                open={openModal}
-                onClose={handleCloseModal}
-                maxWidth="sm"
-                fullWidth
-            >
+            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.5rem", textAlign: "center" }}>
                     Chi tiết đánh giá
                 </DialogTitle>
                 <DialogContent>
-                    {selectedReview && (
+                    {selectedReview ? (
                         <Box sx={{ p: 2 }}>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Người dùng:</span> {selectedReview.userData?.username || "N/A"}
+                                <strong>Người dùng:</strong> {selectedReview.userData?.username || "N/A"}
                             </Typography>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Email:</span> {selectedReview.userData?.email || "N/A"}
+                                <strong>Email:</strong> {selectedReview.userData?.email || "N/A"}
                             </Typography>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Điểm đánh giá:</span> {selectedReview.rating}/5
+                                <strong>Điểm đánh giá:</strong> {selectedReview.rating || 0}/5
                             </Typography>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Bình luận:</span> {selectedReview.comment || "Không có bình luận"}
+                                <strong>Bình luận:</strong> {selectedReview.comment || "Không có bình luận"}
                             </Typography>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Ngày tạo:</span> {new Date(selectedReview.createdAt).toLocaleDateString("vi-VN")}
+                                <strong>Ngày tạo:</strong>{" "}
+                                {new Date(selectedReview.createdAt).toLocaleDateString("vi-VN") || "N/A"}
                             </Typography>
                             <Typography variant="body1" sx={{ mb: 1 }}>
-                                <span style={{ fontWeight: "bold" }}>Trạng thái:</span> {selectedReview.viewed ? "Đã xem" : "Chưa xem"}
+                                <strong>Trạng thái:</strong> {selectedReview.viewed ? "Đã xem" : "Chưa xem"}
                             </Typography>
                         </Box>
+                    ) : (
+                        <Typography>Không có dữ liệu</Typography>
                     )}
                 </DialogContent>
                 <DialogActions>
@@ -583,12 +1076,7 @@ const Reviews = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-            <Dialog
-                open={openDeleteModal}
-                onClose={handleCloseDeleteModal}
-                maxWidth="xs"
-                fullWidth
-            >
+            <Dialog open={openDeleteModal} onClose={handleCloseDeleteModal} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.25rem", textAlign: "center" }}>
                     Xác nhận xóa
                 </DialogTitle>
