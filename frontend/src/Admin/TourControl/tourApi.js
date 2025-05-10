@@ -5,7 +5,7 @@ const CATEGORY_URL = "http://localhost:3000/api/v1/admin/categories";
 
 // Lấy danh sách tour
 export const getTours = async (params = {}) => {
-    const response = await api.get(BASE_URL, { params });
+    const response = await api.get(BASE_URL, { params: { ...params, all: true } });
     console.log("getTours response:", response.data);
     return response.data;
 };

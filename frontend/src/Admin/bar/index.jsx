@@ -3,12 +3,16 @@ import { ResponsiveBar } from "@nivo/bar";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import { useEffect, useState } from "react";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { getRevenueStatistics } from "./BarApi";
+import { useNavigate } from "react-router-dom";
 
 const BarChart = ({ isDashboard = false }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [filterType, setFilterType] = useState("year");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -16,13 +20,17 @@ const BarChart = ({ isDashboard = false }) => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [viewType, setViewType] = useState("all");
   const [statType, setStatType] = useState("revenue");
-  const [errorMessage, setErrorMessage] = useState("");
   const [showTable, setShowTable] = useState(true);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
+  const [rowCount, setRowCount] = useState(0);
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
-
   const months = [
     { value: "", label: "Tất cả tháng" },
     { value: 1, label: "Tháng 1" },
@@ -45,7 +53,9 @@ const BarChart = ({ isDashboard = false }) => {
       setErrorMessage("");
       try {
         const params = {
-          status: "confirmed"
+          status: "paid",
+          page: paginationModel.page + 1,
+          limit: paginationModel.pageSize,
         };
 
         if (filterType === "year") {
@@ -55,8 +65,23 @@ const BarChart = ({ isDashboard = false }) => {
           if (selectedMonth) params.month = selectedMonth;
         } else if (filterType === "range") {
           if (startDate && endDate) {
+            if (new Date(startDate) > new Date(endDate)) {
+              setErrorMessage("Ngày bắt đầu phải trước ngày kết thúc!");
+              setData([]);
+              setRowCount(0);
+              setLoading(false);
+              toast.error("Ngày bắt đầu phải trước ngày kết thúc!", { position: "top-right" });
+              return;
+            }
             params.startDate = startDate;
             params.endDate = endDate;
+          } else {
+            setErrorMessage("Vui lòng chọn cả ngày bắt đầu và ngày kết thúc!");
+            setData([]);
+            setRowCount(0);
+            setLoading(false);
+            toast.error("Vui lòng chọn cả ngày bắt đầu và ngày kết thúc!", { position: "top-right" });
+            return;
           }
         }
 
@@ -66,54 +91,61 @@ const BarChart = ({ isDashboard = false }) => {
 
         if (response.code === 200 && Array.isArray(response.data)) {
           if (response.data.length === 0) {
-            setErrorMessage(`Không có dữ liệu thống kê cho năm ${selectedYear}.`);
+            setErrorMessage(`Không có dữ liệu thống kê cho ${filterType === "year" ? `năm ${selectedYear}` : filterType === "month" ? `tháng ${selectedMonth || "tất cả"} năm ${selectedYear}` : `khoảng thời gian từ ${startDate} đến ${endDate}`}.`);
             setData([]);
+            setRowCount(0);
+            toast.info(`Không có dữ liệu thống kê cho ${filterType === "year" ? `năm ${selectedYear}` : filterType === "month" ? `tháng ${selectedMonth || "tất cả"} năm ${selectedYear}` : `khoảng thời gian từ ${startDate} đến ${endDate}`}.`, { position: "top-right" });
           } else {
             const formattedData = response.data
-              .filter(item => {
-                if (!item.month) {
-                  console.warn("Dữ liệu thiếu trường month:", item);
-                  return false;
-                }
-                const [, year] = item.month.split('/');
-                return parseInt(year) === parseInt(selectedYear);
-              })
-              .map(item => {
-                if (!isFinite(item.totalPrice)) {
+              .map((item, index) => {
+                if (!item.month || !isFinite(item.totalPrice)) {
                   console.warn("Dữ liệu không hợp lệ:", item);
                   return null;
                 }
                 return {
+                  id: `${item.month}-${index}`,
                   month: item.month,
                   tours: Number(item.tours) || 0,
                   hotels: Number(item.hotels) || 0,
                   totalPrice: Number(item.totalPrice) || 0,
                   tourRevenue: Number(item.tourRevenue) || 0,
-                  hotelRevenue: Number(item.hotelRevenue) || 0
+                  hotelRevenue: Number(item.hotelRevenue) || 0,
                 };
               })
-              .filter(item => item !== null);
+              .filter((item) => item !== null);
 
             console.log("Formatted Data:", formattedData);
-            if (formattedData.length === 0) {
-              setErrorMessage(`Không có dữ liệu hợp lệ cho năm ${selectedYear}.`);
-            }
             setData(formattedData);
+            setRowCount(response.totalItems || formattedData.length);
+            if (formattedData.length === 0) {
+              setErrorMessage(`Không có dữ liệu hợp lệ cho ${filterType === "year" ? `năm ${selectedYear}` : filterType === "month" ? `tháng ${selectedMonth || "tất cả"} năm ${selectedYear}` : `khoảng thời gian từ ${startDate} đến ${endDate}`}.`);
+              toast.info(`Không có dữ liệu hợp lệ cho ${filterType === "year" ? `năm ${selectedYear}` : filterType === "month" ? `tháng ${selectedMonth || "tất cả"} năm ${selectedYear}` : `khoảng thời gian từ ${startDate} đến ${endDate}`}.`, { position: "top-right" });
+            }
           }
         } else {
-          setErrorMessage(`Lỗi API: Mã ${response.code || "không xác định"}. Phản hồi: ${JSON.stringify(response)}.`);
+          setErrorMessage(`Lỗi API: Mã ${response.code || "không xác định"}.`);
           setData([]);
+          setRowCount(0);
+          toast.error(`Lỗi API: ${response.message || "Không xác định"}`, { position: "top-right" });
         }
       } catch (error) {
         console.error("Lỗi khi lấy dữ liệu thống kê:", error);
-        setErrorMessage(`Lỗi kết nối API: ${error.message}. Kiểm tra server backend hoặc token xác thực.`);
+        const errorMsg = error.response?.data?.message || `Lỗi kết nối API: ${error.message}`;
+        setErrorMessage(errorMsg);
         setData([]);
+        setRowCount(0);
+        toast.error(errorMsg, { position: "top-right" });
+        if (error.response?.status === 401) {
+          toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+          localStorage.removeItem("adminToken");
+          navigate("/loginadmin");
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchStatistics();
-  }, [filterType, selectedYear, selectedMonth, startDate, endDate]);
+  }, [filterType, selectedYear, selectedMonth, startDate, endDate, paginationModel, navigate]);
 
   const getChartConfig = () => {
     let keys = [];
@@ -123,20 +155,20 @@ const BarChart = ({ isDashboard = false }) => {
     if (viewType === "all") {
       if (statType === "quantity") {
         keys = ["tours", "hotels"];
-        barColors = [colors.redAccent[400], colors.redAccent[400]];
-        legendLabels = ["Tổng hợp"];
+        barColors = [colors.blueAccent[400], colors.greenAccent[400]];
+        legendLabels = ["Tours", "Hotels"];
       } else {
         keys = ["totalPrice"];
         barColors = [colors.redAccent[400]];
-        legendLabels = ["Tổng hợp"];
+        legendLabels = ["Tổng doanh thu"];
       }
     } else if (viewType === "tours") {
       keys = [statType === "quantity" ? "tours" : "tourRevenue"];
-      barColors = [colors.blueAccent[700]];
+      barColors = [colors.blueAccent[400]];
       legendLabels = ["Tours"];
     } else if (viewType === "hotels") {
       keys = [statType === "quantity" ? "hotels" : "hotelRevenue"];
-      barColors = [colors.greenAccent[500]];
+      barColors = [colors.greenAccent[400]];
       legendLabels = ["Hotels"];
     }
 
@@ -151,19 +183,21 @@ const BarChart = ({ isDashboard = false }) => {
     setSelectedMonth("");
     setStartDate("");
     setEndDate("");
+    setPaginationModel({ page: 0, pageSize: 10 });
+    setErrorMessage("");
   };
 
   const toggleTableVisibility = () => {
-    setShowTable(prev => !prev);
+    setShowTable((prev) => !prev);
   };
 
   const columns = [
-    { field: 'month', headerName: 'Tháng', flex: 0.5 },
-    { field: 'tours', headerName: 'Số lượng Tours', flex: 0.7 },
-    { field: 'hotels', headerName: 'Số lượng Hotels', flex: 0.7 },
+    { field: "month", headerName: "Tháng", flex: 0.5 },
+    { field: "tours", headerName: "Số lượng Tours", flex: 0.7 },
+    { field: "hotels", headerName: "Số lượng Hotels", flex: 0.7 },
     {
-      field: 'totalPrice',
-      headerName: 'Tổng doanh thu (K VNĐ)',
+      field: "totalPrice",
+      headerName: "Tổng doanh thu (K VNĐ)",
       flex: 1,
       renderCell: (params) => (
         <Box display="flex" alignItems="center" height="100%">
@@ -171,11 +205,11 @@ const BarChart = ({ isDashboard = false }) => {
             {Math.round(params.value / 1000).toLocaleString("vi-VN")}
           </Typography>
         </Box>
-      )
+      ),
     },
     {
-      field: 'tourRevenue',
-      headerName: 'Doanh thu Tours (K VNĐ)',
+      field: "tourRevenue",
+      headerName: "Doanh thu Tours (K VNĐ)",
       flex: 1,
       renderCell: (params) => (
         <Box display="flex" alignItems="center" height="100%">
@@ -183,11 +217,11 @@ const BarChart = ({ isDashboard = false }) => {
             {Math.round(params.value / 1000).toLocaleString("vi-VN")}
           </Typography>
         </Box>
-      )
+      ),
     },
     {
-      field: 'hotelRevenue',
-      headerName: 'Doanh thu Hotels (K VNĐ)',
+      field: "hotelRevenue",
+      headerName: "Doanh thu Hotels (K VNĐ)",
       flex: 1,
       renderCell: (params) => (
         <Box display="flex" alignItems="center" height="100%">
@@ -195,19 +229,38 @@ const BarChart = ({ isDashboard = false }) => {
             {Math.round(params.value / 1000).toLocaleString("vi-VN")}
           </Typography>
         </Box>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <Box sx={{ p: 2 }}>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        limit={3}
+      />
       <Typography variant="h2" sx={{ mb: 3, color: colors.grey[100] }}>
         Báo cáo doanh thu
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2, backgroundColor: colors.primary[400] }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
-          <Box display="flex" alignItems="center" gap={2}>
+        <Box
+          display="flex"
+          flexDirection={isMobile ? "column" : "row"}
+          alignItems={isMobile ? "stretch" : "center"}
+          justifyContent="space-between"
+          gap={2}
+        >
+          <Box display="flex" flexDirection={isMobile ? "column" : "row"} alignItems={isMobile ? "stretch" : "center"} gap={2}>
             <FormControl sx={{ minWidth: 150 }}>
               <InputLabel>Loại báo cáo</InputLabel>
               <Select
@@ -265,7 +318,7 @@ const BarChart = ({ isDashboard = false }) => {
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
-                  sx={{ width: 180 }}
+                  sx={{ width: isMobile ? "100%" : 180 }}
                 />
                 <TextField
                   label="Đến ngày"
@@ -273,16 +326,12 @@ const BarChart = ({ isDashboard = false }) => {
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
-                  sx={{ width: 180 }}
+                  sx={{ width: isMobile ? "100%" : 180 }}
                 />
               </>
             )}
-
             <Button
-              sx={{
-                ml: 1,
-                backgroundColor: "white"
-              }}
+              sx={{ ml: 1, backgroundColor: "white" }}
               variant="outlined"
               onClick={handleResetFilters}
             >
@@ -290,7 +339,7 @@ const BarChart = ({ isDashboard = false }) => {
             </Button>
           </Box>
 
-          <Box display="flex" gap={2}>
+          <Box display="flex" flexDirection={isMobile ? "column" : "row"} gap={2}>
             <ToggleButtonGroup
               value={statType}
               exclusive
@@ -299,9 +348,9 @@ const BarChart = ({ isDashboard = false }) => {
               }}
               sx={{
                 backgroundColor: colors.primary[400],
-                '& .MuiToggleButton-root': {
+                "& .MuiToggleButton-root": {
                   color: colors.grey[100],
-                  '&.Mui-selected': {
+                  "&.Mui-selected": {
                     backgroundColor: colors.blueAccent[700],
                     color: colors.grey[100],
                   },
@@ -320,9 +369,9 @@ const BarChart = ({ isDashboard = false }) => {
               }}
               sx={{
                 backgroundColor: colors.primary[400],
-                '& .MuiToggleButton-root': {
+                "& .MuiToggleButton-root": {
                   color: colors.grey[100],
-                  '&.Mui-selected': {
+                  "&.Mui-selected": {
                     backgroundColor: colors.blueAccent[700],
                     color: colors.grey[100],
                   },
@@ -340,15 +389,15 @@ const BarChart = ({ isDashboard = false }) => {
               }}
             >
               <ToggleButton value="all">Tổng hợp</ToggleButton>
-              <ToggleButton value="tours">Thống kê Tours</ToggleButton>
-              <ToggleButton value="hotels">Thống kê Hotels</ToggleButton>
+              <ToggleButton value="tours">Tours</ToggleButton>
+              <ToggleButton value="hotels">Hotels</ToggleButton>
             </ToggleButtonGroup>
           </Box>
         </Box>
       </Paper>
 
       <Paper sx={{ p: 2, backgroundColor: colors.primary[400] }}>
-        <Box sx={{ minHeight: isMobile ? 300 : 400, height: isDashboard ? "50vh" : isMobile ? "60vh" : "75vh" }}>
+        <Box sx={{ minHeight: isMobile ? 300 : isDashboard ? 200 : 400, height: isDashboard ? "40vh" : isMobile ? "60vh" : "75vh" }}>
           {loading ? (
             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
               <CircularProgress />
@@ -359,22 +408,20 @@ const BarChart = ({ isDashboard = false }) => {
             </Box>
           ) : data.length === 0 ? (
             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <Typography>Không có dữ liệu để hiển thị biểu đồ cho năm {selectedYear}.</Typography>
+              <Typography>Không có dữ liệu để hiển thị.</Typography>
             </Box>
           ) : (
             <>
-              {statType === "revenue" && (
-                <Typography
-                  variant="h6"
-                  sx={{
-                    textAlign: "center",
-                    color: colors.grey[100],
-                    mb: 2
-                  }}
-                >
-                  Doanh thu (nghìn VNĐ)
-                </Typography>
-              )}
+              <Typography
+                variant="h6"
+                sx={{
+                  textAlign: "center",
+                  color: colors.grey[100],
+                  mb: 2,
+                }}
+              >
+                {statType === "revenue" ? "Doanh thu (nghìn VNĐ)" : "Số lượng"}
+              </Typography>
               <ResponsiveBar
                 data={data}
                 theme={{
@@ -404,6 +451,12 @@ const BarChart = ({ isDashboard = false }) => {
                       fill: colors.grey[100],
                     },
                   },
+                  tooltip: {
+                    container: {
+                      background: colors.primary[400],
+                      color: colors.grey[100],
+                    },
+                  },
                 }}
                 layout="vertical"
                 valueFormat={(value) => {
@@ -415,7 +468,7 @@ const BarChart = ({ isDashboard = false }) => {
                 }}
                 keys={keys}
                 indexBy="month"
-                margin={{ top: 50, right: 130, bottom: 70, left: 60 }}
+                margin={{ top: 50, right: isMobile ? 50 : 130, bottom: 70, left: isMobile ? 50 : 60 }}
                 padding={0.3}
                 valueScale={{ type: "linear" }}
                 indexScale={{ type: "band", round: true }}
@@ -429,10 +482,10 @@ const BarChart = ({ isDashboard = false }) => {
                 axisBottom={{
                   tickSize: 5,
                   tickPadding: 5,
-                  tickRotation: 0,
+                  tickRotation: isMobile ? 45 : 0,
                   legend: isDashboard ? undefined : filterType === "range" ? "Ngày" : "Tháng",
                   legendPosition: "middle",
-                  legendOffset: 32,
+                  legendOffset: 50,
                 }}
                 axisLeft={{
                   tickSize: 5,
@@ -445,12 +498,12 @@ const BarChart = ({ isDashboard = false }) => {
                     }
                     return Math.round(value / 1000);
                   },
-                  legend: undefined,
+                  legend: isDashboard ? undefined : statType === "quantity" ? "Số lượng" : "Doanh thu (K VNĐ)",
                   legendPosition: "middle",
-                  legendOffset: -40,
+                  legendOffset: isMobile ? -45 : -50,
                 }}
                 enableLabel={true}
-                label={({ value }) => statType === "quantity" ? value : `${Math.round(value / 1000)}K`}
+                label={(d) => (statType === "quantity" ? d.value : `${Math.round(d.value / 1000)}K`)}
                 labelSkipWidth={12}
                 labelSkipHeight={12}
                 labelTextColor={{
@@ -458,39 +511,44 @@ const BarChart = ({ isDashboard = false }) => {
                   modifiers: [["darker", 1.6]],
                 }}
                 tooltip={({ id, value, indexValue }) => (
-                  <div style={{ padding: 12, background: '#222', color: '#fff' }}>
-                    <strong>{indexValue}</strong><br />
-                    {id}: {id === 'tours' || id === 'hotels' ? value : `${Math.round(value / 1000)}K VNĐ`}
+                  <div style={{ padding: 12, background: colors.primary[500], color: colors.grey[100] }}>
+                    <strong>{indexValue}</strong>
+                    <br />
+                    {id}: {id === "tours" || id === "hotels" ? value : `${Math.round(value / 1000)}K VNĐ`}
                   </div>
                 )}
-                legends={[
-                  {
-                    data: legendLabels.map((label, index) => ({
-                      id: keys[index] || label,
-                      label: label,
-                      color: barColors[index]
-                    })),
-                    anchor: "bottom-right",
-                    direction: "column",
-                    justify: false,
-                    translateX: 120,
-                    translateY: 0,
-                    itemsSpacing: 2,
-                    itemWidth: 100,
-                    itemHeight: 20,
-                    itemDirection: "left-to-right",
-                    itemOpacity: 0.85,
-                    symbolSize: 20,
-                    effects: [
+                legends={
+                  isMobile || isDashboard
+                    ? []
+                    : [
                       {
-                        on: "hover",
-                        style: {
-                          itemOpacity: 1,
-                        },
+                        data: legendLabels.map((label, index) => ({
+                          id: keys[index] || label,
+                          label: label,
+                          color: barColors[index],
+                        })),
+                        anchor: "bottom-right",
+                        direction: "column",
+                        justify: false,
+                        translateX: 120,
+                        translateY: 0,
+                        itemsSpacing: 2,
+                        itemWidth: 100,
+                        itemHeight: 20,
+                        itemDirection: "left-to-right",
+                        itemOpacity: 0.85,
+                        symbolSize: 20,
+                        effects: [
+                          {
+                            on: "hover",
+                            style: {
+                              itemOpacity: 1,
+                            },
+                          },
+                        ],
                       },
-                    ],
-                  },
-                ]}
+                    ]
+                }
                 role="application"
                 barAriaLabel={(e) =>
                   `${e.id}: ${e.formattedValue} trong ${filterType === "range" ? "ngày" : "tháng"}: ${e.indexValue}`
@@ -505,7 +563,7 @@ const BarChart = ({ isDashboard = false }) => {
               <Button
                 variant="contained"
                 onClick={toggleTableVisibility}
-                sx={{ backgroundColor: colors.blueAccent[400], '&:hover': { backgroundColor: colors.blueAccent[300] } }}
+                sx={{ backgroundColor: colors.blueAccent[400], "&:hover": { backgroundColor: colors.blueAccent[300] } }}
               >
                 {showTable ? "Ẩn bảng" : "Hiện bảng"}
               </Button>
@@ -555,11 +613,15 @@ const BarChart = ({ isDashboard = false }) => {
                 }}
               >
                 <DataGrid
-                  rows={data.map((item, index) => ({ id: index, ...item }))}
+                  rows={data}
                   columns={columns}
-                  pageSize={5}
-                  rowsPerPageOptions={[5]}
-                  disableSelectionOnClick
+                  getRowId={(row) => row.id}
+                  pagination
+                  paginationMode="server"
+                  rowCount={rowCount}
+                  paginationModel={paginationModel}
+                  onPaginationModelChange={setPaginationModel}
+                  pageSizeOptions={[5, 10, 20]}
                   getRowHeight={() => 60}
                   sx={{ width: "100%" }}
                 />

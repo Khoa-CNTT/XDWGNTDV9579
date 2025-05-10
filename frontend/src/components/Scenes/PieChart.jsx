@@ -1,46 +1,58 @@
 import { ResponsivePie } from "@nivo/pie";
 import { tokens } from "../../theme";
-import { useTheme, Typography } from "@mui/material";
+import { useTheme, Typography, Box, useMediaQuery, CircularProgress } from "@mui/material";
 import { useState, useEffect } from "react";
 import { getInvoices } from "../../Admin/invoices/InvoicesApi";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useNavigate } from "react-router-dom";
 
 const PieChart = ({ isDashboard = false }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const navigate = useNavigate();
   const [pieData, setPieData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const adminToken = localStorage.getItem("adminToken");
 
-  // Fetch data for pie chart
   useEffect(() => {
     const fetchPieData = async () => {
+      if (!adminToken) {
+        setErrorMessage("Vui lòng đăng nhập để tiếp tục!");
+        toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
+        navigate("/loginadmin");
+        return;
+      }
+
+      setLoading(true);
+      setErrorMessage("");
       try {
-        const invoicesData = await getInvoices();
         const today = new Date();
-        const currentMonth = today.getMonth() + 1; // Tháng hiện tại (1-12)
-        const currentYear = today.getFullYear(); // Năm hiện tại (2025)
+        const currentMonth = today.getMonth() + 1;
+        const currentYear = today.getFullYear();
 
-        // Lọc các hóa đơn trong tháng hiện tại
-        const monthInvoices = invoicesData.filter((invoice) => {
-          const invoiceDate = new Date(invoice.createdAt);
-          return (
-            invoiceDate.getFullYear() === currentYear &&
-            invoiceDate.getMonth() + 1 === currentMonth
-          );
-        });
+        const invoicesData = await getInvoices({
+          page: 1,
+          limit: 50,
+          status: "paid", // Sửa từ "confirmed" thành "paid"
+          year: currentYear,
+          month: currentMonth,
+        }, adminToken);
+        if (!invoicesData || !Array.isArray(invoicesData.orders)) {
+          throw new Error("Dữ liệu hóa đơn không hợp lệ!");
+        }
 
-        // Tính doanh thu từ tour và khách sạn
         let tourRevenue = 0;
         let hotelRevenue = 0;
-
-        monthInvoices.forEach((invoice) => {
-          // Doanh thu tour
+        invoicesData.orders.forEach((invoice) => {
           if (invoice.tours?.length > 0) {
             invoice.tours.forEach((tour) => {
               const stock = tour.timeStarts?.[0]?.stock || 0;
               tourRevenue += (tour.price || 0) * stock;
             });
           }
-          // Doanh thu khách sạn
           if (invoice.hotels?.length > 0) {
             invoice.hotels.forEach((hotel) => {
               if (hotel.rooms?.length > 0) {
@@ -52,96 +64,121 @@ const PieChart = ({ isDashboard = false }) => {
           }
         });
 
-        // Định dạng dữ liệu cho biểu đồ
-        setPieData([
-          {
-            id: "Tour",
-            label: "Tour",
-            value: tourRevenue / 1000, // Chuyển sang nghìn VNĐ
-            color: colors.blueAccent[700],
-          },
-          {
-            id: "Hotel",
-            label: "Hotel",
-            value: hotelRevenue / 1000, // Chuyển sang nghìn VNĐ
-            color: colors.greenAccent[500],
-          },
-        ]);
+        const totalRevenue = tourRevenue + hotelRevenue;
+        if (totalRevenue === 0) {
+          setErrorMessage(`Không có dữ liệu doanh thu cho tháng ${currentMonth}/${currentYear}.`);
+          setPieData([]);
+          toast.info(`Không có dữ liệu doanh thu cho tháng ${currentMonth}/${currentYear}.`, { position: "top-right" });
+        } else {
+          setPieData([
+            {
+              id: "Tour",
+              label: "Tour",
+              value: tourRevenue / 1000,
+              color: colors.blueAccent[700],
+            },
+            {
+              id: "Hotel",
+              label: "Hotel",
+              value: hotelRevenue / 1000,
+              color: colors.greenAccent[500],
+            },
+          ]);
+        }
       } catch (err) {
-        toast.error("Không thể tải dữ liệu biểu đồ!", { position: "top-right" });
         console.error("Fetch pie data error:", err);
+        const errorMsg = err.message || `Lỗi khi tải dữ liệu hóa đơn: ${err.response?.data?.message || err.message}`;
+        setErrorMessage(errorMsg);
+        setPieData([]);
+        toast.error(errorMsg, { position: "top-right" });
+        if (err.response?.status === 401) {
+          toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+          localStorage.removeItem("adminToken");
+          navigate("/loginadmin");
+        }
+      } finally {
+        setLoading(false);
       }
     };
     fetchPieData();
-  }, []);
-
-  // Handle empty data
-  if (pieData.length === 0 || pieData.every((item) => item.value === 0)) {
-    return (
-      <Typography align="center" color={colors.grey[100]} mt={4}>
-        Chưa có dữ liệu doanh thu để hiển thị
-      </Typography>
-    );
-  }
+  }, [adminToken, navigate]);
 
   return (
-    <ResponsivePie
-      data={pieData}
-      theme={{
-        axis: {
-          domain: {
-            line: { stroke: colors.grey[100] },
-          },
-          legend: {
-            text: { fill: colors.grey[100] },
-          },
-          ticks: {
-            line: { stroke: colors.grey[100], strokeWidth: 1 },
-            text: { fill: colors.grey[100] },
-          },
-        },
-        legends: {
-          text: { fill: colors.grey[100] },
-        },
-      }}
-      margin={isDashboard ? { top: 20, right: 40, bottom: 60, left: 40 } : { top: 40, right: 80, bottom: 80, left: 80 }}
-      innerRadius={0.5}
-      padAngle={0.7}
-      cornerRadius={3}
-      activeOuterRadiusOffset={8}
-      borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
-      arcLinkLabelsSkipAngle={10}
-      arcLinkLabelsTextColor={colors.grey[100]}
-      arcLinkLabelsThickness={2}
-      arcLinkLabelsColor={{ from: "color" }}
-      enableArcLabels={false}
-      arcLabelsRadiusOffset={0.4}
-      arcLabelsSkipAngle={7}
-      arcLabelsTextColor={{ from: "color", modifiers: [["darker", 2]] }}
-      valueFormat={(value) => `${Math.round(value)}K VNĐ`}
-      defs={[
-        {
-          id: "dots",
-          type: "patternDots",
-          background: "inherit",
-          color: "rgba(255, 255, 255, 0.3)",
-          size: 4,
-          padding: 1,
-          stagger: true,
-        },
-        {
-          id: "lines",
-          type: "patternLines",
-          background: "inherit",
-          color: "rgba(255, 255, 255, 0.3)",
-          rotation: -45,
-          lineWidth: 6,
-          spacing: 10,
-        },
-      ]}
-      legends={
-        isDashboard
-          ? [
+    <Box height="100%" position="relative">
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        limit={3}
+      />
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" height={isMobile ? "150px" : isDashboard ? "200px" : "300px"}>
+          <CircularProgress />
+        </Box>
+      ) : errorMessage ? (
+        <Box display="flex" justifyContent="center" alignItems="center" height={isMobile ? "150px" : isDashboard ? "200px" : "300px"}>
+          <Typography color="error">{errorMessage}</Typography>
+        </Box>
+      ) : pieData.length === 0 || pieData.every((item) => item.value === 0) ? (
+        <Box display="flex" justifyContent="center" alignItems="center" height={isMobile ? "150px" : isDashboard ? "200px" : "300px"}>
+          <Typography color={colors.grey[100]}>
+            Chưa có dữ liệu doanh thu để hiển thị
+          </Typography>
+        </Box>
+      ) : (
+        <ResponsivePie
+          data={pieData}
+          theme={{
+            axis: {
+              domain: { line: { stroke: colors.grey[100] } },
+              legend: { text: { fill: colors.grey[100] } },
+              ticks: { line: { stroke: colors.grey[100], strokeWidth: 1 }, text: { fill: colors.grey[100] } },
+            },
+            legends: { text: { fill: colors.grey[100], fontSize: isMobile ? 8 : 10 } },
+          }}
+          margin={isMobile ? { top: 10, right: 20, bottom: 40, left: 20 } : isDashboard ? { top: 20, right: 40, bottom: 60, left: 40 } : { top: 40, right: 80, bottom: 80, left: 80 }}
+          innerRadius={0.5}
+          padAngle={0.7}
+          cornerRadius={3}
+          activeOuterRadiusOffset={8}
+          borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
+          arcLinkLabelsSkipAngle={10}
+          arcLinkLabelsTextColor={colors.grey[100]}
+          arcLinkLabelsThickness={2}
+          arcLinkLabelsColor={{ from: "color" }}
+          enableArcLabels={isMobile ? false : true}
+          arcLabelsRadiusOffset={0.4}
+          arcLabelsSkipAngle={7}
+          arcLabelsTextColor={{ from: "color", modifiers: [["darker", 2]] }}
+          valueFormat={(value) => `${Math.round(value)} VNĐ`}
+          defs={[
+            {
+              id: "dots",
+              type: "patternDots",
+              background: "inherit",
+              color: "rgba(255, 255, 255, 0.3)",
+              size: 4,
+              padding: 1,
+              stagger: true,
+            },
+            {
+              id: "lines",
+              type: "patternLines",
+              background: "inherit",
+              color: "rgba(255, 255, 255, 0.3)",
+              rotation: -45,
+              lineWidth: 6,
+              spacing: 10,
+            },
+          ]}
+          legends={isMobile ? [] : isDashboard ? [
             {
               anchor: "bottom",
               direction: "row",
@@ -163,8 +200,7 @@ const PieChart = ({ isDashboard = false }) => {
                 },
               ],
             },
-          ]
-          : [
+          ] : [
             {
               anchor: "bottom",
               direction: "row",
@@ -186,9 +222,10 @@ const PieChart = ({ isDashboard = false }) => {
                 },
               ],
             },
-          ]
-      }
-    />
+          ]}
+        />
+      )}
+    </Box>
   );
 };
 

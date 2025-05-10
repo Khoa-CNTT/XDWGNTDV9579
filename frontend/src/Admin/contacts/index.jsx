@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
@@ -12,6 +12,11 @@ import {
   CircularProgress,
   Typography,
   Grid,
+  Pagination,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -28,79 +33,392 @@ import {
   deleteContact,
 } from "./ContactsApi";
 import { useAdminAuth } from "../../context/AdminContext";
+import { useNavigate } from "react-router-dom";
+import { debounce } from "lodash";
 
 const ContactsControl = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { adminToken } = useAdminAuth();
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
-  const [allContacts, setAllContacts] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOption, setSortOption] = useState("createdAt_desc");
+  const [sortModel, setSortModel] = useState([{ field: "createdAt", sort: "desc" }]);
   const [openDetail, setOpenDetail] = useState(false);
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+  const [deleteContactId, setDeleteContactId] = useState(null);
   const [currentContact, setCurrentContact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limitItems = 10;
 
-  // Lấy danh sách khách hàng
-  const fetchContacts = async () => {
-    setLoading(true);
-    try {
-      const data = await getContacts();
-      const formattedData = Array.isArray(data)
-        ? data.map((item, index) => ({
-          ...item,
-          id: item._id,
-          stt: index + 1,
-          createdAt: new Date(item.createdAt).toLocaleDateString("vi-VN"),
-        }))
-        : [];
-      setAllContacts(formattedData);
-      setContacts(formattedData);
-      console.log("Contacts loaded:", formattedData);
-      if (formattedData.length === 0) {
-        toast.info("Không có khách hàng nào để hiển thị!", { position: "top-right" });
+  const fetchContacts = useCallback(
+    async (page = 1, search = "", status = "all", sortKey = "createdAt", sortValue = "desc") => {
+      setLoading(true);
+      try {
+        const params = {
+          page,
+          limit: limitItems,
+        };
+        if (search) params.search = search;
+        if (status !== "all") params.status = status;
+        if (sortKey) params.sortKey = sortKey;
+        if (sortValue) params.sortValue = sortValue;
+        console.log("Fetching contacts with params:", params);
+        const response = await getContacts(params);
+        console.log("fetchContacts response:", response);
+        if (response && Array.isArray(response.users)) {
+          const totalRecords = response.totalRecords || response.users.length;
+          const formattedData = response.users.map((item, index) => {
+            let stt;
+            if (sortKey === "_id" && sortValue === "desc") {
+              stt = totalRecords - ((page - 1) * limitItems + index);
+            } else {
+              stt = (page - 1) * limitItems + index + 1;
+            }
+            return {
+              ...item,
+              id: item._id,
+              stt,
+              createdAt: new Date(item.createdAt).toLocaleDateString("vi-VN"),
+            };
+          });
+          setContacts(formattedData);
+          setTotalPages(response.totalPage || 1);
+          if (formattedData.length === 0) {
+            toast.info(
+              search
+                ? `Không tìm thấy liên hệ nào với từ khóa "${search}"!`
+                : "Không có liên hệ nào để hiển thị!",
+              { position: "top-right" }
+            );
+          }
+        } else {
+          setError("Dữ liệu liên hệ không hợp lệ!");
+          toast.error("Dữ liệu liên hệ không hợp lệ!", { position: "top-right" });
+          setContacts([]);
+          setTotalPages(1);
+        }
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || "Không thể tải danh sách liên hệ!";
+        setError(errorMessage);
+        toast.error(errorMessage, { position: "top-right" });
+        console.error("Fetch contacts error:", err.response?.data);
+        if (err.response?.status === 401) {
+          toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+          localStorage.removeItem("adminToken");
+          navigate("/loginadmin");
+        }
+        setContacts([]);
+        setTotalPages(1);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || "Không thể tải danh sách khách hàng!";
-      setError(errorMessage);
-      toast.error(errorMessage, { position: "top-right" });
-      console.error("Fetch contacts error:", err.response?.data);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [adminToken, navigate, limitItems]
+  );
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((value, status, sortKey, sortValue) => {
+      setCurrentPage(1);
+      fetchContacts(1, value, status, sortKey, sortValue);
+    }, 500),
+    [fetchContacts]
+  );
 
   useEffect(() => {
     const token = adminToken || localStorage.getItem("adminToken");
-    console.log("adminToken in ContactsControl:", token);
     if (token) {
-      fetchContacts();
+      fetchContacts(currentPage, searchText, statusFilter);
     } else {
       toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
       setTimeout(() => {
-        window.location.href = "/loginadmin";
+        navigate("/loginadmin");
       }, 2000);
     }
-  }, [adminToken]);
+  }, [adminToken, navigate, fetchContacts]);
 
-  // Xử lý tìm kiếm ở frontend (thời gian thực)
-  useEffect(() => {
-    const filteredContacts = allContacts.filter((contact) =>
-      contact.fullName.toLowerCase().includes(searchText.toLowerCase())
-    );
-    setContacts(filteredContacts);
-  }, [searchText, allContacts]);
-
-  // Xử lý tìm kiếm thủ công khi nhấn nút
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const filteredContacts = allContacts.filter((contact) =>
-      contact.fullName.toLowerCase().includes(searchText.toLowerCase())
-    );
-    setContacts(filteredContacts);
+  const handleSearchTextChange = (e) => {
+    const value = e.target.value;
+    setSearchText(value);
+    let sortKey = "";
+    let sortValue = "";
+    switch (sortOption) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        break;
+      case "fullName_asc":
+        sortKey = "fullName";
+        sortValue = "asc";
+        break;
+      case "fullName_desc":
+        sortKey = "fullName";
+        sortValue = "desc";
+        break;
+      case "email_asc":
+        sortKey = "email";
+        sortValue = "asc";
+        break;
+      case "email_desc":
+        sortKey = "email";
+        sortValue = "desc";
+        break;
+      case "phone_asc":
+        sortKey = "phone";
+        sortValue = "asc";
+        break;
+      case "phone_desc":
+        sortKey = "phone";
+        sortValue = "desc";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+      default:
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+    }
+    debouncedSearch(value, statusFilter, sortKey, sortValue);
   };
 
-  // Mở modal chi tiết
+  const handleSearch = (e) => {
+    e.preventDefault();
+    handleSearchTextChange({ target: { value: searchText } });
+  };
+
+  const handleStatusFilterChange = (event) => {
+    const newStatus = event.target.value;
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+    let sortKey = "";
+    let sortValue = "";
+    switch (sortOption) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        break;
+      case "fullName_asc":
+        sortKey = "fullName";
+        sortValue = "asc";
+        break;
+      case "fullName_desc":
+        sortKey = "fullName";
+        sortValue = "desc";
+        break;
+      case "email_asc":
+        sortKey = "email";
+        sortValue = "asc";
+        break;
+      case "email_desc":
+        sortKey = "email";
+        sortValue = "desc";
+        break;
+      case "phone_asc":
+        sortKey = "phone";
+        sortValue = "asc";
+        break;
+      case "phone_desc":
+        sortKey = "phone";
+        sortValue = "desc";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+      default:
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+    }
+    fetchContacts(1, searchText, newStatus, sortKey, sortValue);
+  };
+
+  const handleSortChange = (event) => {
+    const value = event.target.value;
+    setSortOption(value);
+    setCurrentPage(1);
+    let sortKey = "";
+    let sortValue = "";
+    let sortField = "";
+    switch (value) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        sortField = "stt";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        sortField = "stt";
+        break;
+      case "fullName_asc":
+        sortKey = "fullName";
+        sortValue = "asc";
+        sortField = "fullName";
+        break;
+      case "fullName_desc":
+        sortKey = "fullName";
+        sortValue = "desc";
+        sortField = "fullName";
+        break;
+      case "email_asc":
+        sortKey = "email";
+        sortValue = "asc";
+        sortField = "email";
+        break;
+      case "email_desc":
+        sortKey = "email";
+        sortValue = "desc";
+        sortField = "email";
+        break;
+      case "phone_asc":
+        sortKey = "phone";
+        sortValue = "asc";
+        sortField = "phone";
+        break;
+      case "phone_desc":
+        sortKey = "phone";
+        sortValue = "desc";
+        sortField = "phone";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        sortField = "createdAt";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        sortField = "createdAt";
+        break;
+      default:
+        sortKey = "createdAt";
+        sortValue = "desc";
+        sortField = "createdAt";
+        break;
+    }
+    fetchContacts(1, searchText, statusFilter, sortKey, sortValue);
+    setSortModel([{ field: sortField, sort: sortValue }]);
+  };
+
+  const handleSortModelChange = (newSortModel) => {
+    setSortModel(newSortModel);
+    setCurrentPage(1);
+    if (newSortModel.length > 0) {
+      const { field, sort } = newSortModel[0];
+      let sortKey = "";
+      let sortOptionValue = "";
+      switch (field) {
+        case "stt":
+          sortKey = "_id";
+          sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+          break;
+        case "fullName":
+          sortKey = "fullName";
+          sortOptionValue = sort === "asc" ? "fullName_asc" : "fullName_desc";
+          break;
+        case "email":
+          sortKey = "email";
+          sortOptionValue = sort === "asc" ? "email_asc" : "email_desc";
+          break;
+        case "phone":
+          sortKey = "phone";
+          sortOptionValue = sort === "asc" ? "phone_asc" : "phone_desc";
+          break;
+        case "createdAt":
+          sortKey = "createdAt";
+          sortOptionValue = sort === "asc" ? "createdAt_asc" : "createdAt_desc";
+          break;
+        default:
+          break;
+      }
+      if (sortKey) {
+        setSortOption(sortOptionValue);
+        fetchContacts(1, searchText, statusFilter, sortKey, sort);
+      }
+    } else {
+      setSortOption("createdAt_desc");
+      fetchContacts(1, searchText, statusFilter, "createdAt", "desc");
+    }
+  };
+
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+    let sortKey = "";
+    let sortValue = "";
+    switch (sortOption) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        break;
+      case "fullName_asc":
+        sortKey = "fullName";
+        sortValue = "asc";
+        break;
+      case "fullName_desc":
+        sortKey = "fullName";
+        sortValue = "desc";
+        break;
+      case "email_asc":
+        sortKey = "email";
+        sortValue = "asc";
+        break;
+      case "email_desc":
+        sortKey = "email";
+        sortValue = "desc";
+        break;
+      case "phone_asc":
+        sortKey = "phone";
+        sortValue = "asc";
+        break;
+      case "phone_desc":
+        sortKey = "phone";
+        sortValue = "desc";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+      default:
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+    }
+    fetchContacts(value, searchText, statusFilter, sortKey, sortValue);
+  };
+
   const handleOpenDetail = async (contact) => {
     setLoading(true);
     try {
@@ -109,10 +427,10 @@ const ContactsControl = () => {
         setCurrentContact(response.data);
         setOpenDetail(true);
       } else {
-        toast.error(response.message || "Không thể tải chi tiết khách hàng!", { position: "top-right" });
+        toast.error(response.message || "Không thể tải chi tiết liên hệ!", { position: "top-right" });
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || "Không thể tải chi tiết khách hàng!";
+      const errorMessage = err.response?.data?.message || "Không thể tải chi tiết liên hệ!";
       toast.error(errorMessage, { position: "top-right" });
       console.error("Get contact detail error:", err.response?.data);
     } finally {
@@ -125,19 +443,23 @@ const ContactsControl = () => {
     setCurrentContact(null);
   };
 
-  // Thay đổi trạng thái
+  const handleOpenDeleteConfirm = (id) => {
+    setDeleteContactId(id);
+    setOpenDeleteConfirm(true);
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    setOpenDeleteConfirm(false);
+    setDeleteContactId(null);
+  };
+
   const handleChangeStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     setLoading(true);
     try {
       const response = await changeContactStatus(id, newStatus);
       if (response.code === 200) {
-        setAllContacts(allContacts.map(contact =>
-          contact._id === id ? { ...contact, status: newStatus } : contact
-        ));
-        setContacts(contacts.map(contact =>
-          contact._id === id ? { ...contact, status: newStatus } : contact
-        ));
+        fetchContacts(currentPage, searchText, statusFilter);
         toast.success(`Tài khoản đã được ${newStatus === "active" ? "kích hoạt" : "tạm ngưng"} thành công!`, { position: "top-right" });
       } else {
         toast.error(response.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
@@ -151,38 +473,38 @@ const ContactsControl = () => {
     }
   };
 
-  // Xóa khách hàng
-  const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
-      setLoading(true);
-      try {
-        const response = await deleteContact(id);
-        if (response.code === 200) {
-          setAllContacts(allContacts.filter(contact => contact._id !== id));
-          setContacts(contacts.filter(contact => contact._id !== id));
-          toast.success("Xóa khách hàng thành công!", { position: "top-right" });
-        } else {
-          toast.error(response.message || "Xóa khách hàng thất bại!", { position: "top-right" });
-        }
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || "Xóa khách hàng thất bại!";
-        toast.error(errorMessage, { position: "top-right" });
-        console.error("Delete contact error:", err.response?.data);
-      } finally {
-        setLoading(false);
+  const handleConfirmDelete = async () => {
+    if (!deleteContactId) return;
+    setLoading(true);
+    try {
+      const response = await deleteContact(deleteContactId);
+      if (response.code === 200) {
+        fetchContacts(currentPage, searchText, statusFilter);
+        toast.success("Xóa liên hệ thành công!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Xóa liên hệ thất bại!", { position: "top-right" });
       }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || "Xóa liên hệ thất bại!";
+      toast.error(errorMessage, { position: "top-right" });
+      console.error("Delete contact error:", err.response?.data);
+    } finally {
+      setLoading(false);
+      handleCloseDeleteConfirm();
     }
   };
 
   const columns = [
-    { field: "stt", headerName: "STT", flex: 0.3 },
-    { field: "fullName", headerName: "Tên", flex: 1, cellClassName: "name-column--cell" },
-    { field: "email", headerName: "Email", flex: 1 },
-    { field: "phone", headerName: "Số điện thoại", flex: 0.7 },
+    { field: "stt", headerName: "STT", flex: 0.3, sortable: true },
+    { field: "fullName", headerName: "Tên", flex: 1, sortable: true },
+    { field: "email", headerName: "Email", flex: 1, sortable: true },
+    { field: "phone", headerName: "Số điện thoại", flex: 0.7, sortable: true },
+    { field: "createdAt", headerName: "Ngày tạo", flex: 0.5, sortable: true },
     {
       field: "status",
       headerName: "Trạng thái",
       flex: 0.7,
+      sortable: false,
       renderCell: ({ row }) => (
         <Box
           sx={{
@@ -204,17 +526,18 @@ const ContactsControl = () => {
                 backgroundColor: row.status === "active" ? "darkgreen" : "darkred",
               },
             }}
+            disabled={loading}
           >
             {row.status === "active" ? "Hoạt động" : "Tạm ngưng"}
           </Button>
         </Box>
       ),
     },
-    { field: "createdAt", headerName: "Ngày tạo", flex: 0.5 },
     {
       field: "actions",
       headerName: "Hành động",
       flex: 1,
+      sortable: false,
       renderCell: ({ row }) => (
         <Box display="flex" gap={1} mt="25px">
           <Button
@@ -231,7 +554,7 @@ const ContactsControl = () => {
             color="error"
             size="small"
             startIcon={<DeleteIcon />}
-            onClick={() => handleDelete(row._id)}
+            onClick={() => handleOpenDeleteConfirm(row._id)}
           >
             Xóa
           </Button>
@@ -255,14 +578,50 @@ const ContactsControl = () => {
         theme="light"
         limit={3}
       />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-        <Box sx={{ gridColumn: 'span 12' }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Box display="flex" justifyContent="space-between" mb={2}>
             <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
               Quản lý liên hệ
             </Typography>
             <Box display="flex" gap={2}>
+              <FormControl sx={{ width: 200 }}>
+                <InputLabel>Sắp xếp</InputLabel>
+                <Select
+                  value={sortOption}
+                  onChange={handleSortChange}
+                  label="Sắp xếp"
+                  sx={{
+                    backgroundColor: colors.primary[400],
+                  }}
+                >
+                  <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                  <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                  <MenuItem value="fullName_asc">Tên: Tăng dần</MenuItem>
+                  <MenuItem value="fullName_desc">Tên: Giảm dần</MenuItem>
+                  <MenuItem value="email_asc">Email: Tăng dần</MenuItem>
+                  <MenuItem value="email_desc">Email: Giảm dần</MenuItem>
+                  <MenuItem value="phone_asc">Số điện thoại: Tăng dần</MenuItem>
+                  <MenuItem value="phone_desc">Số điện thoại: Giảm dần</MenuItem>
+                  <MenuItem value="createdAt_asc">Ngày tạo: Tăng dần</MenuItem>
+                  <MenuItem value="createdAt_desc">Ngày tạo: Giảm dần</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl sx={{ width: 150 }}>
+                <InputLabel>Lọc trạng thái</InputLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  label="Trạng thái"
+                  sx={{
+                    backgroundColor: colors.primary[400],
+                  }}
+                >
+                  <MenuItem value="all">Tất cả</MenuItem>
+                  <MenuItem value="active">Hoạt động</MenuItem>
+                  <MenuItem value="inactive">Tạm ngưng</MenuItem>
+                </Select>
+              </FormControl>
               <Paper
                 component="form"
                 sx={{
@@ -276,9 +635,9 @@ const ContactsControl = () => {
               >
                 <InputBase
                   sx={{ ml: 1, flex: 1 }}
-                  placeholder="Tìm kiếm liên hệ (theo tên)"
+                  placeholder="Tìm kiếm liên hệ (tên, email, số điện thoại)"
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={handleSearchTextChange}
                 />
                 <IconButton type="submit" sx={{ p: "10px" }}>
                   <SearchIcon />
@@ -287,8 +646,7 @@ const ContactsControl = () => {
             </Box>
           </Box>
         </Box>
-
-        <Box sx={{ gridColumn: 'span 12' }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Box
             height="75vh"
             sx={{
@@ -305,6 +663,7 @@ const ContactsControl = () => {
               "& .MuiDataGrid-columnHeaders": {
                 backgroundColor: colors.blueAccent[700],
                 borderBottom: "none",
+                backgroundColor: colors.blueAccent[700],
                 color: colors.grey[100],
                 fontSize: "14px",
                 fontWeight: "bold",
@@ -325,9 +684,10 @@ const ContactsControl = () => {
               "& .MuiDataGrid-footerContainer": {
                 borderTop: "none",
                 backgroundColor: colors.blueAccent[700],
-              },
-              "& .MuiCheckbox-root": {
-                color: `${colors.greenAccent[200]} !important`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px",
               },
             }}
           >
@@ -335,24 +695,40 @@ const ContactsControl = () => {
               <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                 <CircularProgress />
               </Box>
+            ) : contacts.length === 0 ? (
+              <Typography variant="h6" align="center" mt={4}>
+                Không có liên hệ nào để hiển thị
+              </Typography>
             ) : (
-              <DataGrid
-                rows={contacts}
-                columns={columns}
-                pageSize={5}
-                rowsPerPageOptions={[5, 10, 20]}
-                disableSelectionOnClick
-                getRowHeight={() => 80}
-                sx={{
-                  width: "100%",
-                }}
-              />
+              <>
+                <DataGrid
+                  rows={contacts}
+                  columns={columns}
+                  getRowId={(row) => row._id}
+                  pagination={false}
+                  getRowHeight={() => 80}
+                  sx={{
+                    width: "100%",
+                  }}
+                  hideFooter={true}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={handleSortModelChange}
+                />
+                <Box display="flex" justifyContent="center" mt={2}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              </>
             )}
           </Box>
         </Box>
       </Box>
-
-      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="xs" fullWidth>
+      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="sm" fullWidth>
         <DialogTitle
           sx={{
             fontWeight: "bold",
@@ -360,19 +736,23 @@ const ContactsControl = () => {
             textAlign: "center",
           }}
         >
-          Chi tiết khách hàng
+          Chi tiết liên hệ
         </DialogTitle>
         <DialogContent>
           {currentContact ? (
-            <Grid container spacing={8}>
+            <Grid container spacing={2}>
               <Grid item xs={4} display="flex" justifyContent="center" alignItems="center">
                 {currentContact.avatar ? (
                   <img
                     src={currentContact.avatar}
                     alt="Avatar"
                     style={{
-                      width: "120px", height: "120px", borderRadius: "50%", boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', objectFit: 'contain',
-                      border: '2px solid #000'
+                      width: "120px",
+                      height: "120px",
+                      borderRadius: "50%",
+                      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+                      objectFit: "contain",
+                      border: "2px solid #000",
                     }}
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/120";
@@ -386,22 +766,21 @@ const ContactsControl = () => {
                   />
                 )}
               </Grid>
-
               <Grid item xs={8}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  <strong>Họ tên: </strong> {currentContact.fullName || "N/A"}
+                  <strong>Họ tên:</strong> {currentContact.fullName || "N/A"}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  <strong>Email: </strong> {currentContact.email || "N/A"}
+                  <strong>Email:</strong> {currentContact.email || "N/A"}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  <strong>Số điện thoại: </strong> {currentContact.phone || "N/A"}
+                  <strong>Số điện thoại:</strong> {currentContact.phone || "N/A"}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  <strong>Trạng thái: </strong> {currentContact.status === "active" ? "Hoạt động" : "Tạm ngưng"}
+                  <strong>Trạng thái:</strong> {currentContact.status === "active" ? "Hoạt động" : "Tạm ngưng"}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  <strong>Ngày tạo: </strong> {new Date(currentContact.createdAt).toLocaleDateString("vi-VN")}
+                  <strong>Ngày tạo:</strong> {new Date(currentContact.createdAt).toLocaleDateString("vi-VN")}
                 </Typography>
               </Grid>
             </Grid>
@@ -420,7 +799,40 @@ const ContactsControl = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+      <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm} maxWidth="xs" fullWidth>
+        <DialogTitle
+          sx={{
+            fontWeight: "bold",
+            fontSize: "1.3rem",
+            textAlign: "center",
+          }}
+        >
+          Xác nhận xóa liên hệ
+        </DialogTitle>
+        <DialogContent>
+          <Typography>Bạn có chắc chắn muốn xóa liên hệ này không?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCloseDeleteConfirm}
+            color="primary"
+            variant="contained"
+            sx={{ fontWeight: "bold" }}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            sx={{ fontWeight: "bold" }}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : "Xóa"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box >
   );
 };
 

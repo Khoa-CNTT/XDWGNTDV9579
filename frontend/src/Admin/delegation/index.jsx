@@ -19,6 +19,7 @@ import { getRightsGroups, updatePermissions } from "../rightsgroup/RightsgroupAp
 import { useAdminAuth } from "../../context/AdminContext";
 import { useTheme } from "@mui/material";
 import { tokens } from "../../theme";
+import { useNavigate } from "react-router-dom";
 
 // Danh sách tính năng và quyền
 const FEATURES = [
@@ -48,51 +49,79 @@ const DelegationControl = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const { adminToken } = useAdminAuth();
+    const navigate = useNavigate();
     const [roles, setRoles] = useState([]);
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [previousPermissions, setPreviousPermissions] = useState({});
 
-    // Lấy danh sách nhóm quyền từ API
     const fetchRoles = async () => {
         setLoading(true);
         try {
-            const data = await getRightsGroups();
-            const formattedRoles = Array.isArray(data)
-                ? data.map((role) => ({
+            const response = await getRightsGroups({
+                page: 1,
+                limit: 100, // Lấy tất cả nhóm quyền
+                sortKey: "createdAt",
+                sortValue: "desc",
+            });
+            console.log("fetchRoles response:", response);
+            if (response && Array.isArray(response.roles)) {
+                const formattedRoles = response.roles.map((role) => ({
                     id: role._id,
                     title: role.title,
                     permissions: role.permissions || [],
-                }))
-                : [];
-            setRoles(formattedRoles);
-            // Tạo cấu trúc permissions dựa trên roles và FEATURES
-            const newPermissions = {};
-            const newPreviousPermissions = {};
-            FEATURES.forEach((feature) => {
-                newPermissions[feature.name] = {
-                    feature: feature.name,
-                    roles: formattedRoles.reduce((acc, role) => {
-                        acc[role.title] = feature.permissions.reduce((permAcc, perm) => {
-                            permAcc[perm.split("_")[1]] = role.permissions.includes(perm);
-                            return permAcc;
-                        }, {});
-                        return acc;
-                    }, {}),
-                };
-                newPreviousPermissions[feature.name] = { roles: {} };
-            });
-            setPermissions(newPermissions);
-            setPreviousPermissions(newPreviousPermissions);
-            console.log("Roles loaded:", formattedRoles);
-            console.log("Permissions structured:", newPermissions);
-            if (formattedRoles.length === 0) {
-                toast.info("Không có nhóm quyền nào để hiển thị!", { position: "top-right" });
+                }));
+                setRoles(formattedRoles);
+                const newPermissions = {};
+                const newPreviousPermissions = {};
+                FEATURES.forEach((feature) => {
+                    newPermissions[feature.name] = {
+                        feature: feature.name,
+                        roles: formattedRoles.reduce((acc, role) => {
+                            acc[role.title] = feature.permissions.reduce((permAcc, perm) => {
+                                const action = perm.split("_")[1];
+                                permAcc[action] = role.permissions.includes(perm);
+                                return permAcc;
+                            }, {});
+                            return acc;
+                        }, {}),
+                    };
+                    newPreviousPermissions[feature.name] = {
+                        roles: formattedRoles.reduce((acc, role) => {
+                            acc[role.title] = feature.permissions.reduce((permAcc, perm) => {
+                                const action = perm.split("_")[1];
+                                permAcc[action] = role.permissions.includes(perm);
+                                return permAcc;
+                            }, {});
+                            return acc;
+                        }, {}),
+                    };
+                });
+                setPermissions(newPermissions);
+                setPreviousPermissions(newPreviousPermissions);
+                console.log("Roles loaded:", formattedRoles);
+                console.log("Permissions structured:", newPermissions);
+                if (formattedRoles.length === 0) {
+                    toast.info("Không có nhóm quyền nào để hiển thị!", { position: "top-right" });
+                }
+            } else {
+                setError("Dữ liệu nhóm quyền không hợp lệ!");
+                toast.error("Dữ liệu nhóm quyền không hợp lệ!", { position: "top-right" });
+                setRoles([]);
+                setPermissions({});
+                setPreviousPermissions({});
             }
         } catch (err) {
             const errorMessage = err.response?.data?.message || "Không thể tải danh sách nhóm quyền!";
+            setError(errorMessage);
             toast.error(errorMessage, { position: "top-right" });
             console.error("Fetch roles error:", err.response?.data);
+            if (err.response?.status === 401) {
+                toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+                localStorage.removeItem("adminToken");
+                navigate("/loginadmin");
+            }
         } finally {
             setLoading(false);
         }
@@ -100,91 +129,84 @@ const DelegationControl = () => {
 
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
-        console.log("adminToken in DelegationControl:", token);
         if (token) {
             fetchRoles();
         } else {
             toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
             setTimeout(() => {
-                window.location.href = "/loginadmin";
+                navigate("/loginadmin");
             }, 2000);
         }
-    }, [adminToken]);
+    }, [adminToken, navigate]);
 
-    // Xử lý thay đổi quyền
     const handlePermissionChange = (featureName, roleTitle, action) => {
         setPermissions((prevPermissions) => {
-            const newPermissions = { ...prevPermissions };
-            newPermissions[featureName].roles[roleTitle][action] =
-                !newPermissions[featureName].roles[roleTitle][action];
-            return newPermissions;
-        });
-    };
-
-    // Xử lý checkbox "Tất cả" cho một nhóm quyền (theo hàng)
-    const handleSelectAllRole = (roleTitle) => {
-        setPermissions((prevPermissions) => {
-            const newPermissions = { ...prevPermissions };
-            const allSelected = FEATURES.every((feature) =>
-                Object.values(newPermissions[feature.name].roles[roleTitle]).every((isChecked) => isChecked)
-            );
-
-            if (!allSelected) {
-                // Lưu trạng thái hiện tại vào previousPermissions trước khi tích "Tất cả"
-                const rolePreviousPermissions = {};
-                FEATURES.forEach((feature) => {
-                    rolePreviousPermissions[feature.name] = JSON.parse(
-                        JSON.stringify(newPermissions[feature.name].roles[roleTitle])
-                    );
-                });
-                setPreviousPermissions((prev) => ({
-                    ...prev,
-                    roles: {
-                        ...prev.roles,
-                        [roleTitle]: rolePreviousPermissions,
-                    },
-                }));
-                // Tích tất cả checkbox trong hàng
-                FEATURES.forEach((feature) => {
-                    Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
-                        newPermissions[feature.name].roles[roleTitle][action] = true;
-                    });
-                });
-            } else {
-                // Khôi phục trạng thái trước đó từ previousPermissions
-                const previousRolePermissions = prevPermissions.roles?.[roleTitle];
-                if (previousRolePermissions) {
-                    FEATURES.forEach((feature) => {
-                        Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
-                            newPermissions[feature.name].roles[roleTitle][action] =
-                                previousRolePermissions[feature.name][action];
-                        });
-                    });
-                } else {
-                    // Nếu không có trạng thái trước đó, bỏ tích tất cả
-                    FEATURES.forEach((feature) => {
-                        Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
-                            newPermissions[feature.name].roles[roleTitle][action] = false;
-                        });
-                    });
-                }
+            const newPermissions = JSON.parse(JSON.stringify(prevPermissions));
+            if (newPermissions[featureName]?.roles[roleTitle]) {
+                newPermissions[featureName].roles[roleTitle][action] =
+                    !newPermissions[featureName].roles[roleTitle][action];
             }
             return newPermissions;
         });
     };
 
-    // Kiểm tra trạng thái checkbox "Tất cả" cho một nhóm quyền
+    const handleSelectAllRole = (roleTitle) => {
+        setPermissions((prevPermissions) => {
+            const newPermissions = JSON.parse(JSON.stringify(prevPermissions));
+            const allSelected = FEATURES.every((feature) =>
+                Object.values(newPermissions[feature.name]?.roles[roleTitle] || {}).every((isChecked) => isChecked)
+            );
+
+            if (!allSelected) {
+                setPreviousPermissions((prev) => {
+                    const newPrevious = JSON.parse(JSON.stringify(prev));
+                    FEATURES.forEach((feature) => {
+                        if (!newPrevious[feature.name]) {
+                            newPrevious[feature.name] = { roles: {} };
+                        }
+                        newPrevious[feature.name].roles[roleTitle] = JSON.parse(
+                            JSON.stringify(newPermissions[feature.name]?.roles[roleTitle] || {})
+                        );
+                    });
+                    return newPrevious;
+                });
+                FEATURES.forEach((feature) => {
+                    if (newPermissions[feature.name]?.roles[roleTitle]) {
+                        Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
+                            newPermissions[feature.name].roles[roleTitle][action] = true;
+                        });
+                    }
+                });
+            } else {
+                FEATURES.forEach((feature) => {
+                    if (
+                        newPermissions[feature.name]?.roles[roleTitle] &&
+                        previousPermissions[feature.name]?.roles[roleTitle]
+                    ) {
+                        Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
+                            newPermissions[feature.name].roles[roleTitle][action] =
+                                previousPermissions[feature.name].roles[roleTitle][action] || false;
+                        });
+                    } else if (newPermissions[feature.name]?.roles[roleTitle]) {
+                        Object.keys(newPermissions[feature.name].roles[roleTitle]).forEach((action) => {
+                            newPermissions[feature.name].roles[roleTitle][action] = false;
+                        });
+                    }
+                });
+            }
+            return newPermissions;
+        });
+    };
+
     const isAllRoleSelected = (roleTitle) => {
         return FEATURES.every((feature) =>
             Object.values(permissions[feature.name]?.roles[roleTitle] || {}).every((isChecked) => isChecked)
         );
     };
 
-    // Cập nhật quyền lên backend
     const handleUpdatePermissions = async () => {
         setLoading(true);
         try {
-            // Tạo mảng permissionsData cho API /permissions
             const permissionsData = {
                 permissions: roles.map((role) => {
                     const rolePermissions = [];
@@ -204,10 +226,9 @@ const DelegationControl = () => {
             };
             console.log("Permissions data to send:", permissionsData);
             const response = await updatePermissions(permissionsData);
-            console.log("Update permissions response:", response);
             if (response.code === 200) {
                 toast.success("Cập nhật phân quyền thành công!", { position: "top-right" });
-                await fetchRoles(); // Tải lại dữ liệu để đồng bộ
+                await fetchRoles();
             } else {
                 const errorMessage = response.message || "Cập nhật phân quyền thất bại!";
                 toast.error(errorMessage, { position: "top-right" });
@@ -217,6 +238,11 @@ const DelegationControl = () => {
             const errorMessage = err.response?.data?.message || "Cập nhật phân quyền thất bại!";
             toast.error(errorMessage, { position: "top-right" });
             console.error("Update permissions error:", err.response?.data);
+            if (err.response?.status === 401) {
+                toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+                localStorage.removeItem("adminToken");
+                navigate("/loginadmin");
+            }
         } finally {
             setLoading(false);
         }
@@ -237,11 +263,14 @@ const DelegationControl = () => {
                 theme="light"
                 limit={3}
             />
-
             <Typography variant="h2" color={colors.grey[100]} fontWeight="bold" mb={2}>
                 Phân quyền
             </Typography>
-
+            {error && (
+                <Typography color="error" mb={2}>
+                    {error}
+                </Typography>
+            )}
             {loading ? (
                 <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
                     <CircularProgress />
@@ -258,10 +287,10 @@ const DelegationControl = () => {
                         <Table sx={{ width: "100%", border: "none" }}>
                             <TableHead>
                                 <TableRow sx={{
-                                    backgroundColor: colors.blueAccent[700] + " !important",
+                                    backgroundColor: colors.blueAccent[700],
                                 }}>
                                     <TableCell sx={{
-                                        backgroundColor: colors.blueAccent[700] + " !important",
+                                        backgroundColor: colors.blueAccent[700],
                                         color: colors.grey[100],
                                         fontSize: "14px",
                                         fontWeight: "bold",
@@ -274,7 +303,7 @@ const DelegationControl = () => {
                                             align="center"
                                             key={role.id}
                                             sx={{
-                                                backgroundColor: colors.blueAccent[700] + " !important",
+                                                backgroundColor: colors.blueAccent[700],
                                                 color: colors.grey[100],
                                                 fontSize: "14px",
                                                 fontWeight: "bold",
@@ -322,7 +351,7 @@ const DelegationControl = () => {
                                                             <TableCell align="center" key={role.id} sx={{ borderBottom: "none" }}>
                                                                 <Checkbox
                                                                     checked={
-                                                                        permission.roles[role.title][action] || false
+                                                                        permission.roles[role.title]?.[action] || false
                                                                     }
                                                                     onChange={() =>
                                                                         handlePermissionChange(
@@ -350,7 +379,6 @@ const DelegationControl = () => {
                             </TableBody>
                         </Table>
                     </TableContainer>
-
                     <Box mt={2} display="flex" justifyContent="flex-end">
                         <Button
                             variant="contained"
@@ -361,7 +389,6 @@ const DelegationControl = () => {
                             {loading ? <CircularProgress size={24} /> : "Cập nhật"}
                         </Button>
                     </Box>
-                    <Box mt={4} display="flex" justifyContent="flex-end"></Box>
                 </>
             )}
         </Box>

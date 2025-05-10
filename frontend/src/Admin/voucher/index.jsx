@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Button,
@@ -12,6 +12,11 @@ import {
     CircularProgress,
     Typography,
     IconButton,
+    Pagination,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -29,21 +34,25 @@ import {
     updateVoucher,
     deleteVoucher,
     getVoucherDetail,
-    toggleVoucherStatus,
 } from "./VoucherApi";
 import { useAdminAuth } from "../../context/AdminContext";
+import { useNavigate } from "react-router-dom";
+import { debounce } from "lodash";
 
 const VoucherControl = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const { adminToken } = useAdminAuth();
+    const navigate = useNavigate();
     const [vouchers, setVouchers] = useState([]);
     const [allVouchers, setAllVouchers] = useState([]);
     const [searchText, setSearchText] = useState("");
+    const [sortOption, setSortOption] = useState("none");
+    const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
-    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false); // State cho modal xóa
-    const [deleteVoucherId, setDeleteVoucherId] = useState(null); // Lưu ID voucher cần xóa
+    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+    const [deleteVoucherId, setDeleteVoucherId] = useState(null);
     const [isEdit, setIsEdit] = useState(false);
     const [currentId, setCurrentId] = useState(null);
     const [currentVoucher, setCurrentVoucher] = useState(null);
@@ -58,69 +67,339 @@ const VoucherControl = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const limitItems = 10;
+    const [totalPages, setTotalPages] = useState(1);
 
     // Lấy danh sách voucher
-    const fetchVouchers = async () => {
-        setLoading(true);
-        try {
-            const data = await getVouchers();
-            const formattedData = Array.isArray(data)
-                ? data.map((item, index) => ({
-                    ...item,
-                    id: item._id,
-                    stt: index + 1,
-                    status: new Date(item.endDate) < new Date() ? "expired" : (item.status || "active"),
-                    endDate: item.endDate,
-                    formattedEndDate: new Date(item.endDate).toLocaleString("vi-VN"),
-                }))
-                : [];
-            setAllVouchers(formattedData);
-            setVouchers(formattedData);
-            console.log("Vouchers loaded:", formattedData);
-            if (formattedData.length === 0) {
-                toast.info("Không có voucher nào để hiển thị!", { position: "top-right" });
+    const fetchVouchers = useCallback(
+        async (page = 1, search = "", sortKey = "", sortValue = "") => {
+            setLoading(true);
+            try {
+                const params = { page, limit: limitItems };
+                if (search) params.search = search;
+                if (sortKey && sortValue) {
+                    params.sortKey = sortKey;
+                    params.sortValue = sortValue;
+                }
+                const response = await getVouchers(params);
+                console.log("fetchVouchers response:", response);
+                if (response && Array.isArray(response.vouchers)) {
+                    const totalRecords = response.totalRecords || response.vouchers.length;
+                    const formattedData = response.vouchers.map((item, index) => {
+                        let stt;
+                        if (sortKey === "_id" && sortValue === "desc") {
+                            stt = totalRecords - ((page - 1) * limitItems + index);
+                        } else {
+                            stt = (page - 1) * limitItems + index + 1;
+                        }
+                        return {
+                            ...item,
+                            id: item._id,
+                            stt: stt,
+                            status: new Date(item.endDate) < new Date() ? "expired" : "active",
+                            formattedEndDate: new Date(item.endDate).toLocaleString("vi-VN"),
+                        };
+                    });
+                    setAllVouchers(formattedData);
+                    setVouchers(formattedData);
+                    setTotalPages(response.totalPage || 1);
+                    if (formattedData.length === 0) {
+                        toast.info("Không có voucher nào để hiển thị!", { position: "top-right" });
+                    }
+                } else {
+                    setError("Dữ liệu voucher không hợp lệ!");
+                    toast.error("Dữ liệu voucher không hợp lệ!", { position: "top-right" });
+                    setVouchers([]);
+                    setAllVouchers([]);
+                    setTotalPages(1);
+                }
+            } catch (err) {
+                const errorMessage = err.response?.data?.message || "Không thể tải danh sách voucher!";
+                setError(errorMessage);
+                toast.error(errorMessage, { position: "top-right" });
+                console.error("Fetch vouchers error:", err.response?.data);
+                if (err.response?.status === 401) {
+                    toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+                    localStorage.removeItem("adminToken");
+                    navigate("/loginadmin");
+                }
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            const errorMessage = err.response?.data?.message || "Không thể tải danh sách voucher!";
-            setError(errorMessage);
-            toast.error(errorMessage, { position: "top-right" });
-            console.error("Fetch vouchers error:", err.response?.data);
-        } finally {
-            setLoading(false);
-        }
-    };
+        },
+        [limitItems, navigate]
+    );
 
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((value) => {
+            setCurrentPage(1);
+            let sortKey = "";
+            let sortValue = "";
+            switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
+                case "code_asc":
+                    sortKey = "code";
+                    sortValue = "asc";
+                    break;
+                case "code_desc":
+                    sortKey = "code";
+                    sortValue = "desc";
+                    break;
+                case "title_asc":
+                    sortKey = "title";
+                    sortValue = "asc";
+                    break;
+                case "title_desc":
+                    sortKey = "title";
+                    sortValue = "desc";
+                    break;
+                case "discount_asc":
+                    sortKey = "discount";
+                    sortValue = "asc";
+                    break;
+                case "discount_desc":
+                    sortKey = "discount";
+                    sortValue = "desc";
+                    break;
+                case "quantity_asc":
+                    sortKey = "quantity";
+                    sortValue = "asc";
+                    break;
+                case "quantity_desc":
+                    sortKey = "quantity";
+                    sortValue = "desc";
+                    break;
+                case "endDate_asc":
+                    sortKey = "endDate";
+                    sortValue = "asc";
+                    break;
+                case "endDate_desc":
+                    sortKey = "endDate";
+                    sortValue = "desc";
+                    break;
+                default:
+                    break;
+            }
+            fetchVouchers(1, value, sortKey, sortValue);
+        }, 500),
+        [sortOption, fetchVouchers]
+    );
+
+    // Khởi tạo dữ liệu
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
-        console.log("adminToken in VoucherControl:", token);
         if (token) {
-            fetchVouchers();
+            fetchVouchers(currentPage);
         } else {
             toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
             setTimeout(() => {
-                window.location.href = "/loginadmin";
+                navigate("/loginadmin");
             }, 2000);
         }
-    }, [adminToken]);
+    }, [adminToken, navigate, currentPage, fetchVouchers]);
 
-    // Xử lý tìm kiếm ở frontend (thời gian thực)
-    useEffect(() => {
-        const filteredVouchers = allVouchers.filter((voucher) =>
-            voucher.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setVouchers(filteredVouchers);
-    }, [searchText, allVouchers]);
-
-    // Xử lý tìm kiếm thủ công khi nhấn nút
-    const handleSearch = (e) => {
-        e.preventDefault();
-        const filteredVouchers = allVouchers.filter((voucher) =>
-            voucher.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setVouchers(filteredVouchers);
+    // Xử lý tìm kiếm
+    const handleSearchTextChange = (e) => {
+        const value = e.target.value;
+        setSearchText(value);
+        debouncedSearch(value);
     };
 
-    // Mở modal thêm mới
+    // Xử lý thay đổi sắp xếp
+    const handleSortChange = (event) => {
+        const value = event.target.value;
+        setSortOption(value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        let sortField = "";
+        switch (value) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                sortField = "stt";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                sortField = "stt";
+                break;
+            case "code_asc":
+                sortKey = "code";
+                sortValue = "asc";
+                sortField = "code";
+                break;
+            case "code_desc":
+                sortKey = "code";
+                sortValue = "desc";
+                sortField = "code";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                sortField = "title";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                sortField = "title";
+                break;
+            case "discount_asc":
+                sortKey = "discount";
+                sortValue = "asc";
+                sortField = "discount";
+                break;
+            case "discount_desc":
+                sortKey = "discount";
+                sortValue = "desc";
+                sortField = "discount";
+                break;
+            case "quantity_asc":
+                sortKey = "quantity";
+                sortValue = "asc";
+                sortField = "quantity";
+                break;
+            case "quantity_desc":
+                sortKey = "quantity";
+                sortValue = "desc";
+                sortField = "quantity";
+                break;
+            case "endDate_asc":
+                sortKey = "endDate";
+                sortValue = "asc";
+                sortField = "formattedEndDate";
+                break;
+            case "endDate_desc":
+                sortKey = "endDate";
+                sortValue = "desc";
+                sortField = "formattedEndDate";
+                break;
+            default:
+                break;
+        }
+        fetchVouchers(1, searchText, sortKey, sortValue);
+        if (sortKey && sortValue) {
+            setSortModel([{ field: sortField, sort: sortValue }]);
+        } else {
+            setSortModel([]);
+        }
+    };
+
+    // Xử lý sắp xếp từ DataGrid
+    const handleSortModelChange = (newSortModel) => {
+        setSortModel(newSortModel);
+        setCurrentPage(1);
+        if (newSortModel.length > 0) {
+            const { field, sort } = newSortModel[0];
+            let sortKey = "";
+            let sortOptionValue = "";
+            switch (field) {
+                case "stt":
+                    sortKey = "_id";
+                    sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+                    break;
+                case "code":
+                    sortKey = "code";
+                    sortOptionValue = sort === "asc" ? "code_asc" : "code_desc";
+                    break;
+                case "title":
+                    sortKey = "title";
+                    sortOptionValue = sort === "asc" ? "title_asc" : "title_desc";
+                    break;
+                case "discount":
+                    sortKey = "discount";
+                    sortOptionValue = sort === "asc" ? "discount_asc" : "discount_desc";
+                    break;
+                case "quantity":
+                    sortKey = "quantity";
+                    sortOptionValue = sort === "asc" ? "quantity_asc" : "quantity_desc";
+                    break;
+                case "formattedEndDate":
+                    sortKey = "endDate";
+                    sortOptionValue = sort === "asc" ? "endDate_asc" : "endDate_desc";
+                    break;
+                default:
+                    break;
+            }
+            if (sortKey) {
+                setSortOption(sortOptionValue);
+                fetchVouchers(1, searchText, sortKey, sort);
+            }
+        } else {
+            setSortOption("none");
+            fetchVouchers(1, searchText);
+        }
+    };
+
+    // Xử lý thay đổi trang
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+        let sortKey = "";
+        let sortValue = "";
+        switch (sortOption) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                break;
+            case "code_asc":
+                sortKey = "code";
+                sortValue = "asc";
+                break;
+            case "code_desc":
+                sortKey = "code";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            case "discount_asc":
+                sortKey = "discount";
+                sortValue = "asc";
+                break;
+            case "discount_desc":
+                sortKey = "discount";
+                sortValue = "desc";
+                break;
+            case "quantity_asc":
+                sortKey = "quantity";
+                sortValue = "asc";
+                break;
+            case "quantity_desc":
+                sortKey = "quantity";
+                sortValue = "desc";
+                break;
+            case "endDate_asc":
+                sortKey = "endDate";
+                sortValue = "asc";
+                break;
+            case "endDate_desc":
+                sortKey = "endDate";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        fetchVouchers(value, searchText, sortKey, sortValue);
+    };
+
     const handleOpen = () => {
         setIsEdit(false);
         setNewVoucher({
@@ -136,22 +415,13 @@ const VoucherControl = () => {
         setOpen(true);
     };
 
-    // Mở modal chỉnh sửa
     const handleEdit = (voucher) => {
-        console.log("Editing voucher:", voucher);
         setIsEdit(true);
         setCurrentId(voucher._id);
         const formatDate = (date) => {
-            if (!date) {
-                console.warn(`Date is undefined or null: ${date}`);
-                return "";
-            }
+            if (!date) return "";
             const parsedDate = new Date(date);
-            if (isNaN(parsedDate.getTime())) {
-                console.warn(`Invalid date value: ${date}`);
-                return "";
-            }
-            return parsedDate.toISOString().split("T")[0];
+            return isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString().split("T")[0];
         };
         setNewVoucher({
             title: voucher.title || "",
@@ -166,7 +436,6 @@ const VoucherControl = () => {
         setOpen(true);
     };
 
-    // Mở modal chi tiết
     const handleOpenDetail = async (voucher) => {
         setLoading(true);
         try {
@@ -196,19 +465,16 @@ const VoucherControl = () => {
         setCurrentVoucher(null);
     };
 
-    // Mở modal xác nhận xóa
     const handleOpenDeleteConfirm = (id) => {
         setDeleteVoucherId(id);
         setOpenDeleteConfirm(true);
     };
 
-    // Đóng modal xác nhận xóa
     const handleCloseDeleteConfirm = () => {
         setOpenDeleteConfirm(false);
         setDeleteVoucherId(null);
     };
 
-    // Thêm voucher
     const handleAdd = async () => {
         if (
             !newVoucher.title ||
@@ -222,11 +488,19 @@ const VoucherControl = () => {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
         }
+        if (newVoucher.quantity <= 0 || newVoucher.discount <= 0 || newVoucher.discount > 100) {
+            setError("Số lượng và % giảm giá phải lớn hơn 0, % giảm giá không quá 100!");
+            return;
+        }
+        if (new Date(newVoucher.startDate) > new Date(newVoucher.endDate)) {
+            setError("Ngày bắt đầu phải trước ngày hết hạn!");
+            return;
+        }
         setLoading(true);
         try {
             const response = await createVoucher(newVoucher);
             if (response.code === 200) {
-                fetchVouchers();
+                fetchVouchers(currentPage);
                 handleClose();
                 toast.success("Thêm voucher thành công!", { position: "top-right" });
             } else {
@@ -246,7 +520,6 @@ const VoucherControl = () => {
         }
     };
 
-    // Cập nhật voucher
     const handleUpdate = async () => {
         if (
             !newVoucher.title ||
@@ -260,11 +533,19 @@ const VoucherControl = () => {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
         }
+        if (newVoucher.quantity <= 0 || newVoucher.discount <= 0 || newVoucher.discount > 100) {
+            setError("Số lượng và % giảm giá phải lớn hơn 0, % giảm giá không quá 100!");
+            return;
+        }
+        if (new Date(newVoucher.startDate) > new Date(newVoucher.endDate)) {
+            setError("Ngày bắt đầu phải trước ngày hết hạn!");
+            return;
+        }
         setLoading(true);
         try {
             const response = await updateVoucher(currentId, newVoucher);
             if (response.code === 200) {
-                fetchVouchers();
+                fetchVouchers(currentPage);
                 handleClose();
                 toast.success("Cập nhật voucher thành công!", { position: "top-right" });
             } else {
@@ -284,14 +565,13 @@ const VoucherControl = () => {
         }
     };
 
-    // Xử lý xác nhận xóa voucher
     const handleConfirmDelete = async () => {
         if (!deleteVoucherId) return;
         setLoading(true);
         try {
             const response = await deleteVoucher(deleteVoucherId);
             if (response.code === 200) {
-                fetchVouchers();
+                fetchVouchers(currentPage);
                 toast.success("Xóa voucher thành công!", { position: "top-right" });
             } else {
                 toast.error(response.message || "Xóa voucher thất bại!", { position: "top-right" });
@@ -306,84 +586,67 @@ const VoucherControl = () => {
         }
     };
 
-    // Chuyển đổi trạng thái voucher (giả lập cục bộ vì API không tồn tại)
-    const handleToggleStatus = async (id, currentStatus) => {
-        if (currentStatus === "expired") {
-            toast.error("Không thể thay đổi trạng thái của voucher đã hết hạn!", { position: "top-right" });
-            return;
-        }
-        setLoading(true);
-        try {
-            // Giả lập thay đổi trạng thái cục bộ
-            const newStatus = currentStatus === "active" ? "paused" : "active";
-            setVouchers((prev) =>
-                prev.map((voucher) =>
-                    voucher._id === id ? { ...voucher, status: newStatus } : voucher
-                )
-            );
-            setAllVouchers((prev) =>
-                prev.map((voucher) =>
-                    voucher._id === id ? { ...voucher, status: newStatus } : voucher
-                )
-            );
-            toast.success(
-                `Thay đổi trạng thái thành ${newStatus === "active" ? "Hoạt động" : "Tạm ngưng"}!`,
-                { position: "top-right" }
-            );
-        } catch (err) {
-            const errorMessage = err.response?.data?.message || "Thay đổi trạng thái thất bại!";
-            toast.error(errorMessage, { position: "top-right" });
-            console.error("Toggle status error:", err.response?.data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const columns = [
-        { field: "stt", headerName: "STT", flex: 0.3 },
-        { field: "code", headerName: "Mã voucher", flex: 0.7 },
-        { field: "title", headerName: "Tiêu đề", flex: 1 },
-        { field: "discount", headerName: "% Giảm giá", flex: 0.5 },
-        { field: "quantity", headerName: "Số lượng", flex: 0.5 },
-        { field: "formattedEndDate", headerName: "Thời gian hết hạn", flex: 1 },
+        {
+            field: "stt",
+            headerName: "STT",
+            flex: 0.3,
+            sortable: true,
+        },
+        {
+            field: "code",
+            headerName: "Mã voucher",
+            flex: 0.7,
+            sortable: true,
+        },
+        {
+            field: "title",
+            headerName: "Tiêu đề",
+            flex: 1,
+            sortable: true,
+        },
+        {
+            field: "discount",
+            headerName: "% Giảm giá",
+            flex: 0.5,
+            sortable: true,
+        },
+        {
+            field: "quantity",
+            headerName: "Số lượng",
+            flex: 0.5,
+            sortable: true,
+        },
+        {
+            field: "formattedEndDate",
+            headerName: "Thời gian hết hạn",
+            flex: 1,
+            sortable: true,
+        },
         {
             field: "status",
             headerName: "Trạng thái",
             flex: 1,
             renderCell: (params) => {
                 const status = params.value;
-                let displayText, bgColor, hoverColor;
-                if (status === "expired") {
-                    displayText = "Đã hết hạn";
-                    bgColor = "red";
-                    hoverColor = "darkred";
-                } else if (status === "paused") {
-                    displayText = "Tạm ngưng";
-                    bgColor = "orange";
-                    hoverColor = "darkorange";
-                } else {
-                    displayText = "Hoạt động";
-                    bgColor = "green";
-                    hoverColor = "darkgreen";
-                }
-
+                const displayText = status === "expired" ? "Đã hết hạn" : "Hoạt động";
+                const bgColor = status === "expired" ? "red" : "green";
+                const hoverColor = status === "expired" ? "darkred" : "darkgreen";
                 return (
-                    <Button
-                        variant="contained"
-                        size="small"
+                    <Typography
                         sx={{
                             backgroundColor: bgColor,
                             color: "white",
                             fontWeight: "bold",
-                            "&:hover": {
-                                backgroundColor: hoverColor,
-                            },
+                            mt: "21px",
+                            width: "80%",
+                            padding: "8px 16px",
+                            borderRadius: "4px",
+                            textAlign: "center",
                         }}
-                        onClick={() => handleToggleStatus(params.row._id, status)}
-                        disabled={status === "expired" || loading}
                     >
                         {displayText}
-                    </Button>
+                    </Typography>
                 );
             },
         },
@@ -446,14 +709,38 @@ const VoucherControl = () => {
                 theme="light"
                 limit={3}
             />
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-                <Box sx={{ gridColumn: 'span 12' }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+                <Box sx={{ gridColumn: "span 12" }}>
                     <Box display="flex" justifyContent="space-between" mb={2}>
                         <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
                             Quản lý voucher
                         </Typography>
-                        <Box display="flex" gap={2}>
+                        <Box display="flex" gap={2} alignItems="center">
+                            <FormControl sx={{ width: 200 }}>
+                                <InputLabel>Sắp xếp</InputLabel>
+                                <Select
+                                    value={sortOption}
+                                    onChange={handleSortChange}
+                                    label="Sắp xếp"
+                                    sx={{
+                                        backgroundColor: colors.primary[400],
+                                    }}
+                                >
+                                    <MenuItem value="none">Không sắp xếp</MenuItem>
+                                    <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                                    <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                                    <MenuItem value="code_asc">Mã voucher: Tăng dần</MenuItem>
+                                    <MenuItem value="code_desc">Mã voucher: Giảm dần</MenuItem>
+                                    <MenuItem value="title_asc">Tiêu đề: Tăng dần</MenuItem>
+                                    <MenuItem value="title_desc">Tiêu đề: Giảm dần</MenuItem>
+                                    <MenuItem value="discount_asc">% Giảm giá: Tăng dần</MenuItem>
+                                    <MenuItem value="discount_desc">% Giảm giá: Giảm dần</MenuItem>
+                                    <MenuItem value="quantity_asc">Số lượng: Tăng dần</MenuItem>
+                                    <MenuItem value="quantity_desc">Số lượng: Giảm dần</MenuItem>
+                                    <MenuItem value="endDate_asc">Thời gian hết hạn: Tăng dần</MenuItem>
+                                    <MenuItem value="endDate_desc">Thời gian hết hạn: Giảm dần</MenuItem>
+                                </Select>
+                            </FormControl>
                             <Paper
                                 component="form"
                                 sx={{
@@ -463,15 +750,15 @@ const VoucherControl = () => {
                                     width: 300,
                                     backgroundColor: colors.primary[400],
                                 }}
-                                onSubmit={handleSearch}
+                                onSubmit={(e) => e.preventDefault()}
                             >
                                 <InputBase
                                     sx={{ ml: 1, flex: 1 }}
-                                    placeholder="Tìm kiếm voucher (theo mã)"
+                                    placeholder="Tìm kiếm voucher (tiêu đề, mã, mô tả)"
                                     value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
+                                    onChange={handleSearchTextChange}
                                 />
-                                <IconButton type="submit" sx={{ p: "10px" }}>
+                                <IconButton sx={{ p: "10px" }}>
                                     <SearchIcon />
                                 </IconButton>
                             </Paper>
@@ -486,8 +773,7 @@ const VoucherControl = () => {
                         </Box>
                     </Box>
                 </Box>
-
-                <Box sx={{ gridColumn: 'span 12' }}>
+                <Box sx={{ gridColumn: "span 12" }}>
                     <Box
                         height="75vh"
                         sx={{
@@ -534,25 +820,37 @@ const VoucherControl = () => {
                             <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                                 <CircularProgress />
                             </Box>
+                        ) : vouchers.length === 0 ? (
+                            <Typography variant="h6" align="center" mt={4}>
+                                Không có voucher nào để hiển thị
+                            </Typography>
                         ) : (
-                            <DataGrid
-                                rows={vouchers}
-                                columns={columns}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10, 20]}
-                                disableSelectionOnClick
-                                getRowHeight={() => 80}
-                                // autoHeight
-                                sx={{
-                                    width: "100%",
-                                }}
-                            />
+                            <>
+                                <DataGrid
+                                    rows={vouchers}
+                                    columns={columns}
+                                    getRowId={(row) => row._id}
+                                    getRowHeight={() => 80}
+                                    sx={{ width: "100%" }}
+                                    pagination={false}
+                                    hideFooter={true}
+                                    sortingMode="server"
+                                    sortModel={sortModel}
+                                    onSortModelChange={handleSortModelChange}
+                                />
+                                <Box display="flex" justifyContent="center" mt={2}>
+                                    <Pagination
+                                        count={totalPages}
+                                        page={currentPage}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                    />
+                                </Box>
+                            </>
                         )}
                     </Box>
                 </Box>
             </Box>
-
-            {/* Modal thêm mới/chỉnh sửa */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle
                     sx={{
@@ -670,8 +968,6 @@ const VoucherControl = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Modal chi tiết */}
             <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="xs" fullWidth>
                 <DialogTitle
                     sx={{
@@ -726,9 +1022,7 @@ const VoucherControl = () => {
                                 <span style={{ marginLeft: "8px" }}>
                                     {new Date(currentVoucher.endDate) < new Date()
                                         ? "Đã hết hạn"
-                                        : currentVoucher.status === "paused"
-                                            ? "Tạm ngưng"
-                                            : "Hoạt động"}
+                                        : "Hoạt động"}
                                 </span>
                             </Typography>
                         </Box>
@@ -747,8 +1041,6 @@ const VoucherControl = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Modal xác nhận xóa */}
             <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm} maxWidth="xs" fullWidth>
                 <DialogTitle
                     sx={{

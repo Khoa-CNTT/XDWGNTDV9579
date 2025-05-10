@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Box,
     Button,
@@ -13,6 +13,7 @@ import {
     Avatar,
     IconButton,
     DialogContent,
+    Pagination,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -21,14 +22,16 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { toast } from "react-toastify";
 import { Formik } from "formik";
 import * as yup from "yup";
-import { getHotels, getRooms, createRoom, updateRoom, deleteRoom } from "./HotelApi";
+import { getHotels, getRooms, createRoom, updateRoom, deleteRoom, changeRoomStatus } from "./HotelApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import { useNavigate } from "react-router-dom";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+
+const FALLBACK_IMAGE = "https://placehold.co/60x40";
 
 const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotelId, selectedHotelName, onSuccess }) => {
     const theme = useTheme();
@@ -45,28 +48,23 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
     const [selectedImage, setSelectedImage] = useState(null);
     const [openImageDialog, setOpenImageDialog] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const limitItems = 10;
+    const [totalPages, setTotalPages] = useState(1);
 
-    // Debug props và state
-    useEffect(() => {
-        console.log("RoomManagement props:", { open, propHotel, selectedHotelId, selectedHotelName });
-        console.log("Selected Hotel:", selectedHotel);
-        console.log("Rooms:", rooms);
-    }, [open, propHotel, selectedHotelId, selectedHotelName, selectedHotel, rooms]);
-
-    // Lấy danh sách khách sạn
     const fetchHotels = async () => {
         setLoading(true);
         try {
-            const response = await getHotels();
-            console.log("getHotels response:", response);
+            const token = adminToken || localStorage.getItem("adminToken");
+            const response = await getHotels(token);
             if (response.code === 200 && Array.isArray(response.data)) {
                 setHotels(response.data);
-                // Nếu có selectedHotelId, tìm và set selectedHotel
                 if (selectedHotelId) {
                     const matchedHotel = response.data.find(h => h._id === selectedHotelId);
                     if (matchedHotel) {
                         setSelectedHotel(matchedHotel);
-                        fetchRooms(selectedHotelId);
+                    } else {
+                        toast.error("Khách sạn không tồn tại!");
                     }
                 }
                 if (response.data.length === 0) {
@@ -78,7 +76,6 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
             }
         } catch (err) {
             const errorMessage = err.response?.data?.message || "Không thể tải danh sách khách sạn!";
-            console.error("Fetch hotels error:", err.response?.data || err);
             toast.error(errorMessage);
             setHotels([]);
         } finally {
@@ -86,103 +83,124 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         }
     };
 
-    // Lấy danh sách phòng
-    const fetchRooms = async (hotelId) => {
+    const fetchRooms = async (hotelId, page = 1) => {
         if (!hotelId) {
-            console.error("No hotel ID provided");
             setRooms([]);
+            setTotalPages(1);
             return;
         }
         setLoading(true);
         try {
-            const response = await getRooms(hotelId);
-            console.log("getRooms response:", response);
+            const token = adminToken || localStorage.getItem("adminToken");
+            const params = { page, limit: limitItems };
+            const response = await getRooms(hotelId, token, params);
             if (response.code === 200 && Array.isArray(response.data)) {
                 const formattedData = response.data.map((item, index) => ({
                     ...item,
                     id: item._id,
-                    stt: index + 1,
+                    stt: (page - 1) * limitItems + index + 1,
+                    images: Array.isArray(item.images) ? item.images.filter(img => typeof img === 'string' && img.trim() !== '') : [],
                 }));
                 setRooms(formattedData);
-                console.log("Rooms loaded:", formattedData);
+                setTotalPages(response.totalPage || 1);
                 if (formattedData.length === 0) {
-                    toast.info("Không có phòng nào để hiển thị!");
+                    toast.info("Không có phòng nào để hiển thị!", { position: "top-right" });
                 }
             } else {
-                console.error("Invalid response:", response);
                 toast.error(response.message || "Không thể tải danh sách phòng!");
                 setRooms([]);
+                setTotalPages(1);
             }
         } catch (err) {
             const errorMessage = err.response?.data?.message || "Không thể tải danh sách phòng!";
-            console.error("Fetch rooms error:", err.response?.data || err);
             toast.error(errorMessage);
             setRooms([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
     };
 
-    // Gọi fetchHotels khi component mount và khi open thay đổi
     useEffect(() => {
         if (open && adminToken) {
             fetchHotels();
         }
-    }, [open, adminToken, selectedHotelId]);
+    }, [open, adminToken]);
 
-    // Xử lý chọn khách sạn
+    useEffect(() => {
+        if (open && selectedHotel?._id) {
+            fetchRooms(selectedHotel._id, currentPage);
+        }
+    }, [open, selectedHotel, currentPage]);
+
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
         const hotel = hotels.find((h) => h._id === hotelId) || null;
-        console.log("Selected hotel:", hotel);
         setSelectedHotel(hotel);
+        setCurrentPage(1);
         if (hotel) {
-            fetchRooms(hotel._id);
+            fetchRooms(hotel._id, 1);
         } else {
             setRooms([]);
+            setTotalPages(1);
         }
     };
 
-    // Mở form thêm/chỉnh sửa
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+        if (selectedHotel?._id) {
+            fetchRooms(selectedHotel._id, value);
+        }
+    };
+
+    const handleChangeStatus = async (roomId, currentStatus) => {
+        try {
+            const token = adminToken || localStorage.getItem("adminToken");
+            const newStatus = currentStatus === "active" ? "inactive" : "active";
+            const response = await changeRoomStatus(selectedHotel._id, roomId, newStatus, token);
+            if (response.code === 200) {
+                fetchRooms(selectedHotel._id, currentPage);
+                toast.success("Cập nhật trạng thái phòng thành công!", { position: "top-right" });
+            } else {
+                toast.error(response.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
+        }
+    };
+
     const handleOpenForm = (room = null) => {
         if (!selectedHotel?._id) {
             toast.error("Vui lòng chọn một khách sạn trước!");
-            console.log("Không thể mở form, không có selectedHotel");
             return;
         }
         setCurrentRoomId(room?._id || null);
         setIsEdit(room !== null);
         setOpenForm(true);
-        console.log("Mở form, room:", room);
     };
 
-    // Đóng form
     const handleCloseForm = () => {
         setOpenForm(false);
         setCurrentRoomId(null);
-        console.log("Đóng form");
     };
 
-    // Xử lý xóa phòng
     const handleDelete = async (roomId) => {
         if (!selectedHotel?._id) {
             toast.error("Vui lòng chọn một khách sạn trước!");
-            console.log("Không thể xóa phòng, không có selectedHotel");
             return;
         }
         if (window.confirm("Bạn có chắc muốn xóa phòng này?")) {
-            console.log("Xóa phòng, roomId:", roomId);
             try {
-                const response = await deleteRoom(selectedHotel._id, roomId);
-                console.log("Phản hồi từ deleteRoom:", response);
+                const token = adminToken || localStorage.getItem("adminToken");
+                const response = await deleteRoom(selectedHotel._id, roomId, token);
                 if (response.code === 200) {
-                    setRooms(rooms.filter(room => room._id !== roomId));
+                    fetchRooms(selectedHotel._id, currentPage);
                     toast.success("Xóa phòng thành công!");
+                    onSuccess();
                 } else {
                     toast.error(response.message || "Xóa phòng thất bại!");
                 }
             } catch (err) {
-                console.error("Lỗi khi gọi deleteRoom:", err.response?.data || err);
                 toast.error(err.response?.data?.message || "Xóa phòng thất bại!");
             }
         }
@@ -212,7 +230,48 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         setCurrentImageIndex(0);
     };
 
-    // Cột của DataGrid
+    const tryLoadImage = (images, index, retries = 3) => {
+        return new Promise((resolve) => {
+            if (!images || !Array.isArray(images) || images.length === 0) {
+                return resolve(FALLBACK_IMAGE);
+            }
+
+            let currentIndex = index % images.length;
+            let attempts = retries;
+
+            const loadImage = (url) => {
+                if (typeof url !== 'string' || url.trim() === '' || !url.match(/\.(jpeg|jpg|png|gif|webp)$/i)) {
+                    return tryNextImage();
+                }
+
+                const img = new Image();
+                img.src = url;
+                img.onload = () => {
+                    resolve(url);
+                };
+                img.onerror = () => {
+                    if (attempts > 0) {
+                        attempts--;
+                        setTimeout(() => loadImage(url), 2000);
+                    } else {
+                        tryNextImage();
+                    }
+                };
+            };
+
+            const tryNextImage = () => {
+                const nextIndex = (currentIndex + 1) % images.length;
+                if (nextIndex === index) {
+                    resolve(FALLBACK_IMAGE);
+                } else {
+                    tryLoadImage(images, nextIndex, retries).then(resolve);
+                }
+            };
+
+            loadImage(images[currentIndex]);
+        });
+    };
+
     const columns = [
         { field: "stt", headerName: "STT", flex: 0.3 },
         { field: "name", headerName: "Tên phòng", flex: 1 },
@@ -246,9 +305,13 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                             </IconButton>
                             <Box
                                 component="img"
-                                src={value[currentImageIndex % value.length]}
+                                src={value[currentImageIndex % value.length] || FALLBACK_IMAGE}
                                 alt={`Room ${currentImageIndex}`}
-                                onClick={() => handleImageClick(value, currentImageIndex % value.length)}
+                                onError={(e) => {
+                                    tryLoadImage(value, (currentImageIndex + 1) % value.length).then((url) => {
+                                        e.target.src = url;
+                                    });
+                                }}
                                 sx={{
                                     width: 60,
                                     height: 40,
@@ -259,6 +322,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                                         opacity: 0.8,
                                     },
                                 }}
+                                onClick={() => handleImageClick(value, currentImageIndex % value.length)}
                             />
                             <IconButton
                                 onClick={() => handleNextImage(value)}
@@ -277,6 +341,20 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                         <Typography variant="caption" sx={{ py: 1 }}>Chưa có ảnh</Typography>
                     )}
                 </Box>
+            ),
+        },
+        {
+            field: "status",
+            headerName: "Trạng thái",
+            flex: 1,
+            renderCell: ({ row }) => (
+                <Button
+                    variant="contained"
+                    color={row.status === "active" ? "success" : "warning"}
+                    onClick={() => handleChangeStatus(row._id, row.status)}
+                >
+                    {row.status === "active" ? "Hoạt động" : "Tạm ngưng"}
+                </Button>
             ),
         },
         {
@@ -314,58 +392,67 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         },
     ];
 
-    // Component form phòng
     const RoomForm = ({ room, onClose, onSuccess }) => {
         const [imagePreviews, setImagePreviews] = useState(room?.images || []);
         const [formLoading, setFormLoading] = useState(false);
 
-        // Xử lý chọn ảnh
         const handleImagesChange = (event, setFieldValue) => {
             const files = Array.from(event.target.files);
-            if (files.length + imagePreviews.length > 10) {
+            const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+            const validFiles = files.filter(file => validImageTypes.includes(file.type));
+
+            if (validFiles.length + imagePreviews.length > 10) {
                 toast.error("Tối đa 10 ảnh!");
-                console.log("Quá nhiều ảnh được chọn:", files.length);
                 return;
             }
-            setFieldValue("images", files);
-            const previews = files.map(file => URL.createObjectURL(file));
+
+            if (validFiles.length < files.length) {
+                toast.warn("Một số file không phải định dạng ảnh hợp lệ!");
+            }
+
+            setFieldValue("images", validFiles);
+            const previews = validFiles.map(file => URL.createObjectURL(file));
             setImagePreviews([...imagePreviews, ...previews]);
-            console.log("Ảnh được chọn, imagePreviews:", imagePreviews);
         };
 
-        // Xử lý submit form
         const handleFormSubmit = async (values) => {
             setFormLoading(true);
-            console.log("Gửi form, values:", values);
             try {
+                const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+                const validImages = values.images?.filter(file => validImageTypes.includes(file.type)) || [];
+
+                if (!room && validImages.length === 0) {
+                    toast.error("Vui lòng chọn ít nhất một ảnh hợp lệ!");
+                    setFormLoading(false);
+                    return;
+                }
+
                 const formData = new FormData();
                 formData.append("name", values.name);
                 formData.append("price", parseFloat(values.price));
                 formData.append("amenities", values.amenities);
                 formData.append("availableRooms", parseInt(values.availableRooms));
-                if (values.images) {
-                    values.images.forEach(file => formData.append("images", file));
+                if (validImages.length > 0) {
+                    validImages.forEach(file => formData.append("images", file));
                 }
 
+                const token = adminToken || localStorage.getItem("adminToken");
                 let response;
                 if (room) {
-                    response = await updateRoom(selectedHotel._id, room._id, formData);
-                    console.log("Phản hồi từ updateRoom:", response);
+                    response = await updateRoom(selectedHotel._id, room._id, formData, token);
                 } else {
-                    response = await createRoom(selectedHotel._id, formData);
-                    console.log("Phản hồi từ createRoom:", response);
+                    response = await createRoom(selectedHotel._id, formData, token);
                 }
 
                 if (response.code === 200) {
                     toast.success(room ? "Cập nhật phòng thành công!" : "Thêm phòng thành công!");
                     onSuccess(response.data);
                     onClose();
-                    fetchRooms(selectedHotel._id);
+                    fetchRooms(selectedHotel._id, currentPage);
                 } else {
                     toast.error(response.message || "Thao tác thất bại!");
                 }
             } catch (err) {
-                console.error("Lỗi khi gửi form:", err.response?.data || err);
                 if (err.response?.status === 400) {
                     const errorMessage = err.response?.data?.message ||
                         err.response?.data?.errors?.join(", ") ||
@@ -427,6 +514,9 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                                                     src={preview}
                                                     alt={`Preview ${index}`}
                                                     sx={{ width: 60, height: 60 }}
+                                                    onError={(e) => {
+                                                        e.target.src = FALLBACK_IMAGE;
+                                                    }}
                                                 />
                                             ))
                                         ) : (
@@ -525,49 +615,50 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         );
     };
 
-    // Ghi log danh sách khách sạn trước khi render dropdown
-    console.log("Render dropdown, hotels:", hotels);
-
     return (
         <Box m="20px">
             <Typography variant="h3" color={colors.grey[100]} mb={2}>
                 Quản lý phòng
             </Typography>
-            <Box display="flex" justifyContent="space-between" mb={2}>
-                <FormControl sx={{ minWidth: 200 }}>
-                    <InputLabel id="hotel-select-label">Chọn khách sạn</InputLabel>
-                    <Select
-                        labelId="hotel-select-label"
-                        value={selectedHotel?._id || ""}
-                        label="Chọn khách sạn"
-                        onChange={handleHotelChange}
-                        disabled={loading}
-                    >
-                        <MenuItem value="">
-                            <em>{loading ? "Đang tải..." : "Chọn khách sạn"}</em>
-                        </MenuItem>
-                        {hotels.map((hotel) => (
-                            <MenuItem key={hotel._id} value={hotel._id}>
-                                {hotel.name}
+            <Box display="flex" justifyContent="space-between" mb={2} gap={2}>
+                <Box display="flex" gap={2}>
+                    <FormControl sx={{ minWidth: 200 }}>
+                        <InputLabel id="hotel-select-label">Chọn khách sạn</InputLabel>
+                        <Select
+                            labelId="hotel-select-label"
+                            value={selectedHotel?._id || ""}
+                            label="Chọn khách sạn"
+                            onChange={handleHotelChange}
+                            disabled={loading || !!selectedHotelId}
+                        >
+                            <MenuItem value="">
+                                <em>{loading ? "Đang tải..." : "Chọn khách sạn"}</em>
                             </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <Button
-                    variant="contained"
-                    color="success"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpenForm()}
-                    disabled={!selectedHotel?._id || loading}
-                >
-                    Thêm phòng
-                </Button>
+                            {hotels.map((hotel) => (
+                                <MenuItem key={hotel._id} value={hotel._id}>
+                                    {hotel.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+                <Box display="flex" gap={2}>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpenForm()}
+                        disabled={!selectedHotel?._id || loading}
+                    >
+                        Thêm phòng
+                    </Button>
+                </Box>
             </Box>
 
             {loading ? (
                 <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
                     <CircularProgress />
-                    <Typography ml={2}>Đang tải danh sách khách sạn...</Typography>
+                    <Typography ml={2}>Đang tải danh sách phòng...</Typography>
                 </Box>
             ) : hotels.length === 0 ? (
                 <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
@@ -580,11 +671,6 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                     <Typography variant="h4" color={colors.grey[100]}>
                         Vui lòng chọn một khách sạn để quản lý phòng!
                     </Typography>
-                </Box>
-            ) : loading ? (
-                <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
-                    <CircularProgress />
-                    <Typography ml={2}>Đang tải danh sách phòng...</Typography>
                 </Box>
             ) : rooms.length === 0 ? (
                 <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
@@ -635,9 +721,17 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                         rows={rooms}
                         columns={columns}
                         getRowId={(row) => row._id}
-                        pageSize={10}
-                        rowsPerPageOptions={[10, 20, 50]}
+                        pagination={false}
+                        hideFooter={true}
                     />
+                    <Box display="flex" justifyContent="center" mt={2}>
+                        <Pagination
+                            count={totalPages}
+                            page={currentPage}
+                            onChange={handlePageChange}
+                            color="primary"
+                        />
+                    </Box>
                 </Box>
             )}
 
@@ -653,14 +747,14 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                         room={selectedHotel ? rooms.find(r => r._id === currentRoomId) : null}
                         onClose={handleCloseForm}
                         onSuccess={(newRoom) => {
-                            setRooms(selectedHotel ? rooms.map(room => room._id === newRoom._id ? { ...newRoom, id: newRoom._id, stt: rooms.find(r => r._id === newRoom._id).stt } : room) : [...rooms, { ...newRoom, id: newRoom._id, stt: rooms.length + 1 }]);
+                            fetchRooms(selectedHotel._id, currentPage);
                             handleCloseForm();
+                            onSuccess();
                         }}
                     />
                 </Box>
             </Dialog>
 
-            {/* Dialog xem ảnh to */}
             <Dialog
                 open={openImageDialog}
                 onClose={handleCloseImageDialog}
@@ -670,8 +764,14 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                 <DialogContent sx={{ p: 0, position: "relative" }}>
                     <Box
                         component="img"
-                        src={selectedImage}
+                        src={selectedImage || FALLBACK_IMAGE}
                         alt="Room image"
+                        onError={(e) => {
+                            const images = rooms.find(r => r.images.includes(selectedImage))?.images || [];
+                            tryLoadImage(images, (currentImageIndex + 1) % images.length).then((url) => {
+                                setSelectedImage(url);
+                            });
+                        }}
                         sx={{
                             width: "100%",
                             height: "auto",

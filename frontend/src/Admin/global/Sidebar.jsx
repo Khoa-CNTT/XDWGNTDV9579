@@ -178,7 +178,7 @@ const Sidebar = () => {
             />
 
             <Item
-              title="Quản lý đơn tour"
+              title="Quản lý hoá đơn"
               to="/admin/invoices"
               icon={<ReceiptOutlinedIcon />}
               selected={selected}
@@ -266,7 +266,7 @@ const Sidebar = () => {
             </Typography>
 
             <Item
-              title="Đội Ngũ"
+              title="Quản lý nhân viên"
               to="/admin/team"
               icon={<PeopleOutlinedIcon />}
               selected={selected}

@@ -36,10 +36,3 @@ export const getVoucherDetail = async (id) => {
     console.log("getVoucherDetail response:", response.data);
     return response.data;
 };
-
-// Chuyển đổi trạng thái voucher
-export const toggleVoucherStatus = async (id) => {
-    const response = await api.patch(`${BASE_URL}/toggle-status/${id}`);
-    console.log("toggleVoucherStatus response:", response.data);
-    return response.data;
-};

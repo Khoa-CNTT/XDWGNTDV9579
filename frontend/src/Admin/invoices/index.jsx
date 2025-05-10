@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
@@ -10,7 +10,6 @@ import {
   TextField,
   InputBase,
   Paper,
-  MenuItem,
   CircularProgress,
   Typography,
   Table,
@@ -19,6 +18,11 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Pagination,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -26,16 +30,16 @@ import { tokens } from "../../theme";
 import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PrintIcon from "@mui/icons-material/Print";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   getInvoices,
-  changeInvoiceStatus,
   getInvoiceDetail,
   deleteInvoice,
 } from "./InvoicesApi";
 import { useAdminAuth } from "../../context/AdminContext";
-import PrintIcon from '@mui/icons-material/Print';
+import { debounce } from "lodash";
 
 const InvoicesControl = () => {
   const theme = useTheme();
@@ -46,74 +50,164 @@ const InvoicesControl = () => {
   const [searchText, setSearchText] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [sortOption, setSortOption] = useState("none");
+  const [sortModel, setSortModel] = useState([]);
   const [openDetail, setOpenDetail] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const limitItems = 10;
+  const [totalPages, setTotalPages] = useState(1);
 
   // Lấy danh sách hóa đơn
-  const fetchInvoices = async () => {
-    setLoading(true);
-    try {
-      const data = await getInvoices();
-      console.log("Raw data from API:", data);
+  const fetchInvoices = useCallback(
+    async (page = 1, search = "", start = "", end = "", sortKey = "", sortValue = "") => {
+      setLoading(true);
+      try {
+        const params = { page, limit: limitItems };
+        if (search) params.search = search;
+        if (start) params.startDate = start;
+        if (end) params.endDate = end;
+        if (sortKey && sortValue) {
+          params.sortKey = sortKey;
+          params.sortValue = sortValue;
+        }
+        const data = await getInvoices(params);
+        console.log("Raw data from API:", data);
 
-      const formattedData = Array.isArray(data)
-        ? data.map((item, index) => ({
-          ...item,
-          id: item._id,
-          stt: index + 1,
-          orderCode: item.orderCode || "N/A",
-          customerName: item.userInfor?.fullName || "N/A",
-          customerPhone: item.userInfor?.phone || "N/A",
-          totalPrice: item.totalPrice || 0,
-          createdAt: item.createdAt, // Giữ nguyên định dạng ngày tháng
-        }))
-        : [];
+        if (!data || !Array.isArray(data.orders)) {
+          console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
+          setAllInvoices([]);
+          setInvoices([]);
+          setTotalPages(1);
+          toast.info("Không có hóa đơn nào để hiển thị!", { position: "top-right" });
+          return;
+        }
 
-      setAllInvoices(formattedData);
-      setInvoices(formattedData);
-      console.log("Formatted invoices:", formattedData);
+        const totalRecords = data.totalRecords || data.orders.length;
+        const formattedData = data.orders.map((item, index) => {
+          let stt;
+          if (sortKey === "_id" && sortValue === "desc") {
+            stt = totalRecords - ((page - 1) * limitItems + index);
+          } else {
+            stt = (page - 1) * limitItems + index + 1;
+          }
+          return {
+            ...item,
+            id: item._id,
+            stt: stt,
+            orderCode: item.orderCode || "N/A",
+            customerName: item.userInfor?.fullName || "N/A",
+            customerPhone: item.userInfor?.phone || "N/A",
+            totalPrice: item.totalPrice || 0,
+            createdAt: item.createdAt,
+            status: item.status || "pending",
+          };
+        });
 
-      if (formattedData.length === 0) {
-        toast.info("Không có hóa đơn nào để hiển thị!", { position: "top-right" });
+        setAllInvoices(formattedData);
+        setInvoices(formattedData);
+        setTotalPages(data.totalPage || 1);
+        console.log("Formatted invoices:", formattedData);
+
+        if (formattedData.length === 0) {
+          toast.info("Không có hóa đơn nào để hiển thị!", { position: "top-right" });
+        }
+      } catch (err) {
+        console.error("Error in fetchInvoices:", err);
+        const errorMessage = err.response?.data?.message || "Không thể tải danh sách hóa đơn!";
+        setError(errorMessage);
+        toast.error(errorMessage, { position: "top-right" });
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error in fetchInvoices:", err);
-      const errorMessage = err.message || "Không thể tải danh sách hóa đơn!";
-      setError(errorMessage);
-      toast.error(errorMessage, { position: "top-right" });
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [limitItems]
+  );
 
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setCurrentPage(1);
+      let sortKey = "";
+      let sortValue = "";
+      switch (sortOption) {
+        case "stt_asc":
+          sortKey = "_id";
+          sortValue = "asc";
+          break;
+        case "stt_desc":
+          sortKey = "_id";
+          sortValue = "desc";
+          break;
+        case "orderCode_asc":
+          sortKey = "orderCode";
+          sortValue = "asc";
+          break;
+        case "orderCode_desc":
+          sortKey = "orderCode";
+          sortValue = "desc";
+          break;
+        case "customerName_asc":
+          sortKey = "userInfor.fullName";
+          sortValue = "asc";
+          break;
+        case "customerName_desc":
+          sortKey = "userInfor.fullName";
+          sortValue = "desc";
+          break;
+        case "customerPhone_asc":
+          sortKey = "userInfor.phone";
+          sortValue = "asc";
+          break;
+        case "customerPhone_desc":
+          sortKey = "userInfor.phone";
+          sortValue = "desc";
+          break;
+        case "totalPrice_asc":
+          sortKey = "totalPrice";
+          sortValue = "asc";
+          break;
+        case "totalPrice_desc":
+          sortKey = "totalPrice";
+          sortValue = "desc";
+          break;
+        case "createdAt_asc":
+          sortKey = "createdAt";
+          sortValue = "asc";
+          break;
+        case "createdAt_desc":
+          sortKey = "createdAt";
+          sortValue = "desc";
+          break;
+        default:
+          break;
+      }
+      fetchInvoices(1, value, startDate, endDate, sortKey, sortValue);
+    }, 500),
+    [sortOption, startDate, endDate, fetchInvoices]
+  );
+
+  // Khởi tạo dữ liệu
   useEffect(() => {
     const token = adminToken || localStorage.getItem("adminToken");
-    console.log("adminToken in InvoicesControl:", token);
     if (token) {
-      fetchInvoices();
+      fetchInvoices(currentPage);
     } else {
       toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
       setTimeout(() => {
         window.location.href = "/loginadmin";
       }, 2000);
     }
-  }, [adminToken]);
+  }, [adminToken, currentPage, fetchInvoices]);
 
-  // Xử lý tìm kiếm theo mã hóa đơn (realtime)
-  useEffect(() => {
-    if (searchText) {
-      const filteredInvoices = allInvoices.filter((invoice) => {
-        // Kiểm tra xem invoice.orderCode có tồn tại không
-        if (!invoice.orderCode) return false;
-        return invoice.orderCode.toLowerCase().includes(searchText.toLowerCase());
-      });
-      setInvoices(filteredInvoices);
-    } else {
-      setInvoices(allInvoices);
-    }
-  }, [searchText, allInvoices]);
+  // Xử lý tìm kiếm theo mã hóa đơn
+  const handleSearchTextChange = (e) => {
+    const value = e.target.value;
+    setSearchText(value);
+    debouncedSearch(value);
+  };
 
   // Xử lý tìm kiếm theo ngày
   const handleDateSearch = (e) => {
@@ -122,24 +216,67 @@ const InvoicesControl = () => {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      // Kiểm tra nếu ngày bắt đầu lớn hơn ngày kết thúc
       if (start > end) {
         toast.error("Ngày bắt đầu phải nhỏ hơn ngày kết thúc!", { position: "top-right" });
         return;
       }
 
-      end.setHours(23, 59, 59, 999);
-
-      const filteredInvoices = allInvoices.filter((invoice) => {
-        if (!invoice.createdAt) return false;
-        const invoiceDate = new Date(invoice.createdAt);
-        return invoiceDate >= start && invoiceDate <= end;
-      });
-
-      if (filteredInvoices.length === 0) {
-        toast.info("Không tìm thấy hóa đơn trong khoảng thời gian này!", { position: "top-right" });
+      setCurrentPage(1);
+      let sortKey = "";
+      let sortValue = "";
+      switch (sortOption) {
+        case "stt_asc":
+          sortKey = "_id";
+          sortValue = "asc";
+          break;
+        case "stt_desc":
+          sortKey = "_id";
+          sortValue = "desc";
+          break;
+        case "orderCode_asc":
+          sortKey = "orderCode";
+          sortValue = "asc";
+          break;
+        case "orderCode_desc":
+          sortKey = "orderCode";
+          sortValue = "desc";
+          break;
+        case "customerName_asc":
+          sortKey = "userInfor.fullName";
+          sortValue = "asc";
+          break;
+        case "customerName_desc":
+          sortKey = "userInfor.fullName";
+          sortValue = "desc";
+          break;
+        case "customerPhone_asc":
+          sortKey = "userInfor.phone";
+          sortValue = "asc";
+          break;
+        case "customerPhone_desc":
+          sortKey = "userInfor.phone";
+          sortValue = "desc";
+          break;
+        case "totalPrice_asc":
+          sortKey = "totalPrice";
+          sortValue = "asc";
+          break;
+        case "totalPrice_desc":
+          sortKey = "totalPrice";
+          sortValue = "desc";
+          break;
+        case "createdAt_asc":
+          sortKey = "createdAt";
+          sortValue = "asc";
+          break;
+        case "createdAt_desc":
+          sortKey = "createdAt";
+          sortValue = "desc";
+          break;
+        default:
+          break;
       }
-      setInvoices(filteredInvoices);
+      fetchInvoices(1, searchText, startDate, endDate, sortKey, sortValue);
     } else {
       toast.warning("Vui lòng chọn khoảng thời gian!", { position: "top-right" });
     }
@@ -149,8 +286,195 @@ const InvoicesControl = () => {
   const handleResetDateSearch = () => {
     setStartDate("");
     setEndDate("");
-    setInvoices(allInvoices);
+    setCurrentPage(1);
+    fetchInvoices(1, searchText);
     toast.success("Đã đặt lại tìm kiếm theo ngày!");
+  };
+
+  // Xử lý thay đổi sắp xếp
+  const handleSortChange = (event) => {
+    const value = event.target.value;
+    setSortOption(value);
+    setCurrentPage(1);
+    let sortKey = "";
+    let sortValue = "";
+    let sortField = "";
+    switch (value) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        sortField = "stt";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        sortField = "stt";
+        break;
+      case "orderCode_asc":
+        sortKey = "orderCode";
+        sortValue = "asc";
+        sortField = "orderCode";
+        break;
+      case "orderCode_desc":
+        sortKey = "orderCode";
+        sortValue = "desc";
+        sortField = "orderCode";
+        break;
+      case "customerName_asc":
+        sortKey = "userInfor.fullName";
+        sortValue = "asc";
+        sortField = "customerName";
+        break;
+      case "customerName_desc":
+        sortKey = "userInfor.fullName";
+        sortValue = "desc";
+        sortField = "customerName";
+        break;
+      case "customerPhone_asc":
+        sortKey = "userInfor.phone";
+        sortValue = "asc";
+        sortField = "customerPhone";
+        break;
+      case "customerPhone_desc":
+        sortKey = "userInfor.phone";
+        sortValue = "desc";
+        sortField = "customerPhone";
+        break;
+      case "totalPrice_asc":
+        sortKey = "totalPrice";
+        sortValue = "asc";
+        sortField = "totalPrice";
+        break;
+      case "totalPrice_desc":
+        sortKey = "totalPrice";
+        sortValue = "desc";
+        sortField = "totalPrice";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        sortField = "createdAt";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        sortField = "createdAt";
+        break;
+      default:
+        break;
+    }
+    fetchInvoices(1, searchText, startDate, endDate, sortKey, sortValue);
+    if (sortKey && sortValue) {
+      setSortModel([{ field: sortField, sort: sortValue }]);
+    } else {
+      setSortModel([]);
+    }
+  };
+
+  // Xử lý sắp xếp từ DataGrid
+  const handleSortModelChange = (newSortModel) => {
+    setSortModel(newSortModel);
+    setCurrentPage(1);
+    if (newSortModel.length > 0) {
+      const { field, sort } = newSortModel[0];
+      let sortKey = "";
+      let sortOptionValue = "";
+      switch (field) {
+        case "stt":
+          sortKey = "_id";
+          sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+          break;
+        case "orderCode":
+          sortKey = "orderCode";
+          sortOptionValue = sort === "asc" ? "orderCode_asc" : "orderCode_desc";
+          break;
+        case "customerName":
+          sortKey = "userInfor.fullName";
+          sortOptionValue = sort === "asc" ? "customerName_asc" : "customerName_desc";
+          break;
+        case "customerPhone":
+          sortKey = "userInfor.phone";
+          sortOptionValue = sort === "asc" ? "customerPhone_asc" : "customerPhone_desc";
+          break;
+        case "totalPrice":
+          sortKey = "totalPrice";
+          sortOptionValue = sort === "asc" ? "totalPrice_asc" : "totalPrice_desc";
+          break;
+        case "createdAt":
+          sortKey = "createdAt";
+          sortOptionValue = sort === "asc" ? "createdAt_asc" : "createdAt_desc";
+          break;
+        default:
+          break;
+      }
+      if (sortKey) {
+        setSortOption(sortOptionValue);
+        fetchInvoices(1, searchText, startDate, endDate, sortKey, sort);
+      }
+    } else {
+      setSortOption("none");
+      fetchInvoices(1, searchText, startDate, endDate);
+    }
+  };
+
+  // Xử lý thay đổi trang
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+    let sortKey = "";
+    let sortValue = "";
+    switch (sortOption) {
+      case "stt_asc":
+        sortKey = "_id";
+        sortValue = "asc";
+        break;
+      case "stt_desc":
+        sortKey = "_id";
+        sortValue = "desc";
+        break;
+      case "orderCode_asc":
+        sortKey = "orderCode";
+        sortValue = "asc";
+        break;
+      case "orderCode_desc":
+        sortKey = "orderCode";
+        sortValue = "desc";
+        break;
+      case "customerName_asc":
+        sortKey = "userInfor.fullName";
+        sortValue = "asc";
+        break;
+      case "customerName_desc":
+        sortKey = "userInfor.fullName";
+        sortValue = "desc";
+        break;
+      case "customerPhone_asc":
+        sortKey = "userInfor.phone";
+        sortValue = "asc";
+        break;
+      case "customerPhone_desc":
+        sortKey = "userInfor.phone";
+        sortValue = "desc";
+        break;
+      case "totalPrice_asc":
+        sortKey = "totalPrice";
+        sortValue = "asc";
+        break;
+      case "totalPrice_desc":
+        sortKey = "totalPrice";
+        sortValue = "desc";
+        break;
+      case "createdAt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        break;
+      case "createdAt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+      default:
+        break;
+    }
+    fetchInvoices(value, searchText, startDate, endDate, sortKey, sortValue);
   };
 
   // Mở modal chi tiết
@@ -158,7 +482,7 @@ const InvoicesControl = () => {
     setLoading(true);
     try {
       const response = await getInvoiceDetail(invoice._id);
-      if (response.code === 200) {
+      if (response.code === 200 && response.data) {
         setCurrentInvoice(response.data);
         setOpenDetail(true);
       } else {
@@ -178,26 +502,6 @@ const InvoicesControl = () => {
     setCurrentInvoice(null);
   };
 
-  // Thay đổi trạng thái
-  const handleChangeStatus = async (id, newStatus) => {
-    setLoading(true);
-    try {
-      const response = await changeInvoiceStatus(id, newStatus);
-      if (response.code === 200) {
-        fetchInvoices();
-        toast.success("Cập nhật trạng thái thành công!", { position: "top-right" });
-      } else {
-        toast.error(response.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || "Cập nhật trạng thái thất bại!";
-      toast.error(errorMessage, { position: "top-right" });
-      console.error("Change status error:", err.response?.data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Xóa hóa đơn
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa hóa đơn này?")) {
@@ -205,7 +509,7 @@ const InvoicesControl = () => {
       try {
         const response = await deleteInvoice(id);
         if (response.code === 200) {
-          fetchInvoices();
+          fetchInvoices(currentPage);
           toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
         } else {
           toast.error(response.message || "Xóa hóa đơn thất bại!", { position: "top-right" });
@@ -222,8 +526,9 @@ const InvoicesControl = () => {
 
   // Hàm xử lý in hóa đơn
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    const content = document.getElementById('invoice-detail').innerHTML;
+    if (!currentInvoice) return;
+    const printWindow = window.open("", "_blank");
+    const content = document.getElementById("invoice-detail").innerHTML;
 
     printWindow.document.write(`
       <html>
@@ -269,20 +574,37 @@ const InvoicesControl = () => {
   };
 
   const columns = [
-    { field: "stt", headerName: "STT", flex: 0.3 },
-    { field: "orderCode", headerName: "Mã hóa đơn", flex: 0.5 },
-    { field: "customerName", headerName: "Khách hàng", flex: 1 },
-    { field: "customerPhone", headerName: "Số điện thoại", flex: 0.7 },
+    {
+      field: "stt",
+      headerName: "STT",
+      flex: 0.3,
+      sortable: true,
+    },
+    {
+      field: "orderCode",
+      headerName: "Mã hóa đơn",
+      flex: 0.5,
+      sortable: true,
+    },
+    {
+      field: "customerName",
+      headerName: "Khách hàng",
+      flex: 1,
+      sortable: true,
+    },
+    {
+      field: "customerPhone",
+      headerName: "Số điện thoại",
+      flex: 0.7,
+      sortable: true,
+    },
     {
       field: "totalPrice",
       headerName: "Tổng giá (VNĐ)",
       flex: 0.7,
+      sortable: true,
       renderCell: (params) => (
-        <Box
-          display="flex"
-          alignItems="center"
-          height="100%"
-        >
+        <Box display="flex" alignItems="center" height="100%">
           <Typography color={colors.grey[100]}>
             {params.value.toLocaleString("vi-VN")}
           </Typography>
@@ -293,38 +615,31 @@ const InvoicesControl = () => {
       field: "status",
       headerName: "Trạng thái",
       flex: 0.7,
-      renderCell: (params) => (
-        <Box
-          display="flex"
-          alignItems="center"
-          height="100%"
-        >
-          <TextField
-            select
-            value={params.value}
-            onChange={(e) => handleChangeStatus(params.row._id, e.target.value)}
-            size="small"
-            sx={{ width: "120px" }}
-          >
-            <MenuItem value="pending">Chờ xử lý</MenuItem>
-            <MenuItem value="confirmed">Đã xác nhận</MenuItem>
-          </TextField>
-        </Box>
-      ),
+      renderCell: (params) => {
+        const statusMap = {
+          cancelled: "Đã hủy",
+          pending: "Chờ xác nhận",
+          confirmed: "Đang xử lý",
+          paid: "Đã thanh toán",
+        };
+        const displayStatus = statusMap[params.value] || "Không xác định";
+        return (
+          <Box display="flex" alignItems="center" height="100%">
+            <Typography sx={{ color: "#000000" }}>{displayStatus}</Typography>
+          </Box>
+        );
+      },
     },
     {
       field: "createdAt",
       headerName: "Ngày tạo",
       flex: 1,
+      sortable: true,
       renderCell: (params) => {
         const date = new Date(params.value);
         return (
-          <Box
-            display="flex"
-            alignItems="center"
-            height="100%"
-          >
-            {date.toLocaleDateString("vi-VN")}
+          <Box display="flex" alignItems="center" height="100%">
+            {isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString("vi-VN")}
           </Box>
         );
       },
@@ -334,12 +649,7 @@ const InvoicesControl = () => {
       headerName: "Hành động",
       flex: 1,
       renderCell: (params) => (
-        <Box
-          display="flex"
-          gap={1}
-          alignItems="center"
-          height="100%"
-        >
+        <Box display="flex" gap={1} alignItems="center" height="100%">
           <Button
             variant="contained"
             color="primary"
@@ -379,19 +689,43 @@ const InvoicesControl = () => {
         limit={3}
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-        {/* Tiêu đề */}
-        <Box sx={{ gridColumn: 'span 12' }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Typography variant="h2" color={colors.grey[100]} fontWeight="bold" mb={2}>
             Quản lý hóa đơn
           </Typography>
         </Box>
 
-        {/* Phần tìm kiếm */}
-        <Box sx={{ gridColumn: 'span 12' }}>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
+        <Box sx={{ gridColumn: "span 12" }}>
+          <Box display="flex" justifyContent="space-between" mb={2}>
             <Box display="flex" gap={2}>
-              {/* Tìm kiếm theo mã hóa đơn */}
+              <FormControl sx={{ width: 200 }}>
+                <InputLabel>Sắp xếp</InputLabel>
+                <Select
+                  value={sortOption}
+                  onChange={handleSortChange}
+                  label="Sắp xếp"
+                  sx={{
+                    backgroundColor: colors.primary[400],
+                  }}
+                >
+                  <MenuItem value="none">Không sắp xếp</MenuItem>
+                  <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                  <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                  <MenuItem value="orderCode_asc">Mã hóa đơn: Tăng dần</MenuItem>
+                  <MenuItem value="orderCode_desc">Mã hóa đơn: Giảm dần</MenuItem>
+                  <MenuItem value="customerName_asc">Khách hàng: Tăng dần</MenuItem>
+                  <MenuItem value="customerName_desc">Khách hàng: Giảm dần</MenuItem>
+                  <MenuItem value="customerPhone_asc">Số điện thoại: Tăng dần</MenuItem>
+                  <MenuItem value="customerPhone_desc">Số điện thoại: Giảm dần</MenuItem>
+                  <MenuItem value="totalPrice_asc">Tổng giá: Tăng dần</MenuItem>
+                  <MenuItem value="totalPrice_desc">Tổng giá: Giảm dần</MenuItem>
+                  <MenuItem value="createdAt_asc">Ngày tạo: Tăng dần</MenuItem>
+                  <MenuItem value="createdAt_desc">Ngày tạo: Giảm dần</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            <Box display="flex" gap={2}>
               <Paper
                 component="form"
                 sx={{
@@ -406,14 +740,12 @@ const InvoicesControl = () => {
                   sx={{ ml: 1, flex: 1 }}
                   placeholder="Tìm kiếm hóa đơn (theo mã)"
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={handleSearchTextChange}
                 />
                 <IconButton sx={{ p: "10px" }}>
                   <SearchIcon />
                 </IconButton>
               </Paper>
-
-              {/* Tìm kiếm theo ngày */}
               <Box display="flex" gap={1} alignItems="center">
                 <TextField
                   type="date"
@@ -424,16 +756,10 @@ const InvoicesControl = () => {
                   sx={{
                     width: 150,
                     backgroundColor: colors.primary[400],
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: 'transparent',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: 'transparent',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: 'transparent',
-                      },
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "transparent" },
+                      "&.Mui-focused fieldset": { borderColor: "transparent" },
                     },
                   }}
                 />
@@ -447,16 +773,10 @@ const InvoicesControl = () => {
                   sx={{
                     width: 150,
                     backgroundColor: colors.primary[400],
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: 'transparent',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: 'transparent',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: 'transparent',
-                      },
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "transparent" },
+                      "&.Mui-focused fieldset": { borderColor: "transparent" },
                     },
                   }}
                 />
@@ -467,18 +787,13 @@ const InvoicesControl = () => {
                   sx={{
                     ml: 1,
                     backgroundColor: colors.blueAccent[400],
-                    '&:hover': {
-                      backgroundColor: colors.blueAccent[300],
-                    },
+                    "&:hover": { backgroundColor: colors.blueAccent[300] },
                   }}
                 >
                   Tìm kiếm
                 </Button>
                 <Button
-                  sx={{
-                    ml: 1,
-                    backgroundColor: "white"
-                  }}
+                  sx={{ ml: 1, backgroundColor: "white" }}
                   variant="outlined"
                   onClick={handleResetDateSearch}
                 >
@@ -489,21 +804,13 @@ const InvoicesControl = () => {
           </Box>
         </Box>
 
-        {/* Bảng dữ liệu */}
-        <Box sx={{ gridColumn: 'span 12' }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Box
             height="75vh"
             sx={{
-              "& .MuiDataGrid-root": {
-                border: "none",
-                width: "100%",
-              },
-              "& .MuiDataGrid-main": {
-                width: "100%",
-              },
-              "& .MuiDataGrid-cell": {
-                borderBottom: "none",
-              },
+              "& .MuiDataGrid-root": { border: "none", width: "100%" },
+              "& .MuiDataGrid-main": { width: "100%" },
+              "& .MuiDataGrid-cell": { borderBottom: "none" },
               "& .MuiDataGrid-columnHeaders": {
                 backgroundColor: colors.blueAccent[700],
                 borderBottom: "none",
@@ -544,18 +851,28 @@ const InvoicesControl = () => {
                 </Typography>
               </Box>
             ) : (
-              <DataGrid
-                rows={invoices}
-                columns={columns}
-                pageSize={5}
-                rowsPerPageOptions={[5, 10, 20]}
-                disableSelectionOnClick
-                getRowHeight={() => 60}
-                // autoHeight
-                sx={{
-                  width: "100%",
-                }}
-              />
+              <>
+                <DataGrid
+                  rows={invoices}
+                  columns={columns}
+                  disableSelectionOnClick
+                  getRowHeight={() => 60}
+                  sx={{ width: "100%" }}
+                  pagination={false}
+                  hideFooter={true}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={handleSortModelChange}
+                />
+                <Box display="flex" justifyContent="center" mt={2}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              </>
             )}
           </Box>
         </Box>
@@ -566,19 +883,10 @@ const InvoicesControl = () => {
         onClose={handleCloseDetail}
         maxWidth="sm"
         fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            maxWidth: '600px',
-            width: '100%'
-          }
-        }}
+        sx={{ "& .MuiDialog-paper": { maxWidth: "600px", width: "100%" } }}
       >
         <DialogTitle
-          sx={{
-            fontWeight: "bold",
-            fontSize: "1.3rem",
-            textAlign: "center",
-          }}
+          sx={{ fontWeight: "bold", fontSize: "1.3rem", textAlign: "center" }}
         >
           Chi tiết hóa đơn
         </DialogTitle>
@@ -586,7 +894,7 @@ const InvoicesControl = () => {
           {currentInvoice ? (
             <Box id="invoice-detail">
               <Typography variant="h4" color={colors.grey[100]} mb={2}>
-                Mã hóa đơn: {currentInvoice.order?.orderCode}
+                Mã hóa đơn: {currentInvoice.order?.orderCode || "N/A"}
               </Typography>
               <Typography variant="h5" color={colors.grey[100]} mb={1}>
                 Thông tin khách hàng
@@ -609,19 +917,24 @@ const InvoicesControl = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {currentInvoice.tours.map((tour, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{tour.tourInfo?.title || "N/A"}</TableCell>
-                        <TableCell align="center">{tour.quantity}</TableCell>
-                        <TableCell align="right">{tour.priceNew.toLocaleString("vi-VN")}</TableCell>
+                    {Array.isArray(currentInvoice.tours) && currentInvoice.tours.length > 0 ? (
+                      currentInvoice.tours.map((tour, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{tour.tourInfo?.title || "N/A"}</TableCell>
+                          <TableCell align="center">{tour.quantity || 0}</TableCell>
+                          <TableCell align="right">{tour.priceNew?.toLocaleString("vi-VN") || "N/A"}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3}>Không có tour</TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
 
-              {/* Chỉ hiển thị danh sách khách sạn nếu có dữ liệu */}
-              {currentInvoice.hotels && currentInvoice.hotels.length > 0 && (
+              {Array.isArray(currentInvoice.hotels) && currentInvoice.hotels.length > 0 && (
                 <>
                   <Typography variant="h5" color={colors.grey[100]} mb={1}>
                     Danh sách khách sạn
@@ -637,16 +950,16 @@ const InvoicesControl = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {currentInvoice.hotels.map((hotel, index) => (
+                        {currentInvoice.hotels.map((hotel, index) =>
                           hotel.rooms.map((room, roomIndex) => (
                             <TableRow key={`${index}-${roomIndex}`}>
                               <TableCell>{hotel.hotelInfo?.name || "N/A"}</TableCell>
                               <TableCell>{room.roomInfo?.name || "N/A"}</TableCell>
-                              <TableCell align="center">{room.quantity}</TableCell>
-                              <TableCell align="right">{room.price.toLocaleString("vi-VN")}</TableCell>
+                              <TableCell align="center">{room.quantity || 0}</TableCell>
+                              <TableCell align="right">{room.price?.toLocaleString("vi-VN") || "N/A"}</TableCell>
                             </TableRow>
                           ))
-                        ))}
+                        )}
                       </TableBody>
                     </Table>
                   </TableContainer>
@@ -659,10 +972,10 @@ const InvoicesControl = () => {
                   mt: 2,
                   textAlign: "right",
                   fontWeight: "bold",
-                  color: colors.grey[100]
+                  color: colors.grey[100],
                 }}
               >
-                Tổng giá: {currentInvoice.order?.totalPrice.toLocaleString("vi-VN")} VNĐ
+                Tổng giá: {currentInvoice.order?.totalPrice?.toLocaleString("vi-VN") || "N/A"} VNĐ
               </Typography>
             </Box>
           ) : (
@@ -675,6 +988,7 @@ const InvoicesControl = () => {
             onClick={handlePrint}
             variant="contained"
             color="primary"
+            disabled={!currentInvoice}
           >
             In hóa đơn
           </Button>

@@ -16,6 +16,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Pagination,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -36,20 +37,24 @@ import {
   changeAccountStatus,
   getRoleDetail,
 } from "./TeamApi";
+import { getRightsGroups } from "../rightsgroup/RightsgroupApi";
 import { useAdminAuth } from "../../context/AdminContext";
-import Header from "../../components/Scenes/Header";
-import api from "../../utils/api";
+import { useNavigate } from "react-router-dom";
 
 const Team = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { adminToken } = useAdminAuth();
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
-  const [allAccounts, setAllAccounts] = useState([]); // Lưu toàn bộ tài khoản từ API
+  const [allAccounts, setAllAccounts] = useState([]);
   const [roles, setRoles] = useState({});
   const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // Thêm state cho bộ lọc trạng thái
   const [open, setOpen] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+  const [deleteAccountId, setDeleteAccountId] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [currentAccount, setCurrentAccount] = useState(null);
@@ -66,102 +71,138 @@ const Team = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [roleOptions, setRoleOptions] = useState([]);
-  const [previewImage, setPreviewImage] = useState(null); // State để lưu URL tạm thời của ảnh
+  const [previewImage, setPreviewImage] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limitItems = 10;
 
-  // Reference for hidden file input
   const fileInputRef = React.useRef(null);
 
-  // Lấy danh sách tài khoản và nhóm quyền
-  const fetchAccounts = async () => {
+  const fetchAccounts = async (page = 1, search = "", status = "all") => {
     setLoading(true);
     try {
-      const data = await getAccounts(); // Không gửi tham số tìm kiếm
-      const formattedData = Array.isArray(data)
-        ? data.map((item, index) => ({
+      const params = {
+        page,
+        limit: limitItems,
+        sortKey: "createdAt",
+        sortValue: "desc",
+      };
+      if (search) {
+        params.search = search;
+      }
+      if (status !== "all") {
+        params.status = status;
+      }
+      const response = await getAccounts(params);
+      console.log("fetchAccounts response:", response);
+      if (response && Array.isArray(response.accounts)) {
+        const formattedData = response.accounts.map((item, index) => ({
           ...item,
           id: item._id,
-          stt: index + 1,
-        }))
-        : [];
-      setAllAccounts(formattedData); // Lưu toàn bộ tài khoản
-      setAccounts(formattedData); // Hiển thị ban đầu
+          stt: index + 1 + (page - 1) * limitItems,
+        }));
+        setAllAccounts(formattedData);
+        setAccounts(formattedData);
+        setTotalPages(response.totalPage || 1);
 
-      // Lấy thông tin nhóm quyền cho từng tài khoản
-      const rolePromises = formattedData.map(async (account) => {
-        if (account.role_id) {
-          const roleData = await getRoleDetail(account.role_id);
-          return { id: account.role_id, title: roleData.title || "N/A" };
+        const rolePromises = formattedData.map(async (account) => {
+          if (account.role_id) {
+            const roleData = await getRoleDetail(account.role_id);
+            return { id: account.role_id, title: roleData.title || "N/A" };
+          }
+          return { id: account.role_id, title: "N/A" };
+        });
+        const roleResults = await Promise.all(rolePromises);
+        const roleMap = roleResults.reduce((acc, role) => {
+          acc[role.id] = role.title;
+          return acc;
+        }, {});
+        setRoles(roleMap);
+
+        if (formattedData.length === 0) {
+          toast.info(
+            search
+              ? `Không tìm thấy nhân viên nào với từ khóa "${search}"!`
+              : "Không có nhân viên nào để hiển thị!",
+            { position: "top-right" }
+          );
         }
-        return { id: account.role_id, title: "N/A" };
-      });
-      const roleResults = await Promise.all(rolePromises);
-      const roleMap = roleResults.reduce((acc, role) => {
-        acc[role.id] = role.title;
-        return acc;
-      }, {});
-      setRoles(roleMap);
-
-      if (formattedData.length === 0) {
-        toast.info("Không có tài khoản nào để hiển thị!", { position: "top-right" });
+      } else {
+        setError("Dữ liệu tài khoản không hợp lệ!");
+        toast.error("Dữ liệu tài khoản không hợp lệ!", { position: "top-right" });
+        setAccounts([]);
+        setAllAccounts([]);
+        setTotalPages(1);
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Không thể tải danh sách tài khoản!";
       setError(errorMessage);
       toast.error(errorMessage, { position: "top-right" });
+      console.error("Fetch accounts error:", err.response?.data);
+      if (err.response?.status === 401) {
+        toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
+        localStorage.removeItem("adminToken");
+        navigate("/loginadmin");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Lấy danh sách nhóm quyền để hiển thị trong dropdown
   const fetchRoleOptions = async () => {
     try {
-      const response = await api.get("http://localhost:3000/api/v1/admin/roles");
-      const roles = Array.isArray(response.data)
-        ? response.data.map((role) => ({
+      const response = await getRightsGroups({
+        page: 1,
+        limit: 100,
+        sortKey: "createdAt",
+        sortValue: "desc",
+      });
+      if (response && Array.isArray(response.roles)) {
+        const roles = response.roles.map((role) => ({
           id: role._id,
           title: role.title,
-        }))
-        : [];
-      setRoleOptions(roles);
+        }));
+        setRoleOptions(roles);
+      } else {
+        toast.error("Dữ liệu nhóm quyền không hợp lệ!", { position: "top-right" });
+        setRoleOptions([]);
+      }
     } catch (err) {
       toast.error("Không thể tải danh sách nhóm quyền!", { position: "top-right" });
+      console.error("Fetch role options error:", err.response?.data);
     }
   };
 
   useEffect(() => {
     const token = adminToken || localStorage.getItem("adminToken");
     if (token) {
-      fetchAccounts();
+      fetchAccounts(currentPage, searchText, statusFilter);
       fetchRoleOptions();
     } else {
       toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
       setTimeout(() => {
-        window.location.href = "/loginadmin";
+        navigate("/loginadmin");
       }, 2000);
     }
-  }, [adminToken]);
+  }, [adminToken, navigate, currentPage, statusFilter]);
 
-  // Xử lý tìm kiếm ở frontend (thời gian thực)
-  useEffect(() => {
-    const filteredAccounts = allAccounts.filter((account) =>
-      account.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
-      account.email.toLowerCase().includes(searchText.toLowerCase())
-    );
-    setAccounts(filteredAccounts);
-  }, [searchText, allAccounts]);
-
-  // Xử lý tìm kiếm thủ công khi nhấn nút
   const handleSearch = (e) => {
     e.preventDefault();
-    const filteredAccounts = allAccounts.filter((account) =>
-      account.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
-      account.email.toLowerCase().includes(searchText.toLowerCase())
-    );
-    setAccounts(filteredAccounts);
+    setCurrentPage(1);
+    fetchAccounts(1, searchText, statusFilter);
   };
 
-  // Mở modal thêm mới
+  const handleStatusFilterChange = (event) => {
+    setStatusFilter(event.target.value);
+    setCurrentPage(1);
+    fetchAccounts(1, searchText, event.target.value);
+  };
+
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+    fetchAccounts(value, searchText, statusFilter);
+  };
+
   const handleOpen = () => {
     setIsEdit(false);
     setNewAccount({
@@ -174,12 +215,11 @@ const Team = () => {
       status: "active",
       avatar: null,
     });
-    setPreviewImage(null); // Reset preview image
+    setPreviewImage(null);
     setError("");
     setOpen(true);
   };
 
-  // Mở modal chỉnh sửa
   const handleEdit = (account) => {
     setIsEdit(true);
     setCurrentId(account._id);
@@ -193,12 +233,11 @@ const Team = () => {
       status: account.status || "active",
       avatar: null,
     });
-    setPreviewImage(account.avatar || null); // Hiển thị ảnh hiện tại của tài khoản
+    setPreviewImage(account.avatar || null);
     setError("");
     setOpen(true);
   };
 
-  // Mở modal chi tiết
   const handleOpenDetail = async (account) => {
     setLoading(true);
     try {
@@ -208,6 +247,7 @@ const Team = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Không thể tải chi tiết tài khoản!";
       toast.error(errorMessage, { position: "top-right" });
+      console.error("Get account detail error:", err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -216,18 +256,25 @@ const Team = () => {
   const handleClose = () => {
     setOpen(false);
     setError("");
-    setPreviewImage(null); // Reset preview image khi đóng modal
+    setPreviewImage(null);
   };
 
-  // Đóng modal chi tiết
   const handleCloseDetail = () => {
     setOpenDetail(false);
     setCurrentAccount(null);
   };
 
-  // Thêm tài khoản
+  const handleOpenDeleteConfirm = (id) => {
+    setDeleteAccountId(id);
+    setOpenDeleteConfirm(true);
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    setOpenDeleteConfirm(false);
+    setDeleteAccountId(null);
+  };
+
   const handleAdd = async () => {
-    // Kiểm tra dữ liệu đầu vào
     if (!newAccount.fullName) {
       setError("Vui lòng nhập họ tên!");
       return;
@@ -277,13 +324,7 @@ const Team = () => {
 
       const response = await createAccount(formData, adminToken);
       if (response.code === 200) {
-        const newAccountData = {
-          ...response.data,
-          id: response.data._id,
-          stt: allAccounts.length + 1,
-        };
-        setAllAccounts([...allAccounts, newAccountData]);
-        setAccounts([...accounts, newAccountData]);
+        fetchAccounts(currentPage, searchText, statusFilter);
         handleClose();
         toast.success("Thêm tài khoản thành công!", { position: "top-right" });
       } else {
@@ -297,17 +338,30 @@ const Team = () => {
         "Thêm tài khoản thất bại!";
       setError(errorMessage);
       toast.error(errorMessage, { position: "top-right" });
+      console.error("Add account error:", err.response?.data);
     } finally {
       setLoading(false);
     }
   };
 
-  // Cập nhật tài khoản
   const handleUpdate = async () => {
     if (!newAccount.fullName || !newAccount.email || !newAccount.role_id) {
       setError("Vui lòng điền đầy đủ thông tin bắt buộc!");
       return;
     }
+    if (newAccount.password && newAccount.password !== newAccount.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp!");
+      return;
+    }
+    if (newAccount.phone && !/^\d{10,11}$/.test(newAccount.phone)) {
+      setError("Số điện thoại không hợp lệ!");
+      return;
+    }
+    if (newAccount.avatar && !(newAccount.avatar instanceof File)) {
+      setError("Ảnh đại diện không hợp lệ!");
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
@@ -315,6 +369,7 @@ const Team = () => {
       formData.append("email", newAccount.email);
       if (newAccount.password) {
         formData.append("password", newAccount.password);
+        formData.append("confirmPassword", newAccount.confirmPassword);
       }
       formData.append("phone", newAccount.phone || "");
       formData.append("role_id", newAccount.role_id);
@@ -323,15 +378,9 @@ const Team = () => {
         formData.append("avatar", newAccount.avatar);
       }
 
-      // Log formData để debug
-      for (let pair of formData.entries()) {
-        console.log(`${pair[0]}: ${pair[1]}`);
-      }
-
       const response = await updateAccount(currentId, formData);
       if (response.code === 200) {
-        // Làm mới danh sách tài khoản bằng cách gọi lại fetchAccounts
-        await fetchAccounts();
+        fetchAccounts(currentPage, searchText, statusFilter);
         handleClose();
         toast.success("Cập nhật tài khoản thành công!", { position: "top-right" });
       } else {
@@ -345,45 +394,39 @@ const Team = () => {
         "Cập nhật tài khoản thất bại!";
       setError(errorMessage);
       toast.error(errorMessage, { position: "top-right" });
+      console.error("Update account error:", err.response?.data);
     } finally {
       setLoading(false);
     }
   };
 
-  // Xóa tài khoản
-  const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa tài khoản này?")) {
-      setLoading(true);
-      try {
-        const response = await deleteAccount(id);
-        if (response.code === 200) {
-          setAllAccounts(allAccounts.filter((acc) => acc._id !== id));
-          setAccounts(accounts.filter((acc) => acc._id !== id));
-          toast.success("Xóa tài khoản thành công!", { position: "top-right" });
-        } else {
-          toast.error(response.message || "Xóa tài khoản thất bại!", { position: "top-right" });
-        }
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || "Xóa tài khoản thất bại!";
-        toast.error(errorMessage, { position: "top-right" });
-      } finally {
-        setLoading(false);
+  const handleConfirmDelete = async () => {
+    if (!deleteAccountId) return;
+    setLoading(true);
+    try {
+      const response = await deleteAccount(deleteAccountId);
+      if (response.code === 200) {
+        fetchAccounts(currentPage, searchText, statusFilter);
+        toast.success("Xóa tài khoản thành công!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Xóa tài khoản thất bại!", { position: "top-right" });
       }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || "Xóa tài khoản thất bại!";
+      toast.error(errorMessage, { position: "top-right" });
+      console.error("Delete account error:", err.response?.data);
+    } finally {
+      setLoading(false);
+      handleCloseDeleteConfirm();
     }
   };
 
-  // Thay đổi trạng thái tài khoản
   const handleChangeStatus = async (id, status) => {
     setLoading(true);
     try {
       const response = await changeAccountStatus(id, status);
       if (response.code === 200) {
-        setAllAccounts(allAccounts.map((acc) =>
-          acc._id === id ? { ...acc, status } : acc
-        ));
-        setAccounts(accounts.map((acc) =>
-          acc._id === id ? { ...acc, status } : acc
-        ));
+        fetchAccounts(currentPage, searchText, statusFilter);
         toast.success("Cập nhật trạng thái tài khoản thành công!", { position: "top-right" });
       } else {
         toast.error(response.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
@@ -391,6 +434,7 @@ const Team = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Cập nhật trạng thái thất bại!";
       toast.error(errorMessage, { position: "top-right" });
+      console.error("Change status error:", err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -421,12 +465,12 @@ const Team = () => {
       renderCell: ({ row }) => (
         <Box
           width="60%"
-          mt="25px"
           p="5px"
           display="flex"
           justifyContent="center"
           backgroundColor={colors.greenAccent[600]}
           borderRadius="4px"
+          mt="12px"
         >
           <Typography color={colors.grey[100]} sx={{ ml: "5px" }}>
             {roles[row.role_id] || "N/A"}
@@ -453,9 +497,9 @@ const Team = () => {
     {
       field: "actions",
       headerName: "Hành động",
-      flex: 2,
+      flex: 1.5,
       renderCell: (params) => (
-        <Box display="flex" gap={1} mt="25px">
+        <Box display="flex" mt="12px" gap={1}>
           <Button
             variant="contained"
             color="primary"
@@ -485,7 +529,7 @@ const Team = () => {
             color="error"
             size="small"
             startIcon={<DeleteIcon />}
-            onClick={() => handleDelete(params.row._id)}
+            onClick={() => handleOpenDeleteConfirm(params.row._id)}
           >
             Xóa
           </Button>
@@ -509,14 +553,28 @@ const Team = () => {
         theme="light"
         limit={3}
       />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-        <Box sx={{ gridColumn: 'span 12' }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Box display="flex" justifyContent="space-between" mb={2}>
             <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
               Quản lý nhân viên
             </Typography>
             <Box display="flex" gap={2}>
+              <FormControl sx={{ width: 150 }}>
+                <InputLabel>Lọc trạng thái</InputLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  label="Trạng thái"
+                  sx={{
+                    backgroundColor: colors.primary[400],
+                  }}
+                >
+                  <MenuItem value="all">Tất cả</MenuItem>
+                  <MenuItem value="active">Hoạt động</MenuItem>
+                  <MenuItem value="inactive">Không hoạt động</MenuItem>
+                </Select>
+              </FormControl>
               <Paper
                 component="form"
                 sx={{
@@ -549,8 +607,7 @@ const Team = () => {
             </Box>
           </Box>
         </Box>
-
-        <Box sx={{ gridColumn: 'span 12' }}>
+        <Box sx={{ gridColumn: "span 12" }}>
           <Box
             height="75vh"
             sx={{
@@ -587,6 +644,10 @@ const Team = () => {
               "& .MuiDataGrid-footerContainer": {
                 borderTop: "none",
                 backgroundColor: colors.blueAccent[700],
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px",
               },
               "& .MuiCheckbox-root": {
                 color: `${colors.greenAccent[200]} !important`,
@@ -598,29 +659,35 @@ const Team = () => {
                 <CircularProgress />
               </Box>
             ) : accounts.length === 0 ? (
-              <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-                <Typography variant="h4" color={colors.grey[100]}>
-                  Không có tài khoản nào để hiển thị
-                </Typography>
-              </Box>
+              <Typography variant="h6" align="center" mt={4}>
+                Không có tài khoản nào để hiển thị
+              </Typography>
             ) : (
-              <DataGrid
-                rows={accounts}
-                columns={columns}
-                pageSize={5}
-                rowsPerPageOptions={[5, 10, 20]}
-                disableSelectionOnClick
-                getRowHeight={() => 80}
-                sx={{
-                  width: "100%",
-                }}
-              />
+              <>
+                <DataGrid
+                  rows={accounts}
+                  columns={columns}
+                  getRowId={(row) => row._id}
+                  pagination={false}
+                  getRowHeight={() => 60}
+                  sx={{
+                    width: "100%",
+                  }}
+                  hideFooter={true}
+                />
+                <Box display="flex" justifyContent="center" mt={2}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              </>
             )}
           </Box>
         </Box>
       </Box>
-
-      {/* Modal thêm mới/chỉnh sửa */}
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle
           sx={{
@@ -637,44 +704,43 @@ const Team = () => {
               {error}
             </Typography>
           )}
-          {isEdit && (
-            <Box display="flex" flexDirection="column" alignItems="center" mb={2}>
-              <img
-                src={
-                  previewImage ||
-                  "/assets/default-avatar.png" // Thay bằng đường dẫn ảnh mặc định thực tế
-                }
-                alt="Avatar"
-                style={{
-                  width: "100px",
-                  height: "100px",
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  border: `2px solid ${colors.grey[100]}`,
+          <Box display="flex" flexDirection="column" alignItems="center" mb={2}>
+            <img
+              src={
+                previewImage ||
+                "/assets/default-avatar.png"
+              }
+              alt="Avatar"
+              style={{
+                width: "100px",
+                height: "100px",
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: `2px solid ${colors.grey[100]}`,
+              }}
+            />
+            <Box mt={1}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => fileInputRef.current.click()}
+                sx={{ fontWeight: "bold" }}
+              >
+                Chọn ảnh
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  setNewAccount({ ...newAccount, avatar: file });
+                  setPreviewImage(file ? URL.createObjectURL(file) : null);
                 }}
               />
-              <Box mt={1}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => fileInputRef.current.click()}
-                  sx={{ fontWeight: "bold" }}
-                >
-                  Chọn ảnh
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    setNewAccount({ ...newAccount, avatar: file });
-                    setPreviewImage(file ? URL.createObjectURL(file) : null);
-                  }}
-                />
-              </Box>
             </Box>
-          )}
+          </Box>
           <TextField
             fullWidth
             margin="normal"
@@ -696,28 +762,56 @@ const Team = () => {
             }
             required
           />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Mật khẩu"
-            type="password"
-            value={newAccount.password}
-            onChange={(e) =>
-              setNewAccount({ ...newAccount, password: e.target.value })
-            }
-            required={!isEdit}
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Xác nhận mật khẩu"
-            type="password"
-            value={newAccount.confirmPassword}
-            onChange={(e) =>
-              setNewAccount({ ...newAccount, confirmPassword: e.target.value })
-            }
-            required={!isEdit}
-          />
+          {!isEdit && (
+            <>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Mật khẩu"
+                type="password"
+                value={newAccount.password}
+                onChange={(e) =>
+                  setNewAccount({ ...newAccount, password: e.target.value })
+                }
+                required
+              />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Xác nhận mật khẩu"
+                type="password"
+                value={newAccount.confirmPassword}
+                onChange={(e) =>
+                  setNewAccount({ ...newAccount, confirmPassword: e.target.value })
+                }
+                required
+              />
+            </>
+          )}
+          {isEdit && (
+            <>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Mật khẩu mới (nếu muốn thay đổi)"
+                type="password"
+                value={newAccount.password}
+                onChange={(e) =>
+                  setNewAccount({ ...newAccount, password: e.target.value })
+                }
+              />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Xác nhận mật khẩu mới"
+                type="password"
+                value={newAccount.confirmPassword}
+                onChange={(e) =>
+                  setNewAccount({ ...newAccount, confirmPassword: e.target.value })
+                }
+              />
+            </>
+          )}
           <TextField
             fullWidth
             margin="normal"
@@ -757,20 +851,6 @@ const Team = () => {
               <MenuItem value="inactive">Không hoạt động</MenuItem>
             </Select>
           </FormControl>
-          {!isEdit && (
-            <TextField
-              fullWidth
-              margin="normal"
-              label="Ảnh đại diện"
-              type="file"
-              InputLabelProps={{ shrink: true }}
-              onChange={(e) => {
-                const file = e.target.files[0];
-                setNewAccount({ ...newAccount, avatar: file });
-                setPreviewImage(file ? URL.createObjectURL(file) : null);
-              }}
-            />
-          )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -798,9 +878,7 @@ const Team = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Modal chi tiết */}
-      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="xs" fullWidth>
+      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="sm" fullWidth>
         <DialogTitle
           sx={{
             fontWeight: "bold",
@@ -812,13 +890,12 @@ const Team = () => {
         </DialogTitle>
         <DialogContent>
           {currentAccount ? (
-            <Box display="flex" gap={3}>
-              {/* Left: Avatar */}
-              <Box ml="20px" mt="25px">
+            <Box>
+              <Box display="flex" justifyContent="center" mb={2}>
                 <img
                   src={
                     currentAccount.avatar ||
-                    "/assets/default-avatar.png" 
+                    "/assets/default-avatar.png"
                   }
                   alt="Avatar"
                   style={{
@@ -830,40 +907,22 @@ const Team = () => {
                   }}
                 />
               </Box>
-              {/* Right: Account Details */}
-              <Box flex={1}>
-                <Box ml={6} mt={1}>
-                  <Typography component="span" fontWeight="bold">
-                    Họ và tên:
-                  </Typography>{" "}
-                  <Typography component="span">{currentAccount.fullName || "N/A"}</Typography>
-                </Box>
-                <Box ml={6} mt={1}>
-                  <Typography component="span" fontWeight="bold">
-                    Email:
-                  </Typography>{" "}
-                  <Typography component="span">{currentAccount.email || "N/A"}</Typography>
-                </Box>
-                <Box ml={6} mt={1}>
-                  <Typography component="span" fontWeight="bold">
-                    Số điện thoại:
-                  </Typography>{" "}
-                  <Typography component="span">{currentAccount.phone || "N/A"}</Typography>
-                </Box>
-                <Box ml={6} mt={1}>
-                  <Typography component="span" fontWeight="bold">
-                    Chức vụ:
-                  </Typography>{" "}
-                  <Typography component="span">{roles[currentAccount.role_id] || "N/A"}</Typography>
-                </Box>
-                <Box ml={6} mt={1}>
-                  <Typography component="span" fontWeight="bold">
-                    Trạng thái:
-                  </Typography>{" "}
-                  <Typography component="span">
-                    {currentAccount.status === "active" ? "Hoạt động" : "Không hoạt động"}
-                  </Typography>
-                </Box>
+              <Box>
+                <Typography variant="h5">
+                  <strong>Họ và tên:</strong> {currentAccount.fullName || "N/A"}
+                </Typography>
+                <Typography variant="h5">
+                  <strong>Email:</strong> {currentAccount.email || "N/A"}
+                </Typography>
+                <Typography variant="h5">
+                  <strong>Số điện thoại:</strong> {currentAccount.phone || "N/A"}
+                </Typography>
+                <Typography variant="h5">
+                  <strong>Chức vụ:</strong> {roles[currentAccount.role_id] || "N/A"}
+                </Typography>
+                <Typography variant="h5">
+                  <strong>Trạng thái:</strong> {currentAccount.status === "active" ? "Hoạt động" : "Không hoạt động"}
+                </Typography>
               </Box>
             </Box>
           ) : (
@@ -878,6 +937,39 @@ const Team = () => {
             sx={{ fontWeight: "bold" }}
           >
             Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm} maxWidth="xs" fullWidth>
+        <DialogTitle
+          sx={{
+            fontWeight: "bold",
+            fontSize: "1.3rem",
+            textAlign: "center",
+          }}
+        >
+          Xác nhận xóa tài khoản
+        </DialogTitle>
+        <DialogContent>
+          <Typography>Bạn có chắc chắn muốn xóa tài khoản này không?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCloseDeleteConfirm}
+            color="primary"
+            variant="contained"
+            sx={{ fontWeight: "bold" }}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            sx={{ fontWeight: "bold" }}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : "Xóa"}
           </Button>
         </DialogActions>
       </Dialog>

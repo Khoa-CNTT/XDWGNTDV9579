@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Button,
@@ -13,6 +13,10 @@ import {
     MenuItem,
     CircularProgress,
     Typography,
+    Pagination,
+    FormControl,
+    InputLabel,
+    Select,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -39,8 +43,11 @@ const CategoryControl = () => {
     const colors = tokens(theme.palette.mode);
     const { adminToken } = useAdminAuth();
     const [categories, setCategories] = useState([]);
-    const [allCategories, setAllCategories] = useState([]); // Lưu toàn bộ danh mục từ API
+    const [allCategories, setAllCategories] = useState([]);
     const [searchText, setSearchText] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [sortOption, setSortOption] = useState("none");
+    const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [currentId, setCurrentId] = useState(null);
@@ -53,76 +60,274 @@ const CategoryControl = () => {
     const [imageFile, setImageFile] = useState(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [openImageDialog, setOpenImageDialog] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentCategoryImages, setCurrentCategoryImages] = useState([]);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const limitItems = 10;
+    const [totalPages, setTotalPages] = useState(1);
 
-    // Thêm event listener để theo dõi sự thay đổi của Sidebar
+    // Chuẩn hóa từ khóa tìm kiếm
+    const normalizeSearchText = (text) => {
+        return text
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    };
+
+    // Lấy danh sách danh mục từ API
+    const fetchCategories = useCallback(
+        async (page = 1, search = "", status = "all", sortKey = "", sortValue = "") => {
+            setLoading(true);
+            try {
+                const params = { page, limit: limitItems };
+                if (search) {
+                    params.search = search;
+                }
+                if (status !== "all") {
+                    params.status = status;
+                }
+                if (sortKey && sortValue) {
+                    params.sortKey = sortKey;
+                    params.sortValue = sortValue;
+                }
+                const data = await getCategories(params);
+                const totalRecords = data.totalRecords || data.categories.length;
+                const formattedData = Array.isArray(data.categories)
+                    ? data.categories.map((item, index) => {
+                        let stt;
+                        if (sortKey === "_id" && sortValue === "desc") {
+                            stt = totalRecords - ((page - 1) * limitItems + index);
+                        } else {
+                            stt = (page - 1) * limitItems + index + 1;
+                        }
+                        return {
+                            ...item,
+                            id: item._id,
+                            stt: stt,
+                        };
+                    })
+                    : [];
+                setAllCategories(formattedData);
+                setCategories(formattedData);
+                setTotalPages(data.totalPage || 1);
+                if (formattedData.length === 0) {
+                    toast.info(
+                        search
+                            ? `Không tìm thấy danh mục nào với từ khóa "${searchText}"!`
+                            : "Không có danh mục nào để hiển thị!",
+                        { position: "top-right" }
+                    );
+                }
+            } catch (err) {
+                const errorMessage = err.response?.data?.message || "Không thể tải danh sách danh mục!";
+                setError(errorMessage);
+                toast.error(errorMessage, { position: "top-right" });
+                console.error("Fetch categories error:", err.response?.data);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [limitItems]
+    );
+
+    // Hàm làm mới dữ liệu danh mục
+    const refreshCategories = useCallback(
+        async (page = 1, searchQuery = "", status = statusFilter, sortKey = "", sortValue = "") => {
+            const normalizedQuery = normalizeSearchText(searchQuery);
+            await fetchCategories(page, normalizedQuery, status, sortKey, sortValue);
+        },
+        [fetchCategories, statusFilter]
+    );
+
+    // Theo dõi trạng thái sidebar
     useEffect(() => {
         const handleSidebarChange = (event) => {
             setIsSidebarCollapsed(event.detail.isCollapsed);
         };
-
-        window.addEventListener('sidebarCollapse', handleSidebarChange);
+        window.addEventListener("sidebarCollapse", handleSidebarChange);
         return () => {
-            window.removeEventListener('sidebarCollapse', handleSidebarChange);
+            window.removeEventListener("sidebarCollapse", handleSidebarChange);
         };
     }, []);
 
-    // Lấy danh sách danh mục từ API
-    const fetchCategories = async () => {
-        setLoading(true);
-        try {
-            const data = await getCategories(); // Không gửi tham số title
-            const formattedData = Array.isArray(data)
-                ? data.map((item, index) => ({
-                    ...item,
-                    id: item._id,
-                    stt: index + 1,
-                }))
-                : [];
-            setAllCategories(formattedData); // Lưu toàn bộ danh mục
-            setCategories(formattedData); // Hiển thị ban đầu
-        } catch (err) {
-            const errorMessage = err.response?.data?.message || "Không thể tải danh sách danh mục!";
-            setError(errorMessage);
-            toast.error(errorMessage, { position: "top-right" });
-            console.error("Fetch categories error:", err.response?.data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Khởi tạo dữ liệu khi component mount
     useEffect(() => {
         const token = adminToken || localStorage.getItem("adminToken");
-        console.log("adminToken in CategoryControl:", token);
         if (token) {
-            fetchCategories();
+            fetchCategories(currentPage, "", statusFilter);
         } else {
             toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
             setTimeout(() => {
                 window.location.href = "/loginadmin";
-            }, 2000); // Đợi 2 giây để hiển thị toast
+            }, 2000);
         }
-    }, [adminToken]);
+    }, [adminToken, currentPage, fetchCategories, statusFilter]);
 
-    // Xử lý tìm kiếm ở frontend
-    useEffect(() => {
-        const filteredCategories = allCategories.filter((category) =>
-            category.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setCategories(filteredCategories);
-    }, [searchText, allCategories]);
-
-    // Xử lý tìm kiếm thủ công khi nhấn nút
-    const handleSearch = (e) => {
+    // Xử lý tìm kiếm
+    const handleSearch = async (e) => {
         e.preventDefault();
-        const filteredCategories = allCategories.filter((category) =>
-            category.title.toLowerCase().includes(searchText.toLowerCase())
-        );
-        setCategories(filteredCategories);
+        setIsSearching(true);
+        try {
+            setCurrentPage(1);
+            let sortKey = "";
+            let sortValue = "";
+            switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
+                case "title_asc":
+                    sortKey = "title";
+                    sortValue = "asc";
+                    break;
+                case "title_desc":
+                    sortKey = "title";
+                    sortValue = "desc";
+                    break;
+                default:
+                    break;
+            }
+            const normalizedValue = normalizeSearchText(searchText);
+            await refreshCategories(1, normalizedValue, statusFilter, sortKey, sortValue);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Xử lý thay đổi văn bản tìm kiếm
+    const handleSearchTextChange = (e) => {
+        setSearchText(e.target.value);
+    };
+
+    // Xử lý thay đổi trạng thái bộ lọc
+    const handleStatusFilterChange = (event) => {
+        setStatusFilter(event.target.value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        switch (sortOption) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        refreshCategories(1, searchText, event.target.value, sortKey, sortValue);
+    };
+
+    // Xử lý thay đổi sắp xếp từ dropdown
+    const handleSortChange = (event) => {
+        const value = event.target.value;
+        setSortOption(value);
+        setCurrentPage(1);
+        let sortKey = "";
+        let sortValue = "";
+        let sortField = "";
+        switch (value) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                sortField = "stt";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                sortField = "stt";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                sortField = "title";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                sortField = "title";
+                break;
+            default:
+                break;
+        }
+        refreshCategories(1, searchText, statusFilter, sortKey, sortValue);
+        if (sortKey && sortValue) {
+            setSortModel([{ field: sortField, sort: sortValue }]);
+        } else {
+            setSortModel([]);
+        }
+    };
+
+    // Xử lý thay đổi trang
+    const handlePageChange = (event, value) => {
+        setCurrentPage(value);
+        let sortKey = "";
+        let sortValue = "";
+        switch (sortOption) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                break;
+            case "title_asc":
+                sortKey = "title";
+                sortValue = "asc";
+                break;
+            case "title_desc":
+                sortKey = "title";
+                sortValue = "desc";
+                break;
+            default:
+                break;
+        }
+        refreshCategories(value, searchText, statusFilter, sortKey, sortValue);
+    };
+
+    // Xử lý sắp xếp từ DataGrid
+    const handleSortModelChange = (newSortModel) => {
+        setSortModel(newSortModel);
+        setCurrentPage(1);
+        if (newSortModel.length > 0) {
+            const { field, sort } = newSortModel[0];
+            let sortKey = "";
+            let sortOptionValue = "";
+            if (field === "stt") {
+                sortKey = "_id";
+                sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+            } else if (field === "title") {
+                sortKey = field;
+                sortOptionValue = sort === "asc" ? "title_asc" : "title_desc";
+            }
+            if (sortKey) {
+                setSortOption(sortOptionValue);
+                refreshCategories(1, searchText, statusFilter, sortKey, sort);
+            }
+        } else {
+            setSortOption("none");
+            refreshCategories(1, searchText, statusFilter);
+        }
     };
 
     // Mở modal thêm mới
@@ -166,7 +371,7 @@ const CategoryControl = () => {
 
             const response = await createCategory(formData);
             if (response.code === 200) {
-                fetchCategories();
+                refreshCategories(currentPage, searchText, statusFilter);
                 handleClose();
                 toast.success("Thêm danh mục thành công!", { position: "top-right" });
             } else {
@@ -216,7 +421,7 @@ const CategoryControl = () => {
 
             const response = await updateCategory(currentId, formData);
             if (response.code === 200) {
-                fetchCategories();
+                refreshCategories(currentPage, searchText, statusFilter);
                 handleClose();
                 toast.success("Cập nhật danh mục thành công!", { position: "top-right" });
             } else {
@@ -240,7 +445,7 @@ const CategoryControl = () => {
             try {
                 const response = await deleteCategory(id);
                 if (response.code === 200) {
-                    fetchCategories();
+                    refreshCategories(currentPage, searchText, statusFilter);
                     toast.success("Xóa danh mục thành công!", { position: "top-right" });
                 } else {
                     setError(response.message || "Xóa danh mục thất bại!");
@@ -264,7 +469,7 @@ const CategoryControl = () => {
         try {
             const response = await changeCategoryStatus(id, newStatus);
             if (response.code === 200) {
-                fetchCategories();
+                refreshCategories(currentPage, searchText, statusFilter);
                 toast.success("Cập nhật trạng thái thành công!", { position: "top-right" });
             } else {
                 setError(response.message || "Cập nhật trạng thái thất bại!");
@@ -283,7 +488,7 @@ const CategoryControl = () => {
     const handleImageClick = (image, category) => {
         setSelectedImage(image);
         setCurrentImageIndex(0);
-        setCurrentCategoryImages([image]); // Khởi tạo với hình ảnh hiện tại
+        setCurrentCategoryImages([image]);
         setOpenImageDialog(true);
     };
 
@@ -311,13 +516,14 @@ const CategoryControl = () => {
             field: "stt",
             headerName: "STT",
             flex: 0.3,
-            headerClassName: 'header-stt',
+            headerClassName: "header-stt",
+            sortable: true,
         },
         {
             field: "image",
             headerName: "Hình ảnh",
             flex: 0.5,
-            headerClassName: 'header-image',
+            headerClassName: "header-image",
             renderCell: (params) => (
                 <Box
                     sx={{
@@ -354,19 +560,20 @@ const CategoryControl = () => {
             field: "title",
             headerName: "Tiêu đề",
             flex: 1,
-            headerClassName: 'header-title',
+            headerClassName: "header-title",
+            sortable: true,
         },
         {
             field: "description",
             headerName: "Mô tả",
             flex: 1,
-            headerClassName: 'header-description',
+            headerClassName: "header-description",
         },
         {
             field: "status",
             headerName: "Trạng thái",
             flex: 0.5,
-            headerClassName: 'header-status',
+            headerClassName: "header-status",
             renderCell: (params) => (
                 <Box
                     sx={{
@@ -398,7 +605,7 @@ const CategoryControl = () => {
             field: "actions",
             headerName: "Hành động",
             flex: 0.8,
-            headerClassName: 'header-actions',
+            headerClassName: "header-actions",
             renderCell: (params) => (
                 <Box
                     sx={{
@@ -437,6 +644,7 @@ const CategoryControl = () => {
             ),
         },
     ];
+
     return (
         <Box m="20px">
             <ToastContainer
@@ -453,13 +661,53 @@ const CategoryControl = () => {
                 limit={3}
             />
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 2 }}>
-                <Box sx={{ gridColumn: 'span 12' }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 2 }}>
+                <Box sx={{ gridColumn: "span 12" }}>
                     <Box display="flex" justifyContent="space-between" mb={2}>
                         <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
                             Quản lý danh mục tour
                         </Typography>
                         <Box display="flex" gap={2}>
+                            <FormControl sx={{ width: 150 }}>
+                                <InputLabel>Sắp xếp</InputLabel>
+                                <Select
+                                    value={sortOption}
+                                    onChange={handleSortChange}
+                                    label="Sắp xếp"
+                                    sx={{
+                                        backgroundColor: colors.primary[400],
+                                    }}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                maxHeight: 250,
+                                                overflowY: "auto",
+                                            },
+                                        },
+                                    }}
+                                >
+                                    <MenuItem value="none">Không sắp xếp</MenuItem>
+                                    <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                                    <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                                    <MenuItem value="title_asc">Tiêu đề: Tăng dần</MenuItem>
+                                    <MenuItem value="title_desc">Tiêu đề: Giảm dần</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl sx={{ width: 150 }}>
+                                <InputLabel>Lọc trạng thái</InputLabel>
+                                <Select
+                                    value={statusFilter}
+                                    onChange={handleStatusFilterChange}
+                                    label="Trạng thái"
+                                    sx={{
+                                        backgroundColor: colors.primary[400],
+                                    }}
+                                >
+                                    <MenuItem value="all">Tất cả</MenuItem>
+                                    <MenuItem value="active">Hoạt động</MenuItem>
+                                    <MenuItem value="inactive">Tạm ngưng</MenuItem>
+                                </Select>
+                            </FormControl>
                             <Paper
                                 component="form"
                                 sx={{
@@ -473,12 +721,12 @@ const CategoryControl = () => {
                             >
                                 <InputBase
                                     sx={{ ml: 1, flex: 1 }}
-                                    placeholder="Tìm kiếm danh mục (theo tiêu đề)"
+                                    placeholder="Tìm kiếm danh mục (nhấn Enter)"
                                     value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
+                                    onChange={handleSearchTextChange}
                                 />
-                                <IconButton type="submit" sx={{ p: "10px" }}>
-                                    <SearchIcon />
+                                <IconButton type="submit" sx={{ p: "10px" }} disabled={isSearching}>
+                                    {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
                                 </IconButton>
                             </Paper>
                             <Button
@@ -493,68 +741,71 @@ const CategoryControl = () => {
                     </Box>
                 </Box>
 
-                <Box sx={{ gridColumn: 'span 12' }}>
-                    <Box
-                        height="75vh"
-                        sx={{
-                            "& .MuiDataGrid-root": {
-                                border: "none",
-                                width: "100%",
-                            },
-                            "& .MuiDataGrid-main": {
-                                width: "100%",
-                            },
-                            "& .MuiDataGrid-cell": {
-                                borderBottom: "none",
-                            },
-                            "& .MuiDataGrid-columnHeaders": {
-                                backgroundColor: colors.blueAccent[700],
-                                borderBottom: "none",
-                                color: colors.grey[100],
-                                fontSize: "14px",
-                                fontWeight: "bold",
-                            },
-                            "& .MuiDataGrid-columnHeader": {
-                                backgroundColor: colors.blueAccent[700],
-                                color: colors.grey[100],
-                                fontSize: "14px",
-                                fontWeight: "bold",
-                            },
-                            "& .MuiDataGrid-columnHeaderTitle": {
-                                color: colors.grey[100],
-                                fontWeight: "bold",
-                            },
-                            "& .MuiDataGrid-virtualScroller": {
-                                backgroundColor: colors.primary[400],
-                            },
-                            "& .MuiDataGrid-footerContainer": {
-                                borderTop: "none",
-                                backgroundColor: colors.blueAccent[700],
-                            },
-                            "& .MuiCheckbox-root": {
-                                color: `${colors.greenAccent[200]} !important`,
-                            },
-                        }}
-                    >
-                        {loading ? (
-                            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-                                <CircularProgress />
-                            </Box>
-                        ) : (
+                <Box
+                    sx={{
+                        gridColumn: "span 12",
+                        height: "75vh",
+                        "& .MuiDataGrid-root": { border: "none", width: "100%" },
+                        "& .MuiDataGrid-main": { width: "100%" },
+                        "& .MuiDataGrid-cell": { borderBottom: "none" },
+                        "& .MuiDataGrid-columnHeaders": {
+                            backgroundColor: colors.blueAccent[700],
+                            borderBottom: "none",
+                            color: colors.grey[100],
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                        },
+                        "& .MuiDataGrid-columnHeader": {
+                            backgroundColor: colors.blueAccent[700],
+                            color: colors.grey[100],
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                        },
+                        "& .MuiDataGrid-columnHeaderTitle": {
+                            color: colors.grey[100],
+                            fontWeight: "bold",
+                        },
+                        "& .MuiDataGrid-virtualScroller": {
+                            backgroundColor: colors.primary[400],
+                        },
+                        "& .MuiDataGrid-footerContainer": {
+                            borderTop: "none",
+                            backgroundColor: colors.blueAccent[700],
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px",
+                        },
+                    }}
+                >
+                    {loading ? (
+                        <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                            <CircularProgress />
+                        </Box>
+                    ) : (
+                        <>
                             <DataGrid
                                 rows={categories}
                                 columns={columns}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10, 20]}
                                 disableSelectionOnClick
                                 getRowHeight={() => 80}
-                                // autoHeight
-                                sx={{
-                                    width: "100%",
-                                }}
+                                sx={{ width: "100%" }}
+                                pagination={false}
+                                hideFooter={true}
+                                sortingMode="server"
+                                sortModel={sortModel}
+                                onSortModelChange={handleSortModelChange}
                             />
-                        )}
-                    </Box>
+                            <Box display="flex" justifyContent="center" mt={2}>
+                                <Pagination
+                                    count={totalPages}
+                                    page={currentPage}
+                                    onChange={handlePageChange}
+                                    color="primary"
+                                />
+                            </Box>
+                        </>
+                    )}
                 </Box>
             </Box>
 
@@ -663,7 +914,6 @@ const CategoryControl = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Dialog xem hình ảnh to */}
             <Dialog
                 open={openImageDialog}
                 onClose={handleCloseImageDialog}
