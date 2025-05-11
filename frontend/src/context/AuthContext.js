@@ -3,11 +3,11 @@ import { toast } from "react-toastify";
 import { verifyToken, logout as logoutService } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 
-const Auth_Context = createContext({
+const AuthContext = createContext({
   user: null,
   token: null,
-  login: () => { },
-  logout: () => { },
+  login: () => {},
+  logout: () => {},
   loading: false,
 });
 
@@ -101,14 +101,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <Auth_Context.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
       {children}
-    </Auth_Context.Provider>
+    </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  const context = useContext(Auth_Context);
+  const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };

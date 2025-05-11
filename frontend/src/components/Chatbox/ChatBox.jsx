@@ -1,66 +1,94 @@
-import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
-import { FaComments, FaTimes } from "react-icons/fa";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { FaComments, FaTimes, FaTrash } from "react-icons/fa";
+import api from "../../utils/api";
+import { toast } from "react-toastify";
 import "./chatbox.css";
 
 const ChatBox = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Cuộn xuống cuối danh sách tin nhắn
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Tải lịch sử chat khi mở chatbox
+  useEffect(() => {
+    if (isOpen) {
+      fetchChatHistory();
+    }
+  }, [isOpen]);
+
+  const fetchChatHistory = async () => {
+    try {
+      const response = await api.get("/chats");
+      if (response.data.code === 200) {
+        const history = response.data.history || [];
+        const formattedMessages = history.map(msg => ({
+          text: msg.content,
+          sender: msg.role === "user" ? "user" : "bot"
+        }));
+        setMessages(formattedMessages);
+      } else {
+        setMessages([{ text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" }]);
+        toast.error(response.data.message || "Không thể tải lịch sử!");
+      }
+    } catch (error) {
+      toast.error("Không thể tải lịch sử trò chuyện!");
+      setMessages([{ text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" }]);
+    }
+  };
 
   const toggleChatbox = () => {
     setIsOpen(!isOpen);
   };
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  // Debounce gửi tin nhắn
+  const sendMessage = useCallback(async () => {
+    if (!input.trim() || isLoading) return;
 
     const userMessage = { text: input, sender: "user" };
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    setMessages((prevMessages) => [...prevMessages, { ...userMessage, animate: true }]);
     setInput("");
+    setIsLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Delay 2 giây
-      const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          model: "gpt-3.5-turbo",
-          messages: [{ role: "user", content: input }],
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-          },
-        }
-      );
-
+      const response = await api.post("/chats", { message: userMessage.text });
       const botMessage = {
-        text: response.data.choices[0]?.message?.content || "Xin lỗi, tôi không hiểu!",
+        text: response.data.reply || "Xin lỗi, tôi không hiểu!",
         sender: "bot",
+        animate: true,
       };
       setMessages((prevMessages) => [...prevMessages, botMessage]);
     } catch (error) {
-      console.error("Lỗi khi gọi API:", error);
-      let errorMessage = "Xin lỗi, có lỗi xảy ra!";
-      if (error.response?.status === 429) {
-        errorMessage = "Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau vài phút!";
-      }
+      const errorMessage = error.response?.data?.error || "Có lỗi xảy ra!";
       setMessages((prevMessages) => [
         ...prevMessages,
-        { text: errorMessage, sender: "bot" },
+        { text: errorMessage, sender: "bot", animate: true },
       ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [input, isLoading]);
+
+  const clearChatHistory = async () => {
+    try {
+      const response = await api.patch("/chats/clear");
+      if (response.data.code === 200) {
+        toast.success(response.data.message || "Đã xóa lịch sử!");
+        setMessages([{ text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" }]);
+      } else {
+        toast.error(response.data.message || "Không thể xóa lịch sử!");
+      }
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi xóa lịch sử!");
     }
   };
 
-  // Hỗ trợ gửi tin nhắn bằng phím Enter
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
       sendMessage();
@@ -78,27 +106,43 @@ const ChatBox = () => {
         <div className="chatbox">
           <div className="chat-header">
             <span>Hỗ trợ tư vấn</span>
-            <button className="close-btn" onClick={toggleChatbox}>
-              <FaTimes />
-            </button>
+            <div>
+              <button className="clear-btn" onClick={clearChatHistory}>
+                <FaTrash /> Xóa
+              </button>
+              <button className="close-btn" onClick={toggleChatbox}>
+                <FaTimes />
+              </button>
+            </div>
           </div>
           <div className="chatbox-messages">
             {messages.map((msg, index) => (
-              <div key={index} className={`message ${msg.sender}`}>
+              <div
+                key={index}
+                className={`message ${msg.sender} ${msg.animate ? "fade-in" : ""}`}
+              >
                 {msg.text}
               </div>
             ))}
+            {isLoading && (
+              <div className="message bot">
+                <span className="loading-dots">Đang xử lý...</span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
           <div className="chatbox-input">
-            <input  
+            <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress} // Thêm sự kiện Enter
+              onKeyPress={handleKeyPress}
               placeholder="Nhập tin nhắn..."
+              disabled={isLoading}
             />
-            <button onClick={sendMessage}>Gửi</button>
+            <button onClick={sendMessage} disabled={isLoading}>
+              {isLoading ? "..." : "Gửi"}
+            </button>
           </div>
         </div>
       )}

@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -8,7 +7,7 @@ import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
 import ReceiptOutlinedIcon from "@mui/icons-material/ReceiptOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
@@ -21,7 +20,11 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
 import AppsOutageIcon from '@mui/icons-material/AppsOutage';
-
+import BusinessIcon from '@mui/icons-material/Business';
+import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
+import { useState, useEffect } from "react";
+import { getGeneralSettings } from "../../Admin/Setting/SettingApi";
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
@@ -38,9 +41,7 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
       <Typography>{title}</Typography>
       <Link to={to} />
     </MenuItem>
-
   );
-
 };
 
 const Sidebar = () => {
@@ -48,6 +49,27 @@ const Sidebar = () => {
   const colors = tokens(theme.palette.mode);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selected, setSelected] = useState("Dashboard");
+  const [settings, setSettings] = useState({
+    websiteName: "GoTravel",
+    logo: ""
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await getGeneralSettings();
+        if (data) {
+          setSettings({
+            websiteName: data.websiteName || "GoTravel",
+            logo: data.logo || ""
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching settings in Sidebar:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   return (
     <Box
@@ -67,6 +89,8 @@ const Sidebar = () => {
         "& .pro-menu-item.active": {
           color: "#6870fa !important",
         },
+        boxShadow: "5px 0 10px rgba(0, 0, 0, 0.2)", // Adjusted shadow to cast to the right
+        zIndex: 2,
       }}
     >
       <ProSidebar collapsed={isCollapsed}>
@@ -101,11 +125,11 @@ const Sidebar = () => {
             <Box mb="25px">
               <Box display="flex" justifyContent="center" alignItems="center">
                 <img
-                  alt="profile-user"
+                  alt="website-logo"
                   width="100px"
                   height="100px"
-                  src={`../../assets/user.png`}
-                  style={{ cursor: "pointer", borderRadius: "50%" }}
+                  src={settings.logo || "https://images.seeklogo.com/logo-png/39/1/go-travel-logo-png_seeklogo-399837.png"}
+                  style={{ cursor: "pointer", borderRadius: "50%", border: "2px solid" }}
                 />
               </Box>
               <Box textAlign="center">
@@ -115,15 +139,11 @@ const Sidebar = () => {
                   fontWeight="bold"
                   sx={{ m: "10px 0 0 0" }}
                 >
-                  Nguyên
-                </Typography>
-                <Typography variant="h5" color={colors.greenAccent[500]}>
-                  Admin
+                  {settings.websiteName}
                 </Typography>
               </Box>
             </Box>
           )}
-
 
           <Box paddingLeft={isCollapsed ? undefined : "10%"}>
             <Item
@@ -158,7 +178,7 @@ const Sidebar = () => {
             />
 
             <Item
-              title="Quản lý đơn hàng"
+              title="Quản lý hoá đơn"
               to="/admin/invoices"
               icon={<ReceiptOutlinedIcon />}
               selected={selected}
@@ -174,13 +194,28 @@ const Sidebar = () => {
             />
 
             <Item
+              title="Quản lý khách sạn"
+              to="/admin/hotel"
+              icon={<BusinessIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Item
+              title="Quản lý Review"
+              to="/admin/review"
+              icon={<RateReviewOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Item
               title="Quản lý khách hàng"
               to="/admin/contacts"
               icon={<ContactsOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
-
 
             <Typography
               variant="h6"
@@ -206,20 +241,12 @@ const Sidebar = () => {
               setSelected={setSelected}
             />
 
-            {/* <Item
-              title="FAQ Page"
-              to="/admin/faq"
-              icon={<HelpOutlineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
-
             <Typography
               variant="h6"
               color={colors.grey[300]}
               sx={{ m: "15px 0 5px 20px" }}
             >
-              Charts
+              Doanh thu
             </Typography>
 
             <Item
@@ -229,37 +256,17 @@ const Sidebar = () => {
               selected={selected}
               setSelected={setSelected}
             />
-            {/* <Item
-              title="Pie Chart"
-              to="/admin/pie"
-              icon={<PieChartOutlineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Line Chart"
-              to="/admin/line"
-              icon={<TimelineOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
-            {/* <Item
-              title="Geography Chart"
-              to="/admin/geography"
-              icon={<MapOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            /> */}
+
             <Typography
               variant="h6"
               color={colors.grey[300]}
               sx={{ m: "15px 0 5px 20px" }}
             >
-              Pages
+              Nội bộ
             </Typography>
 
             <Item
-              title="Đội Ngũ"
+              title="Quản lý nhân viên"
               to="/admin/team"
               icon={<PeopleOutlinedIcon />}
               selected={selected}
@@ -267,18 +274,16 @@ const Sidebar = () => {
             />
 
             <Item
-              title="Tài khoản Admin"
-              to="/admin/form"
-              icon={<PersonOutlinedIcon />}
+              title="Cài đặt website"
+              to="/admin/settings"
+              icon={<SettingsOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
-
           </Box>
         </Menu>
       </ProSidebar>
     </Box>
-
   );
 };
 

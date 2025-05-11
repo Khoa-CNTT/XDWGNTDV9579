@@ -1,4 +1,3 @@
-// src/components/AdvanceSearch/AdvanceSearch.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../AdvanceSearch/search.css";
@@ -9,36 +8,47 @@ import { toast } from "react-toastify";
 const AdvanceSearch = () => {
   const [searchTab, setSearchTab] = useState("tour");
   const [searchQuery, setSearchQuery] = useState("");
-  const [relatedKeywords, setRelatedKeywords] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Gọi API để lấy gợi ý và từ khóa liên quan khi người dùng nhập
+  // Gọi API để lấy gợi ý khi người dùng nhập
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (!searchQuery) {
-        setRelatedKeywords([]);
         setSuggestions([]);
         return;
       }
 
       try {
-        const endpoint = searchTab === "tour" ? "/tours/search" : "/hotels/search";
+        const endpoint = searchTab === "tour" ? "/search/tours" : "/search/hotels";
         const response = await api.get(endpoint, {
-          params: { query: searchQuery },
+          params: { keyword: searchQuery, mode: "suggestion" },
         });
-        // Giả định API trả về cả từ khóa liên quan và kết quả
-        setRelatedKeywords(response.data.relatedKeywords || []);
-        setSuggestions(response.data.results || []);
+
+        if (response.data.code === 200) {
+          const items = searchTab === "tour" ? response.data.tours : response.data.hotels;
+          // Chuẩn hóa dữ liệu để khớp với giao diện
+          const formattedSuggestions = items.map(item => ({
+            _id: item._id,
+            name: searchTab === "tour" ? item.title : item.name,
+            image: item.avatar,
+            description: searchTab === "tour" ? "Tour du lịch" : `${item.location.city}, ${item.location.country}`,
+            slug: item.slug
+          }));
+          setSuggestions(formattedSuggestions);
+        } else {
+          toast.error(response.data.message || "Không thể lấy gợi ý!");
+          setSuggestions([]);
+        }
       } catch (error) {
         console.error("Lỗi khi lấy gợi ý:", error);
-        setRelatedKeywords([]);
+        toast.error("Có lỗi xảy ra khi lấy gợi ý!");
         setSuggestions([]);
       }
     };
 
-    const debounce = setTimeout(fetchSuggestions, 300); // Debounce để tránh gọi API quá nhiều
+    const debounce = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(debounce);
   }, [searchQuery, searchTab]);
 
@@ -52,18 +62,21 @@ const AdvanceSearch = () => {
     setLoading(true);
 
     try {
-      if (searchTab === "tour") {
-        const response = await api.get("/tours", {
-          params: { query: searchQuery },
-        });
-        navigate("/tours", { state: { tours: response.data } });
+      const endpoint = searchTab === "tour" ? "/search/tours" : "/search/hotels";
+      const response = await api.get(endpoint, {
+        params: { keyword: searchQuery, mode: "full" },
+      });
+
+      if (response.data.code === 200) {
+        if (searchTab === "tour") {
+          navigate("/tours", { state: { tours: response.data.tours } });
+        } else {
+          navigate("/hotel-services", { state: { hotels: response.data.hotels } });
+        }
+        toast.success("Tìm kiếm thành công!");
       } else {
-        const response = await api.get("/hotels", {
-          params: { query: searchQuery },
-        });
-        navigate("/hotel-services", { state: { hotels: response.data } });
+        toast.error(response.data.message || "Tìm kiếm thất bại!");
       }
-      toast.success("Tìm kiếm thành công!");
     } catch (error) {
       const errorMessage =
         error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại!";
@@ -73,20 +86,22 @@ const AdvanceSearch = () => {
     }
   };
 
-  // Xử lý khi chọn một từ khóa liên quan
-  const handleSelectKeyword = (keyword) => {
-    setSearchQuery(keyword);
-  };
-
   // Xử lý khi chọn một gợi ý
   const handleSelectSuggestion = (suggestion) => {
     setSearchQuery(suggestion.name);
-    setRelatedKeywords([]);
     setSuggestions([]);
     if (searchTab === "tour") {
-      navigate("/tours", { state: { tours: [suggestion] } });
+      if (!suggestion.slug) {
+        toast.error("Không tìm thấy thông tin tour!");
+        return;
+      }
+      navigate(`/tours/detail/${suggestion.slug}`);
     } else {
-      navigate("/hotel-services", { state: { hotels: [suggestion] } });
+      if (!suggestion._id) {
+        toast.error("Không tìm thấy thông tin khách sạn!");
+        return;
+      }
+      navigate(`/hotels/${suggestion._id}`);
     }
   };
 
@@ -103,7 +118,6 @@ const AdvanceSearch = () => {
                   onClick={() => {
                     setSearchTab("tour");
                     setSearchQuery("");
-                    setRelatedKeywords([]);
                     setSuggestions([]);
                   }}
                 >
@@ -115,7 +129,6 @@ const AdvanceSearch = () => {
                   onClick={() => {
                     setSearchTab("hotel");
                     setSearchQuery("");
-                    setRelatedKeywords([]);
                     setSuggestions([]);
                   }}
                 >
@@ -137,54 +150,32 @@ const AdvanceSearch = () => {
                     className="search-input"
                   />
                   {/* Danh sách gợi ý */}
-                  {(relatedKeywords.length > 0 || suggestions.length > 0) && (
+                  {suggestions.length > 0 && (
                     <div className="suggestions-container">
-                      {/* Từ khóa liên quan */}
-                      {relatedKeywords.length > 0 && (
-                        <div className="related-keywords">
-                          <h6>Từ khóa liên quan</h6>
-                          <ul className="keywords-list">
-                            {relatedKeywords.map((keyword, index) => (
-                              <li
-                                key={index}
-                                onClick={() => handleSelectKeyword(keyword)}
-                                className="keyword-item"
-                              >
-                                <i className="bi bi-search me-2"></i>
-                                {keyword}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Gợi ý kết quả */}
-                      {suggestions.length > 0 && (
-                        <div className="suggestions-list">
-                          <h6>Gợi ý kết quả</h6>
-                          <ul className="results-list">
-                            {suggestions.map((suggestion, index) => (
-                              <li
-                                key={index}
-                                onClick={() => handleSelectSuggestion(suggestion)}
-                                className="result-item"
-                              >
-                                <img
-                                  src={suggestion.image || "/default-image.jpg"}
-                                  alt={suggestion.name}
-                                  className="result-image"
-                                />
-                                <div className="result-info">
-                                  <p className="result-name">{suggestion.name}</p>
-                                  <p className="result-description">
-                                    {suggestion.description || "Không có mô tả"}
-                                  </p>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      <div className="suggestions-list">
+                        <h6>Gợi ý kết quả</h6>
+                        <ul className="results-list">
+                          {suggestions.map((suggestion, index) => (
+                            <li
+                              key={index}
+                              onClick={() => handleSelectSuggestion(suggestion)}
+                              className="result-item"
+                            >
+                              <img
+                                src={suggestion.image || "/default-image.jpg"}
+                                alt={suggestion.name}
+                                className="result-image"
+                              />
+                              <div className="result-info">
+                                <p className="result-name">{suggestion.name}</p>
+                                <p className="result-description">
+                                  {suggestion.description || "Không có mô tả"}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>

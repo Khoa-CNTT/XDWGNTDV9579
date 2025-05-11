@@ -1,76 +1,234 @@
-import React, { useState, useEffect } from "react";
-import CartItem from "./CartItem";
+import React from "react";
+import { Container, Row, Col, Button, Table, Alert, Form } from "react-bootstrap";
+import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
+import { useCart } from "../../context/CartContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import CartForm from "./CartForm";
-import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs"; // ✅ Thêm Breadcrumbs
-import { Table, Container, Row, Col, Card } from "react-bootstrap";
-import Header from "../../components/Common/Header/Header";
+import "./cart.css";
 
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState([
-    { id: 1, name: "Tour Đà Nẵng", price: 1350000, discount: 0, quantity: 1, image: "" },
-    { id: 2, name: "Tour Sapa", price: 1650000, discount: 10, quantity: 2, image: "" }
-  ]);
+  const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    document.title = "Giỏ hàng - GoTravel"; // ✅ Đặt tiêu đề trang
-    window.scrollTo(0, 0); // ✅ Cuộn lên đầu trang khi vào giỏ hàng
-  }, []);
+  const cartItems = [
+    ...cart.tours.flatMap((tour) =>
+      tour.timeStarts.map((time) => ({
+        type: "tour",
+        id: `${tour.tour_id}-${time.timeDepart}`,
+        tour_id: tour.tour_id,
+        timeDepart: time.timeDepart,
+        quantity: time.quantity || 1,
+        title: tour.tourInfo?.title || "Tên tour không xác định",
+        price: tour.priceNew || tour.tourInfo?.price || 0,
+        image: tour.tourInfo?.images?.[0]?.original || "/path/to/fallback-image.jpg",
+      }))
+    ),
+    ...cart.hotels.flatMap((hotel) =>
+      hotel.rooms.map((room) => ({
+        type: "room",
+        id: `${hotel.hotel_id}-${room.room_id}`,
+        hotel_id: hotel.hotel_id,
+        room_id: room.room_id,
+        quantity: room.quantity || 1,
+        checkIn: room.checkIn,
+        checkOut: room.checkOut,
+        title: `${hotel.hotelInfo?.name || "Khách sạn không xác định"} - ${
+          room.roomInfo?.name || "Phòng không xác định"
+        }`,
+        price: room.roomInfo?.price || room.price || 0,
+        image:
+          room.roomInfo?.images?.[0] ||
+          hotel.hotelInfo?.images?.[0] ||
+          "/path/to/fallback-image.jpg",
+      }))
+    ),
+  ];
 
-  // Tính tổng số lượng sản phẩm trong giỏ hàng
-  const totalQuantity = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const calculatedTotalPrice = cartItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+  const totalPrice =
+    cart.totalPrice !== undefined && cart.totalPrice !== null
+      ? cart.totalPrice
+      : calculatedTotalPrice;
 
-  const calculateTotal = () => {
-    return cartItems.reduce(
-      (total, item) => total + item.quantity * (item.price * (1 - item.discount / 100)),
-      0
-    );
+  const handleQuantityChange = async (item, newQuantity) => {
+    if (newQuantity < 1) return;
+    try {
+      await updateQuantity(
+        item.type,
+        item.type === "tour"
+          ? { id: item.tour_id, timeDepart: item.timeDepart }
+          : { hotel_id: item.hotel_id, room_id: item.room_id },
+        newQuantity
+      );
+    } catch (error) {
+      // Lỗi đã được xử lý trong updateQuantity
+    }
   };
 
-  const removeItem = (id) => {
-    setCartItems(cartItems.filter((item) => item.id !== id));
-  };
-
-  const updateQuantity = (id, quantity) => {
-    setCartItems(cartItems.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)));
+  const handleRemoveItem = async (item) => {
+    try {
+      await removeFromCart(
+        item.type,
+        item.type === "tour" ? item.tour_id : item.hotel_id,
+        item.type === "room" ? item.room_id : undefined
+      );
+    } catch (error) {
+      // Lỗi đã được xử lý trong removeFromCart
+    }
   };
 
   return (
     <>
-      <Header cartCount={totalQuantity} /> {/* Truyền số lượng vào giỏ hàng */}
-      <Breadcrumbs title="Giỏ Hàng" pagename="Giỏ Hàng" /> {/* Thêm Breadcrumbs */}
-
-      <section className="cart-section py-5"> {/* Thêm class giống Booking */}
+      <Breadcrumbs title="Giỏ hàng" pagename="Giỏ hàng" />
+      <section className="cart_page py-5">
         <Container>
-          <Row>
-            <Col md={8}>
-              <Card className="p-3 shadow-sm">
-                <h2>🛒 Giỏ Hàng</h2>
-                <Table responsive striped bordered hover className="text-center">
+          {cartItems.length === 0 ? (
+            <Alert variant="info">Giỏ hàng của bạn đang trống.</Alert>
+          ) : (
+            <Row>
+              <Col lg={8}>
+                <h4 className="mb-3">Danh sách tour</h4>
+                <Table responsive className="cart-table">
                   <thead>
                     <tr>
-                      <th>Ảnh</th>
-                      <th>Tiêu đề</th>
+                      <th>Sản phẩm</th>
                       <th>Giá</th>
-                      <th>Giảm giá</th>
                       <th>Số lượng</th>
-                      <th>Tổng tiền</th>
-                      <th>Hành động</th>
+                      <th>Tổng</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cartItems.map((item) => (
-                      <CartItem key={item.id} item={item} removeItem={removeItem} updateQuantity={updateQuantity} />
-                    ))}
+                    {cartItems
+                      .filter((item) => item.type === "tour")
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="cart-item-info">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="cart-item-image"
+                              />
+                              <div>
+                                <h5>{item.title}</h5>
+                                <p>
+                                  Thời gian khởi hành:{" "}
+                                  {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.price.toLocaleString()} VNĐ</td>
+                          <td>
+                            <Form.Control
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChange(item, parseInt(e.target.value))
+                              }
+                              min="1"
+                              style={{ width: "80px" }}
+                              disabled={isLoading}
+                            />
+                          </td>
+                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                          <td>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <i className="bi bi-spinner bi-spin"></i>
+                              ) : (
+                                "Xóa"
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </Table>
-                <h3 className="text-end">Tổng thanh toán: {calculateTotal().toLocaleString()}VNĐ</h3>
-              </Card>
-            </Col>
 
-            <Col md={4}>
-              <CartForm />
-            </Col>
-          </Row>
+                <h4 className="mt-4 mb-3">Danh sách phòng</h4>
+                <Table responsive className="cart-table">
+                  <thead>
+                    <tr>
+                      <th>Sản phẩm</th>
+                      <th>Giá</th>
+                      <th>Số lượng</th>
+                      <th>Tổng</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems
+                      .filter((item) => item.type === "room")
+                      .map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="cart-item-info">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="cart-item-image"
+                              />
+                              <div>
+                                <h5>{item.title}</h5>
+                                <p>
+                                  Check-in: {new Date(item.checkIn).toLocaleDateString("vi-VN")}
+                                </p>
+                                <p>
+                                  Check-out:{" "}
+                                  {new Date(item.checkOut).toLocaleDateString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.price.toLocaleString()} VNĐ</td>
+                          <td>
+                            <Form.Control
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChange(item, parseInt(e.target.value))
+                              }
+                              min="1"
+                              style={{ width: "80px" }}
+                              disabled={isLoading}
+                            />
+                          </td>
+                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                          <td>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <i className="bi bi-spinner bi-spin"></i>
+                              ) : (
+                                "Xóa"
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </Table>
+              </Col>
+              <Col lg={4}>
+                <CartForm totalPrice={totalPrice} />
+              </Col>
+            </Row>
+          )}
         </Container>
       </section>
     </>

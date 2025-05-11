@@ -1,10 +1,16 @@
-// src/components/Cards/HotelCard.jsx
 import React from "react";
 import { Card, Stack, Button } from "react-bootstrap";
-import { NavLink } from "react-router-dom";
-import "../../pages/HotelService/hotel.css"; // Import CSS mới
+import { NavLink, useNavigate } from "react-router-dom";
+import "../../pages/HotelService/hotel.css";
 
 const HotelCard = ({ val }) => {
+  const navigate = useNavigate();
+
+  const handleViewHotel = () => {
+    // Điều hướng đến trang chi tiết khách sạn
+    navigate(`/hotel-details/${val._id}`);
+  };
+
   return (
     <Card className="hotel-card">
       <Card.Img
@@ -30,13 +36,9 @@ const HotelCard = ({ val }) => {
         </Card.Title>
       </Card.Body>
       <Card.Footer className="py-4">
-        <Stack direction="horizontal" className="justify-content-between mt-3">
-          <p>
-            Từ <b>{val.price ? val.price.toLocaleString() : "Liên hệ"} VNĐ</b>
-          </p>
-        </Stack>
-        <Button variant="success" className="mt-3">
-          <i className="bi bi-cart-plus"></i> Thêm vào giỏ hàng
+        
+        <Button variant="success" className="mt-3" onClick={handleViewHotel}>
+          <i className="bi bi-eye"></i> Xem khách sạn
         </Button>
       </Card.Footer>
     </Card>

@@ -1,182 +1,156 @@
-.tours_section .img-box {
-    padding: 0px 12px;
-  }
-  
- .img-box .card {
-    border: none;
-    width: 100%;
+.popular {
+    padding: 8px;
+    border: 1px solid #e0e0e0; /* Thêm viền nhẹ */
+    border-radius: 10px; /* Bo góc mềm hơn */
+    background: #ffffff;
+    transition: all 0.3s ease;
     overflow: hidden;
-    position: relative;
-  }
-  
- .img-box .card a {
-    border: none;
-  }
-  
- .img-box .card img {
-    transition: all 0.5s ease 0s;
-    filter: brightness(0.8);
-  }
-  
- .img-box .card .card-title {
-    position: absolute;
-    top: 5%;
-    left: 3%;
-    font-size: 16px;
-    color: var(--white);
-    line-height: 150%;
-    font-weight: bold;
-    width: 100%;
-  }
-  
- .img-box .card .tours {
-    position: absolute;
-    right: 5%;
-    bottom: 5%;
-    font-size: 16px;
-    color: var(--primaryClr);
-    line-height: 18px;
-    font-weight: 600;
-    padding: 6px 15px;
-    background: var(--white);
-    border-radius: 15px;
-    transform: translateX(120%);
-    transition: 0.2s ease-in;
-  }
-  
- .img-box .card:hover {
-    transition: 0.2 ease-in;
-  }
-  
- .img-box .card:hover img {
-    filter: brightness(1);
-    transform: scale(1.1);
-  }
-  
- .img-box .card:hover .tours {
-    transform: translateX(0);
-  }
-  
-
-
-
-
-
-.popular  {
-    padding: 5px;
-    border: none;
-    transition: all 0.5s ease 0s;
-    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Bóng nhẹ ban đầu */
 }
 
-.popular:hover{
-    transform: translateY(-10px);
-    transition: 0.2s ease-in;
-    
+.popular:hover {
+    transform: translateY(-8px); /* Nâng card nhẹ khi hover */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); /* Tăng bóng khi hover */
+    transition: all 0.3s ease;
 }
-
 
 .popular:hover .card-title {
-    color:var(--primaryClr)
+    color: var(--primaryClr); /* Màu tiêu đề nổi bật khi hover */
 }
 
 .popular img {
-    transition: all 0.5s ease 0s;
+    width: 100%;
+    height: 180px; /* Đặt chiều cao cố định cho ảnh */
+    object-fit: cover; /* Đảm bảo ảnh không bị méo */
+    border-radius: 8px 8px 0 0; /* Bo góc trên của ảnh */
+    transition: all 0.5s ease;
 }
 
 .popular:hover img {
-    transform: scale(1.1);
+    transform: scale(1.1); /* Phóng to ảnh khi hover */
+    filter: brightness(1.05); /* Tăng độ sáng nhẹ */
 }
 
-.popular  .card-body .badge {
-    padding: 4px 8px;
-    border-radius: 4px;
+.popular .card-body .badge {
+    padding: 5px 10px;
+    border-radius: 12px; /* Bo góc badge mềm hơn */
     margin-right: 8px;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
+.popular:hover .card-body .badge {
+    transform: scale(1.05); /* Phóng to badge khi hover */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Thêm bóng cho badge */
+}
 
-
-.popular  .card-body .River{
+/* Tùy chỉnh màu sắc badge */
+.popular .card-body .River {
     background-color: #ffebf5 !important;
-    color:#cf3881 !important;
+    color: #cf3881 !important;
 }
 
-.popular  .card-body .Wildlife{
+.popular .card-body .Wildlife {
     background-color: #4ba7fc !important;
-    color:#e6f7f4 !important;
+    color: #ffffff !important; /* Đổi màu chữ cho dễ đọc */
 }
 
-.popular  .card-body .Escorted{
+.popular .card-body .Escorted {
     background-color: #e8edf1 !important;
-    color:#4f5e71 !important;
+    color: #4f5e71 !important;
 }
 
-.popular  .card-body .Rail{
+.popular .card-body .Rail {
     background-color: #fc961b !important;
-    color:#ffffff !important;
+    color: #ffffff !important;
 }
 
-.popular  .card-body .Tour{
+.popular .card-body .Tour {
     background-color: #6088c4 !important;
-    color:#ffffff !important;
+    color: #ffffff !important;
 }
 
-.popular  .card-body .card-title{
+.popular .card-body .card-title {
     font-size: var(--bodyText);
     font-weight: bold;
-    transition: all 0.5s ease 0s;
-    margin-bottom: 10px;
-
-    
-}
-
-.popular  .card-body .card-text {
-    font-size: 13px;
-    padding: 10px 0px;
-    line-height: 1.3em;
-    position: relative;
-    color:#4f5e71;
-}
-
- 
-.popular  .card-body .card-text i {
-    position: absolute;
-    top: 15px;
-}
-
-
-.popular  .card-body .text {
-    margin-left: 16px;
-    display: block;
-    font-size: 13px;
-}
-
-.popular  .card-body .reviwe {
+    color: #2c3e50; /* Màu tối hơn cho tiêu đề */
+    transition: all 0.3s ease;
     margin-bottom: 12px;
-}
-.popular  .card-body .reviwe i {
-    color:var(--primaryClr)
+    line-height: 1.4;
 }
 
-.popular  .card-footer  {
+.popular .card-body .card-text {
+    font-size: 13px;
+    padding: 8px 0;
+    line-height: 1.5em;
+    position: relative;
+    color: #666;
+    display: flex;
+    align-items: center;
+}
+
+.popular .card-body .card-text i {
+    position: relative;
+    top: auto;
+    color: var(--primaryClr);
+    margin-right: 8px;
+}
+
+.popular .card-body .text {
+    margin-left: 0;
+    font-size: 13px;
+}
+
+.popular .card-body .reviwe {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #666;
+}
+
+.popular .card-body .reviwe i {
+    color: var(--primaryClr);
+    margin-right: 5px;
+}
+
+.popular .card-footer {
     background: none;
+    border-top: none;
+    padding: 10px 15px;
 }
 
-.popular  .card-footer p  {
+.popular .card-footer p {
     font-size: var(--bodyText);
-    color:#4f5e71
+    color: #4f5e71;
+    margin: 0;
 }
 
-.popular  .card-footer p strong {
+.popular .card-footer p strong {
     font-size: var(--bodyText);
-    color:black;
+    color: #e74c3c; /* Màu giá nổi bật */
     font-weight: bold;
 }
 
+.popular .card-footer .justify-content-between p:last-child {
+    font-size: 13px;
+    color: #2c3e50; /* Màu đậm hơn cho ngày khởi hành */
+    display: flex;
+    align-items: center;
+}
 
+.popular .card-footer .justify-content-between p:last-child i {
+    color: var(--primaryClr);
+    margin-right: 5px;
+}
 
+.popular .card-footer .justify-content-between p:last-child span {
+    font-weight: 600; /* Làm đậm "Ngày khởi hành" */
+    color: #2c3e50;
+    margin-right: 5px;
+}
 
-
-
-  
+.popular:hover .card-footer .justify-content-between p:last-child {
+    color: var(--primaryClr); /* Đổi màu ngày khởi hành khi hover */
+}
