@@ -1,5 +1,7 @@
 const Hotel = require("../../models/hotel.model");
 const Room = require("../../models/room.model");
+const paginationHelper = require("../../helper/pagination");
+const { convertToSlug } = require("../../helper/convertToSlug");
 
 // [GET]/api/v1/admin/hotels
 module.exports.index = async (req, res) => {
@@ -11,16 +13,53 @@ module.exports.index = async (req, res) => {
         });
     } else {
         try {
-            const hotels = await Hotel.find({ deleted: false });
+            let find = { deleted: false };
+
+            // Search
+            if (req.query.search) {
+                const keywordRegex = new RegExp(req.query.search, "i");
+
+                const stringSlug = convertToSlug(req.query.search);
+                const stringSlugRegex = new RegExp(stringSlug, "i");
+                find.$or = [
+                    { name: keywordRegex },
+                    { slug: stringSlugRegex }
+                ];
+            }
+
+            if (req.query.status) {
+                find.status = req.query.status;
+            };
+
+            // sort
+            const sort = {};
+            if (req.query.sortKey && req.query.sortValue) {
+                sort[req.query.sortKey] = req.query.sortValue;
+            }
+
+            // pagination
+            const countRecords = await Hotel.countDocuments(find);
+            let objPagination = paginationHelper(
+                {
+                    currentPage: 1,
+                    limitItems: 10
+                },
+                req.query,
+                countRecords
+            );
+            // end pagination
+
+            const hotels = await Hotel.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
             res.json({
                 code: 200,
                 message: "Danh sách khách sạn",
-                data: hotels
+                data: hotels,
+                totalPage: objPagination.totalPage
             });
         } catch (error) {
             res.json({
                 code: 500,
-                message: "Error: " + error
+                message: "Error: " + error.message
             });
         }
     }

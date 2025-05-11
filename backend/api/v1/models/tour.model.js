@@ -10,8 +10,12 @@ const TourSchema = new mongoose.Schema({
     discount: Number,
     information: String,
     schedule: String,
-    timeStart: Date,
-    stock: Number,
+    timeStarts: [
+        {
+            timeDepart: Date,
+            stock: Number,
+        }
+    ],
     category_id: {
         type: String,
         default: ""

@@ -1,8 +1,9 @@
 const Tour = require("../../models/tour.model");
 const Category = require("../../models/category.model");
-const generate = require("../../helpers/generate");
+const generate = require("../../helper/generate");
 const paginationHelper = require("../../helper/pagination");
 const tourHelper = require("../../helper/tours");
+const { convertToSlug } = require("../../helper/convertToSlug");
 
 // [GET]/api/v1/admin/tours
 module.exports.index = async (req, res) => {
@@ -14,6 +15,18 @@ module.exports.index = async (req, res) => {
         });
     } else {
         let find = { deleted: false };
+
+        // Search
+        if (req.query.search) {
+            const keywordRegex = new RegExp(req.query.search, "i");
+
+            const stringSlug = convertToSlug(req.query.search);
+            const stringSlugRegex = new RegExp(stringSlug, "i");
+            find.$or = [
+                { title: keywordRegex },
+                { slug: stringSlugRegex }
+            ];
+        }
 
         if (req.query.status) {
             find.status = req.query.status;
@@ -29,7 +42,7 @@ module.exports.index = async (req, res) => {
         let objPagination = paginationHelper(
             {
                 currentPage: 1,
-                limitItems: 5
+                limitItems: 10
             },
             req.query,
             countRecords
@@ -42,7 +55,10 @@ module.exports.index = async (req, res) => {
         toursObject.forEach(item => {
             item.price_special = tourHelper.priceNewTour(item);
         });
-        res.json(toursObject);
+        res.json({
+            toursObject: toursObject,
+            totalPage: objPagination.totalPage
+        });
     }
 };
 
@@ -59,6 +75,20 @@ module.exports.createPost = async (req, res) => {
             const countTour = await Tour.countDocuments();
             const code = generate.generateTourCode(countTour + 1);
 
+            let rawTimeStarts = req.body.timeStarts;
+
+            if (typeof rawTimeStarts === "string") {
+                try {
+                    rawTimeStarts = JSON.parse(rawTimeStarts);
+                } catch (err) {
+                    return res.status(400).json({
+                        code: 400,
+                        message: "timeStarts không đúng định dạng JSON"
+                    });
+                }
+            }
+
+
             const tour = new Tour({
                 title: req.body.title,
                 code: code,
@@ -66,7 +96,10 @@ module.exports.createPost = async (req, res) => {
                 discount: parseInt(req.body.discount),
                 stock: parseInt(req.body.stock),
                 category_id: req.body.category_id,
-                timeStart: req.body.timeStart,
+                timeStarts: rawTimeStarts.map(item => ({
+                    timeDepart: new Date(item.timeDepart),
+                    stock: parseInt(item.stock),
+                })),
                 status: req.body.status,
                 images: req.body.images,
                 information: req.body.information,
@@ -184,58 +217,60 @@ module.exports.editPatch = async (req, res) => {
     } else {
         try {
             const id = req.params.id;
-            if (req.body.price) req.body.price = parseInt(req.body.price);
-            if (req.body.discount) req.body.discount = parseInt(req.body.discount);
-            if (req.body.stock) req.body.stock = parseInt(req.body.stock);
-            if (req.body.position) req.body.position = parseInt(req.body.position);
+            const existingTour = await Tour.findById(id);
 
-            const data = await Tour.updateOne({
-                _id: id
-            }, {
-                ...req.body
-            });
+            if (!existingTour) {
+                return res.json({
+                    code: 404,
+                    message: "Tour không tồn tại"
+                });
+            }
 
+            let rawTimeStarts = req.body.timeStarts;
+
+            if (typeof rawTimeStarts === "string") {
+                try {
+                    rawTimeStarts = JSON.parse(rawTimeStarts);
+                } catch (err) {
+                    return res.json({
+                        code: 400,
+                        message: "timeStarts không đúng định dạng JSON"
+                    });
+                }
+            }
+
+            const updatedData = {
+                title: req.body.title || existingTour.title,
+                price: req.body.price ? parseInt(req.body.price) : existingTour.price,
+                discount: req.body.discount ? parseInt(req.body.discount) : existingTour.discount,
+                stock: req.body.stock ? parseInt(req.body.stock) : existingTour.stock,
+                category_id: req.body.category_id || existingTour.category_id,
+                timeStarts: rawTimeStarts ? rawTimeStarts.map(item => ({
+                    timeDepart: new Date(item.timeDepart),
+                    stock: parseInt(item.stock),
+                })) : existingTour.timeStarts,
+                status: req.body.status || existingTour.status,
+                images: req.body.images || existingTour.images,
+                information: req.body.information || existingTour.information,
+                schedule: req.body.schedule || existingTour.schedule,
+            };
+
+            const data = await Tour.findByIdAndUpdate(
+                id,
+                { $set: updatedData },
+                { new: true }
+            );
 
             res.json({
                 code: 200,
-                message: "Cập nhật tour thành công"
+                message: "Cập nhật tour thành công",
+                data: data
             });
         } catch (error) {
             res.json({
                 code: 404,
                 message: "Cập nhật tour thất bại" + error
             });
-        }
-    }
-};
-
-// [PATCH]/api/v1/admin/tours/change-stock/:stock/:id
-module.exports.stock = async (req, res) => {
-    const permissions = req.roles.permissions;
-    if (!permissions.includes("tour_edit")) {
-        return res.json({
-            code: 400,
-            message: "Bạn không có quyền chỉnh sửa trạng thái tour"
-        });
-    } else {
-        try {
-            const id = req.params.id;
-            const stock = parseInt(req.params.stock);
-            const data = await Tour.findOneAndUpdate({
-                _id: id
-            }, {
-                stock: stock
-            }, { new: true });
-            res.json({
-                code: 200,
-                message: "Cập nhật số lượng thành công",
-                data: data
-            });
-        } catch (error) {
-            res.json({
-                code: 500,
-                message: "Lỗi! " + error
-            })
         }
     }
 };

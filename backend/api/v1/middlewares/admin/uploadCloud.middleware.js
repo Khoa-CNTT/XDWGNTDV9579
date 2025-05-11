@@ -1,4 +1,4 @@
-const { uploadToCloudinary } = require("../../helpers/uploadToCloudinary");
+const { uploadToCloudinary } = require("../../helper/uploadToCloudinary");
 
 module.exports.uploadSingle = async (req, res, next) => {
     if (req["file"]) {

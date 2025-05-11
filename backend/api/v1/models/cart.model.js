@@ -5,9 +5,25 @@ const cartSchema = new mongoose.Schema({
     tours: [
         {
             tour_id: String,
-            quantity: Number
+            timeStarts: [
+                {
+                    timeDepart: Date,
+                    stock: Number,
+                }
+            ]
         }
-    ]
+    ],
+    hotels: [
+        {
+            hotel_id: String,
+            rooms: [
+                {
+                    room_id: String,
+                    quantity: Number
+                }
+            ],
+        }
+    ],
 }, {
     timestamps: true
 });

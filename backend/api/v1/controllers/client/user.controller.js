@@ -2,8 +2,8 @@ const bcrypt = require('bcrypt');
 const saltRounds = 10;
 const User = require("../../models/user.model");
 const ForgotPassword = require("../../models/forgot-password.model");
-const generateHelper = require("../../helpers/generate");
-const sendMailHelper = require("../../helpers/sendMail");
+const generateHelper = require("../../helper/generate");
+const sendMailHelper = require("../../helper/sendMail");
 const Cart = require('../../models/cart.model');
 
 // [POST]/api/v1/users/register
@@ -198,28 +198,6 @@ module.exports.detail = async (req, res) => {
     });
 };
 
-// [PATCH]/api/v1/users/edit
-module.exports.edit = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const data = await User.findByIdAndUpdate({
-            _id: userId
-        }, req.body, {
-            new: true
-        });
-        res.json({
-            code: 200,
-            message: "Thành công",
-            data: data
-        });
-    } catch (error) {
-        res.json({
-            code: 500,
-            message: "error: " + error
-        });
-    }
-};
-
 // [GET]/api/v1/user/logout
 module.exports.logout = async (req, res) => {
     res.clearCookie("token");
@@ -229,3 +207,65 @@ module.exports.logout = async (req, res) => {
         message: "Đăng xuất thành công"
     });
 }
+
+// [PATCH]/api/v1/users/edit
+module.exports.edit = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const data = await User.findOneAndUpdate({
+            _id: userId
+        }, req.body, {
+            new: true
+        });
+        res.json({
+            code: 200,
+            message: "Cập nhật thông tin thành công",
+            data: data
+        });
+    } catch (error) {
+        res.json({
+            code: 500,
+            message: "Có lỗi xảy ra" + error.message,
+        });
+    }
+};
+
+// [PATCH]/api/v1/users/password/change
+module.exports.changePass = async (req, res) => {
+    try {
+        const token = req.user.token;
+        const password = req.body.password;
+        const newPassword = req.body.newPassword;
+        const confirmNewPassword = req.body.confirmNewPassword;
+
+
+        const user = await User.findOne({
+            token: token
+        });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.json({
+                code: 400,
+                message: "Mật khẩu không đúng"
+            });
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        await User.updateOne({
+            token: token
+        }, {
+            password: hashedPassword
+        });
+
+        return res.json({
+            code: 200,
+            message: "Đặt lại mật khẩu thành công"
+        });
+
+    } catch (error) {
+        return res.json({
+            code: 500,
+            message: "Có lỗi xảy ra" + error.message,
+        });
+    }
+};

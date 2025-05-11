@@ -12,11 +12,8 @@ module.exports.tourValidate = (req, res, next) => {
     if (parseInt(req.body.discount) <= 0) {
         errors.push('Vui lòng nhập % giảm giá lớn hơn 0!');
     }
-    if (parseInt(req.body.stock) <= 0) {
-        errors.push('Vui lòng nhập số lượng lớn hơn 0!');
-    }
-    if (!req.body.timeStart) {
-        errors.push('Vui lòng nhập ngày khởi hành!');
+    if (!req.body.timeStarts) {
+        errors.push("Vui lòng cung cấp ít nhất một thời gian khởi hành!");
     }
     if (!req.body.schedule) {
         errors.push('Vui lòng nhập lịch trình tour!');

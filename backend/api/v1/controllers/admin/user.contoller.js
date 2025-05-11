@@ -1,5 +1,5 @@
 const User = require("../../models/user.model");
-const paginationHelper = require("../../helpers/pagination");
+const paginationHelper = require("../../helper/pagination");
 
 // [GET]/api/v1/admin/users
 module.exports.index = async (req, res) => {
@@ -11,6 +11,14 @@ module.exports.index = async (req, res) => {
         });
     } else {
         let find = { deleted: false };
+
+        // Search
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            find.$or = [
+                { fullName: searchRegex }
+            ];
+        }
 
         if (req.query.status) {
             find.status = req.query.status;
@@ -27,7 +35,7 @@ module.exports.index = async (req, res) => {
         let objPagination = paginationHelper(
             {
                 currentPage: 1,
-                limitItems: 5
+                limitItems: 10
             },
             req.query,
             countRecords
@@ -36,7 +44,10 @@ module.exports.index = async (req, res) => {
 
         const accounts = await User.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip).select("-password");
 
-        res.json(accounts);
+        res.json({
+            users: accounts,
+            totalPage: objPagination.totalPage
+        });
     }
 };
 

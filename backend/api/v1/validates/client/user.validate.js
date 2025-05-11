@@ -18,6 +18,10 @@ module.exports.registerPost = (req, res, next) => {
         errors.push('Xác nhận mật khẩu không trùng khớp');
     }
 
+    if (req.body.password.length < 6) {
+        errors.push('Mật khẩu phải có ít nhất 6 ký tự!');
+    }
+
     if (errors.length > 0) {
         return res.status(400).json({
             success: false,
@@ -74,6 +78,11 @@ module.exports.resetPasswordPost = (req, res, next) => {
     if (req.body.password != req.body.confirmPassword) {
         errors.push("Xác nhận mật khẩu không trùng khớp!")
     }
+
+    if (req.body.password.length < 6) {
+        errors.push("Mật khẩu phải có ít nhất 6 ký tự!");
+    }
+
     if (errors.length > 0) {
         return res.status(400).json({
             success: false,
@@ -85,28 +94,45 @@ module.exports.resetPasswordPost = (req, res, next) => {
 
 
 module.exports.changePassword = (req, res, next) => {
+    const errors = [];
     if (!req.body.password) {
-        req.flash('error', 'Vui lòng nhập mật khẩu!');
-        res.redirect("back");
-        return;
+        errors.push("Vui lòng nhập mật khẩu!")
     }
 
-    if (!req.body.newpassword) {
-        req.flash('error', 'Vui lòng mật khẩu mới!');
-        res.redirect("back");
-        return;
+    if (!req.body.newPassword) {
+        errors.push("Vui lòng nhập mật khẩu mới!")
     }
 
-    if (!req.body.confirmNewpassword) {
-        req.flash('error', 'Vui lòng xác nhận lại mật khẩu mới!');
-        res.redirect("back");
-        return;
+    if (!req.body.confirmNewPassword) {
+        errors.push("Vui lòng nhập xác nhận mật khẩu!")
     }
 
-    if (req.body.newpassword != req.body.confirmNewpassword) {
-        req.flash('error', 'Xác nhận mật khẩu mới không trùng khớp');
-        res.redirect("back");
-        return;
+    if (req.body.newPassword.length < 6) {
+        errors.push("Mật khẩu mới phải có ít nhất 6 ký tự!");
+    }
+
+    if (req.body.newPassword !== req.body.confirmNewPassword) {
+        errors.push("Vui lòng nhập mật khẩu mới không trùng khớp!")
+    }
+    if (errors.length > 0) {
+        return res.status(400).json({
+            success: false,
+            errors: errors
+        });
+    }
+    next();
+}
+
+module.exports.edit = (req, res, next) => {
+    const errors = [];
+    if (req.body.email) {
+        errors.push('Không được chỉnh sửa email!');
+    }
+    if (errors.length > 0) {
+        return res.status(400).json({
+            success: false,
+            errors: errors
+        });
     }
     next();
 }

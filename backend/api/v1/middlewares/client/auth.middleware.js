@@ -7,8 +7,9 @@ module.exports.requireAuth = async (req, res, next) => {
             token: token,
             deleted: false
         }).select("-password");
+
         const cart = await Cart.findOne({
-            user_id: user.id
+            user_id: user._id
         });
         if (!user) {
             res.json({

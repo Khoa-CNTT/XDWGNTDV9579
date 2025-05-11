@@ -1,5 +1,6 @@
 const Category = require("../../models/category.model");
-const paginationHelper = require("../../helpers/pagination");
+const paginationHelper = require("../../helper/pagination");
+const { convertToSlug } = require("../../helper/convertToSlug");
 
 // [GET]/api/v1/admin/categories
 module.exports.index = async (req, res) => {
@@ -11,6 +12,18 @@ module.exports.index = async (req, res) => {
         });
     } else {
         let find = { deleted: false };
+
+        // Search
+        if (req.query.search) {
+            const keywordRegex = new RegExp(req.query.search, "i");
+
+            const stringSlug = convertToSlug(req.query.search);
+            const stringSlugRegex = new RegExp(stringSlug, "i");
+            find.$or = [
+                { title: keywordRegex },
+                { slug: stringSlugRegex }
+            ];
+        }
 
         if (req.query.status) {
             find.status = req.query.status;
@@ -27,7 +40,7 @@ module.exports.index = async (req, res) => {
         let objPagination = paginationHelper(
             {
                 currentPage: 1,
-                limitItems: 5
+                limitItems: 10
             },
             req.query,
             countRecords
@@ -36,7 +49,10 @@ module.exports.index = async (req, res) => {
 
         const categories = await Category.find(find).sort(sort).limit(objPagination.limitItems).skip(objPagination.skip);
 
-        res.json(categories);
+        res.json({
+            categories: categories,
+            totalPage: objPagination.totalPage
+        });
     }
 };
 

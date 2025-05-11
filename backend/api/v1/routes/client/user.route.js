@@ -12,7 +12,8 @@ router.post('/password/forgot', validate.forgotPassword, controller.forgotPasswo
 router.post('/password/otp', controller.otpPassword);
 router.post('/password/reset', validate.resetPasswordPost, controller.resetPassword);
 router.get('/detail', authMiddleware.requireAuth, controller.detail);
-router.patch('/edit', authMiddleware.requireAuth, controller.edit);
 router.get('/logout', controller.logout);
+router.patch('/edit', authMiddleware.requireAuth, validate.edit, controller.edit);
+router.patch('/password/change', authMiddleware.requireAuth, validate.changePassword, controller.changePass);
 
 module.exports = router;

@@ -10,7 +10,7 @@ router.post('/add/:hotel_id/:room_id', authMiddleware.requireAuth, controller.ad
 router.patch('/delete/:tour_id', authMiddleware.requireAuth, controller.delete);
 router.patch('/deleteHotel/:hotel_id/:room_id', authMiddleware.requireAuth, controller.deleteRoom);
 router.patch('/deleteHotel/:hotel_id', authMiddleware.requireAuth, controller.deleteHotel);
-router.patch('/update/:tour_id/:quantity', authMiddleware.requireAuth, controller.update);
-router.patch('/updateRoom/:hotel_id/:room_id/:quantity', authMiddleware.requireAuth, controller.updateRoom);
+router.patch('/update/:tour_id', authMiddleware.requireAuth, controller.update);
+router.patch('/updateRoom/:hotel_id/:room_id', authMiddleware.requireAuth, controller.updateRoom);
 
 module.exports = router;

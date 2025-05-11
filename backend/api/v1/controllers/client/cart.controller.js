@@ -1,19 +1,19 @@
 const Cart = require("../../models/cart.model");
 const Tour = require("../../models/tour.model");
-const tourHelper = require("../../helpers/tours");
+const tourHelper = require("../../helper/tours");
 const Hotel = require("../../models/hotel.model");
 const Room = require("../../models/room.model");
 
 // [POST] /api/v1/carts/add/:tour_id
 module.exports.addPost = async (req, res) => {
     const tourId = req.params.tour_id;
-    const quantity = parseInt(req.body.quantity);
+    const { timeDepart, quantity } = req.body;
     const cartId = req.cart.id;
 
-    if (!quantity || quantity <= 0) {
+    if (!quantity || quantity <= 0 || new Date(timeDepart) < Date.now()) {
         return res.status(400).json({
             code: 400,
-            message: "Số lượng không hợp lệ"
+            message: "Số lượng hoặc thời gian khởi hành không hợp lệ"
         });
     }
 
@@ -21,52 +21,94 @@ module.exports.addPost = async (req, res) => {
         _id: cartId
     });
     const tour = await Tour.findOne({ _id: tourId });
-    const existTourInCart = cart.tours.find(item => item.tour_id === tourId);
+
+    if (!tour) {
+        return res.json({
+            code: 404,
+            message: "Không tìm thấy tour"
+        });
+    }
+
+    const tourTime = tour.timeStarts.find(item =>
+        new Date(item.timeDepart).getTime() === new Date(timeDepart).getTime() &&
+        new Date(item.timeDepart) >= Date.now()
+    );
+
+    if (!tourTime) {
+        return res.json({
+            code: 400,
+            message: "Thời gian khởi hành không hợp lệ"
+        });
+    }
+    if (quantity > tourTime.stock) {
+        return res.json({
+            code: 400,
+            message: "Số lượng tour vượt quá số lượng còn lại"
+        });
+    }
+
+    const existTourInCart = cart.tours.find(item => {
+        const matchingTime = item.timeStarts.find(t =>
+            new Date(t.timeDepart).getTime() === new Date(timeDepart).getTime()
+        );
+        return item.tour_id.toString() === tourId && matchingTime;
+    });
+
+    let updatedCart;
 
     if (existTourInCart) {
-        const quantityNew = quantity + existTourInCart.quantity;
-        if (quantityNew > tour.stock) {
+        const existTime = existTourInCart.timeStarts.find(item =>
+            new Date(item.timeDepart).getTime() === new Date(timeDepart).getTime());
+        const quantityNew = existTime.stock + quantity;
+
+        if (quantityNew > tourTime.stock) {
             return res.json({
                 code: 400,
                 message: "Số lượng tour trong giỏ hàng vượt quá số lượng tour đang có"
             });
         }
-        const data = await Cart.findOneAndUpdate({
-            _id: cartId,
-            "tours.tour_id": tourId
-        }, {
-            $set: {
-                "tours.$.quantity": quantityNew
-            }
-        }, { new: true });
-        res.json({
-            code: 200,
-            message: "Thêm giỏ hàng thành công",
-            data: data
-        });
-    } else {
-        if (quantity > tour.stock) {
-            return res.json({
-                code: 400,
-                message: "Số lượng tour trong giỏ hàng vượt quá số lượng tour đang có"
-            });
-        }
-        const objectCart = {
-            tour_id: tourId,
-            quantity: quantity
-        }
-        const data = await Cart.findOneAndUpdate(
+
+        updatedCart = await Cart.findOneAndUpdate(
             {
-                _id: cartId
+                _id: cartId,
+                "tours.tour_id": tourId,
+                "tours.timeStarts.timeDepart": new Date(timeDepart)
             },
             {
-                $push: { tours: objectCart }
-            }, { new: true }
+                $set: {
+                    "tours.$[tour].timeStarts.$[time].stock": quantityNew
+                }
+            },
+            {
+                arrayFilters: [
+                    { "tour.tour_id": tourId },
+                    { "time.timeDepart": new Date(timeDepart) }
+                ],
+                new: true
+            }
         );
-        res.json({
+
+        return res.json({
             code: 200,
-            message: "Thêm giỏ hàng thành công",
-            data: data
+            message: "Thêm tour vào giỏ hàng thành công",
+            data: updatedCart
+        });
+    } else {
+        const newTourInCart = {
+            tour_id: tourId,
+            timeStarts: [{ timeDepart: new Date(timeDepart), stock: quantity }]
+        };
+
+        updatedCart = await Cart.findOneAndUpdate(
+            { _id: cartId },
+            { $push: { tours: newTourInCart } },
+            { new: true }
+        );
+
+        return res.json({
+            code: 200,
+            message: "Thêm tour vào giỏ hàng thành công",
+            data: updatedCart
         });
     }
 }
@@ -225,21 +267,30 @@ module.exports.index = async (req, res) => {
 
     // Xử lý tour
     for (const item of cart.tours) {
-        const tourInfo = await Tour.findById(item.tour_id);
+        const tourInfo = await Tour.findById(item.tour_id).select("-timeStarts");
         if (!tourInfo) continue;
 
         const priceNew = tourHelper.priceNewTour(tourInfo);
-        const totalPrice = item.quantity * priceNew;
-
-        processedCart.tours.push({
+        const tourProcessed = {
             tour_id: item.tour_id,
-            quantity: item.quantity,
             tourInfo,
             priceNew,
-            totalPrice
-        });
+            timeStarts: []
+        };
+        for (const timeStart of item.timeStarts) {
+            const totalPrice = timeStart.stock * parseInt(priceNew);
 
-        processedCart.totalPrice += totalPrice;
+            tourProcessed.timeStarts.push({
+                timeDepart: timeStart.timeDepart,
+                quantity: timeStart.quantity,
+                totalPrice: totalPrice
+            })
+            processedCart.totalPrice += totalPrice;
+        }
+
+        if (tourProcessed.timeStarts.length > 0) {
+            processedCart.tours.push(tourProcessed);
+        }
     }
 
     // Xử lý hotels & rooms
@@ -381,55 +432,95 @@ module.exports.deleteHotel = async (req, res) => {
     });
 }
 
-// [PATCH] /api/v1/carts/update/:tour_id/:quantity
+// [PATCH] /api/v1/carts/update/:tour_id?timeDepart=?quantity=
 module.exports.update = async (req, res) => {
-    const cartId = req.cart.id;
     const tourId = req.params.tour_id;
-    const quantity = parseInt(req.params.quantity);
+    const quantity = req.query.quantity;
+    const cartId = req.cart.id;
+    const timeDepart = new Date(req.query.timeDepart);
+
+
+    if (!quantity || quantity <= 0 || new Date(timeDepart) < Date.now()) {
+        return res.status(400).json({
+            code: 400,
+            message: "Số lượng hoặc thời gian khởi hành không hợp lệ"
+        });
+    }
 
     const cart = await Cart.findOne({
-        _id: cartId,
-        "tours.tour_id": tourId
+        _id: cartId
     });
+    const tour = await Tour.findOne({ _id: tourId });
 
-    if (!cart) {
+    if (!tour) {
         return res.json({
-            code: 400,
-            message: "Giỏ hàng không tồn tại hoặc tour không có trong giỏ hàng"
-        });
-    }
-    const tour = await Tour.findOne({
-        _id: tourId
-    });
-    if (quantity < 1 || quantity > tour.stock) {
-        return res.json({
-            code: 400,
-            message: "Số lượng tour không hợp lệ"
+            code: 404,
+            message: "Không tìm thấy tour"
         });
     }
 
-    const data = await Cart.findOneAndUpdate({
-        _id: cartId,
-        "tours.tour_id": tourId
-    }, {
-        $set: {
-            "tours.$.quantity": quantity
-        }
-    }, { new: true });
+    const tourTime = tour.timeStarts.find(item =>
+        new Date(item.timeDepart).getTime() === new Date(timeDepart).getTime() &&
+        new Date(item.timeDepart) >= Date.now()
+    );
 
-    res.json({
-        code: 200,
-        message: "Cập nhật số lượng giỏ hàng thành công",
-        data: data
+    if (!tourTime) {
+        return res.json({
+            code: 400,
+            message: "Thời gian khởi hành không hợp lệ"
+        });
+    }
+    if (quantity > tourTime.stock) {
+        return res.json({
+            code: 400,
+            message: "Số lượng tour vượt quá số lượng còn lại"
+        });
+    }
+
+    const existTourInCart = cart.tours.find(item => {
+        const matchingTime = item.timeStarts.find(t =>
+            new Date(t.timeDepart).getTime() === new Date(timeDepart).getTime()
+        );
+        return item.tour_id.toString() === tourId && matchingTime;
     });
+
+    let updatedCart;
+
+    if (existTourInCart) {
+        updatedCart = await Cart.findOneAndUpdate(
+            {
+                _id: cartId,
+                "tours.tour_id": tourId,
+                "tours.timeStarts.timeDepart": new Date(timeDepart)
+            },
+            {
+                $set: {
+                    "tours.$[tour].timeStarts.$[time].stock": quantity
+                }
+            },
+            {
+                arrayFilters: [
+                    { "tour.tour_id": tourId },
+                    { "time.timeDepart": new Date(timeDepart) }
+                ],
+                new: true
+            }
+        );
+
+        return res.json({
+            code: 200,
+            message: "Thêm tour vào giỏ hàng thành công",
+            data: updatedCart
+        });
+    }
 }
 
-// [PATCH] /api/v1/carts/updateRoom/:hotel_id/:room_id/:quantity
+// [PATCH] /api/v1/carts/updateRoom/:hotel_id/:room_id?quantity=
 module.exports.updateRoom = async (req, res) => {
     const cartId = req.cart.id;
     const hotelId = req.params.hotel_id;
     const roomId = req.params.room_id;
-    const quantity = parseInt(req.params.quantity);
+    const quantity = parseInt(req.query.quantity);
 
     const cart = await Cart.findOne({
         _id: cartId,

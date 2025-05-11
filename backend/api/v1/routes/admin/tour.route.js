@@ -21,6 +21,5 @@ router.patch("/edit/:id",
     uploadCloud.uploadFields,
     controller.editPatch);
 router.get("/detail/:id", controller.detail);
-router.patch("/change-stock/:stock/:id", controller.stock);
 
 module.exports = router;
