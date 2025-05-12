@@ -63,6 +63,14 @@ const InvoicesControl = () => {
   // Lấy danh sách hóa đơn
   const fetchInvoices = useCallback(
     async (page = 1, search = "", start = "", end = "", sortKey = "", sortValue = "") => {
+      if (!adminToken) {
+        toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
+        setTimeout(() => {
+          window.location.href = "/loginadmin";
+        }, 2000);
+        return;
+      }
+
       setLoading(true);
       try {
         const params = { page, limit: limitItems };
@@ -73,9 +81,11 @@ const InvoicesControl = () => {
           params.sortKey = sortKey;
           params.sortValue = sortValue;
         }
-        const data = await getInvoices(params);
+
+        const data = await getInvoices(adminToken, params);
         console.log("Raw data from API:", data);
 
+        // Kiểm tra dữ liệu trả về
         if (!data || !Array.isArray(data.orders)) {
           console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
           setAllInvoices([]);
@@ -116,14 +126,19 @@ const InvoicesControl = () => {
         }
       } catch (err) {
         console.error("Error in fetchInvoices:", err);
-        const errorMessage = err.response?.data?.message || "Không thể tải danh sách hóa đơn!";
+        const errorMessage = err.message || "Không thể tải danh sách hóa đơn!";
         setError(errorMessage);
         toast.error(errorMessage, { position: "top-right" });
+        if (err.message.includes("Token") || err.message.includes("401")) {
+          setTimeout(() => {
+            window.location.href = "/loginadmin";
+          }, 2000);
+        }
       } finally {
         setLoading(false);
       }
     },
-    [limitItems]
+    [adminToken, limitItems]
   );
 
   // Debounced search function
@@ -191,16 +206,8 @@ const InvoicesControl = () => {
 
   // Khởi tạo dữ liệu
   useEffect(() => {
-    const token = adminToken || localStorage.getItem("adminToken");
-    if (token) {
-      fetchInvoices(currentPage);
-    } else {
-      toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
-      setTimeout(() => {
-        window.location.href = "/loginadmin";
-      }, 2000);
-    }
-  }, [adminToken, currentPage, fetchInvoices]);
+    fetchInvoices(currentPage);
+  }, [currentPage, fetchInvoices]);
 
   // Xử lý tìm kiếm theo mã hóa đơn
   const handleSearchTextChange = (e) => {
@@ -481,7 +488,7 @@ const InvoicesControl = () => {
   const handleOpenDetail = async (invoice) => {
     setLoading(true);
     try {
-      const response = await getInvoiceDetail(invoice._id);
+      const response = await getInvoiceDetail(adminToken, invoice._id);
       if (response.code === 200 && response.data) {
         setCurrentInvoice(response.data);
         setOpenDetail(true);
@@ -507,7 +514,7 @@ const InvoicesControl = () => {
     if (window.confirm("Bạn có chắc chắn muốn xóa hóa đơn này?")) {
       setLoading(true);
       try {
-        const response = await deleteInvoice(id);
+        const response = await deleteInvoice(adminToken, id);
         if (response.code === 200) {
           fetchInvoices(currentPage);
           toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
@@ -806,7 +813,7 @@ const InvoicesControl = () => {
 
         <Box sx={{ gridColumn: "span 12" }}>
           <Box
-            height="75vh"
+            height="70vh"
             sx={{
               "& .MuiDataGrid-root": { border: "none", width: "100%" },
               "& .MuiDataGrid-main": { width: "100%" },
@@ -843,6 +850,12 @@ const InvoicesControl = () => {
             {loading ? (
               <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                 <CircularProgress />
+              </Box>
+            ) : error ? (
+              <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                <Typography variant="h4" color={colors.redAccent[500]}>
+                  {error}
+                </Typography>
               </Box>
             ) : invoices.length === 0 ? (
               <Box display="flex" justifyContent="center" alignItems="center" height="100%">

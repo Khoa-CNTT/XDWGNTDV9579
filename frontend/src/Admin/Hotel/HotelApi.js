@@ -12,10 +12,10 @@ const createApiInstance = (adminToken) => {
     });
 };
 
-export const getHotels = async (adminToken) => {
+export const getHotels = async (adminToken, params = {}) => {
     try {
         const api = createApiInstance(adminToken);
-        const response = await api.get(BASE_URL);
+        const response = await api.get(BASE_URL, { params });
         console.log("getHotels response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (err) {

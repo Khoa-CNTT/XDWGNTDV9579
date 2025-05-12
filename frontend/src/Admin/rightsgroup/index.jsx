@@ -452,7 +452,7 @@ const RightsGroupControl = () => {
                 <Box sx={{ gridColumn: "span 12" }}>
                     <Box display="flex" justifyContent="space-between" mb={2}>
                         <Typography variant="h2" color={colors.grey[100]} fontWeight="bold">
-                            Quản lý nhóm quyền
+                            Nhóm quyền
                         </Typography>
                         <Box display="flex" gap={2}>
                             <Paper

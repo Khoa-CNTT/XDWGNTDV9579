@@ -485,12 +485,12 @@ const Team = () => {
       renderCell: ({ row }) => (
         <Button
           variant="contained"
-          color={row.status === "active" ? "success" : "error"}
+          color={row.status === "active" ? "success" : "warning"}
           onClick={() =>
             handleChangeStatus(row._id, row.status === "active" ? "inactive" : "active")
           }
         >
-          {row.status === "active" ? "Hoạt động" : "Không hoạt động"}
+          {row.status === "active" ? "Hoạt động" : "Tạm ngưng"}
         </Button>
       ),
     },

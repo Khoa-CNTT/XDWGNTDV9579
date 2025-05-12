@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Button,
@@ -16,6 +16,7 @@ import {
     DialogContent,
     DialogActions,
     Pagination,
+    CircularProgress,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -31,7 +32,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
-import { debounce } from "lodash";
 
 const Reviews = () => {
     const theme = useTheme();
@@ -46,6 +46,7 @@ const Reviews = () => {
     const [sortOption, setSortOption] = useState("none");
     const [sortModel, setSortModel] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [userCache, setUserCache] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -67,7 +68,6 @@ const Reviews = () => {
         setLoading(true);
         try {
             const response = await getHotels(adminToken);
-            console.log("fetchHotels response:", response);
             if (response.code === 200 && Array.isArray(response.data)) {
                 setHotels(response.data);
                 if (response.data.length === 0) {
@@ -82,7 +82,6 @@ const Reviews = () => {
                 setHotels([]);
             }
         } catch (err) {
-            console.error("Error fetching hotels:", err);
             toast.error(err.response?.data?.message || "Không thể tải danh sách khách sạn!", {
                 position: "top-right",
             });
@@ -129,9 +128,7 @@ const Reviews = () => {
                     params.sortKey = sortKey;
                     params.sortValue = sortValue;
                 }
-                console.log("Fetching reviews with params:", params);
                 const response = await getHotelReviews(hotelId, params, adminToken);
-                console.log("fetchReviews response:", response);
                 if (response && Array.isArray(response.reviews)) {
                     const totalRecords = response.totalRecords || response.reviews.length;
                     const reviewsWithUsers = await Promise.all(
@@ -155,7 +152,12 @@ const Reviews = () => {
                     setReviews(reviewsWithUsers);
                     setTotalPages(response.totalPage || 1);
                     if (reviewsWithUsers.length === 0) {
-                        toast.info("Không có đánh giá nào để hiển thị!", { position: "top-right" });
+                        toast.info(
+                            search
+                                ? `Không tìm thấy đánh giá nào với từ khóa "${search}"!`
+                                : "Không có đánh giá nào để hiển thị!",
+                            { position: "top-right" }
+                        );
                     }
                 } else {
                     toast.error("Dữ liệu đánh giá không hợp lệ!", { position: "top-right" });
@@ -163,7 +165,6 @@ const Reviews = () => {
                     setTotalPages(1);
                 }
             } catch (err) {
-                console.error("Error fetching reviews:", err);
                 toast.error(err.response?.data?.message || "Không thể tải danh sách đánh giá!", {
                     position: "top-right",
                 });
@@ -181,13 +182,11 @@ const Reviews = () => {
         [adminToken, viewedReviews, limitItems, navigate]
     );
 
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((hotelId, value, sortKey, sortValue) => {
-            setCurrentPage(1);
-            fetchReviews(hotelId, 1, value, sortKey, sortValue);
-        }, 500),
-        [fetchReviews]
+    const refreshReviews = useCallback(
+        async (page = 1, searchQuery = "", sortKey = "", sortValue = "") => {
+            await fetchReviews(selectedHotel?._id, page, searchQuery, sortKey, sortValue);
+        },
+        [fetchReviews, selectedHotel]
     );
 
     useEffect(() => {
@@ -204,67 +203,9 @@ const Reviews = () => {
 
     useEffect(() => {
         if (selectedHotel?._id) {
-            let sortKey = "";
-            let sortValue = "";
-            if (sortOption !== "none") {
-                switch (sortOption) {
-                    case "stt_asc":
-                        sortKey = "_id";
-                        sortValue = "asc";
-                        break;
-                    case "stt_desc":
-                        sortKey = "_id";
-                        sortValue = "desc";
-                        break;
-                    case "username_asc":
-                        sortKey = "user_id";
-                        sortValue = "asc";
-                        break;
-                    case "username_desc":
-                        sortKey = "user_id";
-                        sortValue = "desc";
-                        break;
-                    case "email_asc":
-                        sortKey = "user_id";
-                        sortValue = "asc";
-                        break;
-                    case "email_desc":
-                        sortKey = "user_id";
-                        sortValue = "desc";
-                        break;
-                    case "rating_asc":
-                        sortKey = "rating";
-                        sortValue = "asc";
-                        break;
-                    case "rating_desc":
-                        sortKey = "rating";
-                        sortValue = "desc";
-                        break;
-                    case "comment_asc":
-                        sortKey = "comment";
-                        sortValue = "asc";
-                        break;
-                    case "comment_desc":
-                        sortKey = "comment";
-                        sortValue = "desc";
-                        break;
-                    case "createdAt_asc":
-                        sortKey = "createdAt";
-                        sortValue = "asc";
-                        break;
-                    case "createdAt_desc":
-                        sortKey = "createdAt";
-                        sortValue = "desc";
-                        break;
-                    default:
-                        sortKey = "createdAt";
-                        sortValue = "desc";
-                        break;
-                }
-            }
-            fetchReviews(selectedHotel._id, currentPage, searchText, sortKey, sortValue);
+            refreshReviews(currentPage, searchText);
         }
-    }, [selectedHotel, fetchReviews]);
+    }, [selectedHotel, currentPage, refreshReviews]);
 
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
@@ -272,9 +213,16 @@ const Reviews = () => {
         setSelectedHotel(hotel);
         setCurrentPage(1);
         setSearchText("");
-        let sortKey = "";
-        let sortValue = "";
-        if (sortOption !== "none") {
+        refreshReviews(1, "");
+    };
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        setIsSearching(true);
+        try {
+            setCurrentPage(1);
+            let sortKey = "";
+            let sortValue = "";
             switch (sortOption) {
                 case "stt_asc":
                     sortKey = "_id";
@@ -325,76 +273,16 @@ const Reviews = () => {
                     sortValue = "desc";
                     break;
                 default:
-                    sortKey = "createdAt";
-                    sortValue = "desc";
                     break;
             }
+            await refreshReviews(1, searchText, sortKey, sortValue);
+        } finally {
+            setIsSearching(false);
         }
-        fetchReviews(hotelId, 1, "", sortKey, sortValue);
     };
 
     const handleSearchTextChange = (e) => {
-        const value = e.target.value;
-        setSearchText(value);
-        let sortKey = "";
-        let sortValue = "";
-        if (sortOption !== "none") {
-            switch (sortOption) {
-                case "stt_asc":
-                    sortKey = "_id";
-                    sortValue = "asc";
-                    break;
-                case "stt_desc":
-                    sortKey = "_id";
-                    sortValue = "desc";
-                    break;
-                case "username_asc":
-                    sortKey = "user_id";
-                    sortValue = "asc";
-                    break;
-                case "username_desc":
-                    sortKey = "user_id";
-                    sortValue = "desc";
-                    break;
-                case "email_asc":
-                    sortKey = "user_id";
-                    sortValue = "asc";
-                    break;
-                case "email_desc":
-                    sortKey = "user_id";
-                    sortValue = "desc";
-                    break;
-                case "rating_asc":
-                    sortKey = "rating";
-                    sortValue = "asc";
-                    break;
-                case "rating_desc":
-                    sortKey = "rating";
-                    sortValue = "desc";
-                    break;
-                case "comment_asc":
-                    sortKey = "comment";
-                    sortValue = "asc";
-                    break;
-                case "comment_desc":
-                    sortKey = "comment";
-                    sortValue = "desc";
-                    break;
-                case "createdAt_asc":
-                    sortKey = "createdAt";
-                    sortValue = "asc";
-                    break;
-                case "createdAt_desc":
-                    sortKey = "createdAt";
-                    sortValue = "desc";
-                    break;
-                default:
-                    sortKey = "createdAt";
-                    sortValue = "desc";
-                    break;
-            }
-        }
-        debouncedSearch(selectedHotel?._id, value, sortKey, sortValue);
+        setSearchText(e.target.value);
     };
 
     const handleSortChange = (event) => {
@@ -467,16 +355,13 @@ const Reviews = () => {
                     sortField = "createdAt";
                     break;
                 default:
-                    sortKey = "createdAt";
-                    sortValue = "desc";
-                    sortField = "createdAt";
                     break;
             }
             setSortModel([{ field: sortField, sort: sortValue }]);
         } else {
             setSortModel([]);
         }
-        fetchReviews(selectedHotel?._id, 1, searchText, sortKey, sortValue);
+        refreshReviews(1, searchText, sortKey, sortValue);
     };
 
     const handleSortModelChange = (newSortModel) => {
@@ -516,11 +401,11 @@ const Reviews = () => {
             }
             if (sortKey) {
                 setSortOption(sortOptionValue);
-                fetchReviews(selectedHotel?._id, 1, searchText, sortKey, sort);
+                refreshReviews(1, searchText, sortKey, sort);
             }
         } else {
             setSortOption("none");
-            fetchReviews(selectedHotel?._id, 1, searchText);
+            refreshReviews(1, searchText);
         }
     };
 
@@ -579,77 +464,17 @@ const Reviews = () => {
                     sortValue = "desc";
                     break;
                 default:
-                    sortKey = "createdAt";
-                    sortValue = "desc";
                     break;
             }
         }
-        fetchReviews(selectedHotel?._id, value, searchText, sortKey, sortValue);
+        refreshReviews(value, searchText, sortKey, sortValue);
     };
 
     const handleDelete = async (reviewId) => {
         try {
             const response = await deleteReview(reviewId, adminToken);
             if (response.code === 200) {
-                let sortKey = "";
-                let sortValue = "";
-                if (sortOption !== "none") {
-                    switch (sortOption) {
-                        case "stt_asc":
-                            sortKey = "_id";
-                            sortValue = "asc";
-                            break;
-                        case "stt_desc":
-                            sortKey = "_id";
-                            sortValue = "desc";
-                            break;
-                        case "username_asc":
-                            sortKey = "user_id";
-                            sortValue = "asc";
-                            break;
-                        case "username_desc":
-                            sortKey = "user_id";
-                            sortValue = "desc";
-                            break;
-                        case "email_asc":
-                            sortKey = "user_id";
-                            sortValue = "asc";
-                            break;
-                        case "email_desc":
-                            sortKey = "user_id";
-                            sortValue = "desc";
-                            break;
-                        case "rating_asc":
-                            sortKey = "rating";
-                            sortValue = "asc";
-                            break;
-                        case "rating_desc":
-                            sortKey = "rating";
-                            sortValue = "desc";
-                            break;
-                        case "comment_asc":
-                            sortKey = "comment";
-                            sortValue = "asc";
-                            break;
-                        case "comment_desc":
-                            sortKey = "comment";
-                            sortValue = "desc";
-                            break;
-                        case "createdAt_asc":
-                            sortKey = "createdAt";
-                            sortValue = "asc";
-                            break;
-                        case "createdAt_desc":
-                            sortKey = "createdAt";
-                            sortValue = "desc";
-                            break;
-                        default:
-                            sortKey = "createdAt";
-                            sortValue = "desc";
-                            break;
-                    }
-                }
-                fetchReviews(selectedHotel?._id, currentPage, searchText, sortKey, sortValue);
+                refreshReviews(currentPage, searchText);
                 setViewedReviews((prev) => {
                     const newViewed = { ...prev };
                     delete newViewed[reviewId];
@@ -811,7 +636,7 @@ const Reviews = () => {
                     theme="light"
                     limit={3}
                 />
-                <Header title="QUẢN LÝ ĐÁNH GIÁ" />
+                <Header title="Quản lý đánh giá" />
                 <Box
                     display="flex"
                     justifyContent="space-between"
@@ -911,10 +736,7 @@ const Reviews = () => {
                                 width: isMobile ? "100%" : 300,
                                 backgroundColor: colors.primary[400],
                             }}
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                handleSearchTextChange({ target: { value: searchText } });
-                            }}
+                            onSubmit={handleSearch}
                         >
                             <InputBase
                                 sx={{ ml: 1, flex: 1, color: colors.grey[100] }}
@@ -922,8 +744,8 @@ const Reviews = () => {
                                 value={searchText}
                                 onChange={handleSearchTextChange}
                             />
-                            <IconButton sx={{ p: "10px", color: colors.grey[100] }} type="submit">
-                                <SearchIcon />
+                            <IconButton type="submit" sx={{ p: "10px", color: colors.grey[100] }} disabled={isSearching}>
+                                {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
                             </IconButton>
                         </Paper>
                     </Box>
@@ -977,9 +799,9 @@ const Reviews = () => {
                         }}
                     >
                         {loading ? (
-                            <Typography variant="h6" align="center" mt={4}>
-                                Đang tải...
-                            </Typography>
+                            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                                <CircularProgress />
+                            </Box>
                         ) : hotels.length === 0 ? (
                             <Box textAlign="center" mt={4}>
                                 <Typography variant="h6">Không có khách sạn nào để hiển thị</Typography>

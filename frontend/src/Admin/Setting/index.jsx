@@ -114,7 +114,7 @@ const Setting = () => {
                     <CardHeader
                         title={
                             <Typography variant="h4" color={colors.grey[100]}>
-                                Cài đặt thông tin website
+                                Cài đặt website
                             </Typography>
                         }
                     />

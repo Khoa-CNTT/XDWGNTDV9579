@@ -721,7 +721,7 @@ const CategoryControl = () => {
                             >
                                 <InputBase
                                     sx={{ ml: 1, flex: 1 }}
-                                    placeholder="Tìm kiếm danh mục (nhấn Enter)"
+                                    placeholder="Tìm kiếm danh mục (Theo tiêu đề)"
                                     value={searchText}
                                     onChange={handleSearchTextChange}
                                 />

@@ -37,7 +37,6 @@ import {
 } from "./VoucherApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import { useNavigate } from "react-router-dom";
-import { debounce } from "lodash";
 
 const VoucherControl = () => {
     const theme = useTheme();
@@ -66,10 +65,20 @@ const VoucherControl = () => {
         endDate: "",
     });
     const [loading, setLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const limitItems = 10;
     const [totalPages, setTotalPages] = useState(1);
+
+    // Chuẩn hóa từ khóa tìm kiếm
+    const normalizeSearchText = (text) => {
+        return text
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    };
 
     // Lấy danh sách voucher
     const fetchVouchers = useCallback(
@@ -131,9 +140,24 @@ const VoucherControl = () => {
         [limitItems, navigate]
     );
 
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((value) => {
+    // Khởi tạo dữ liệu
+    useEffect(() => {
+        const token = adminToken || localStorage.getItem("adminToken");
+        if (token) {
+            fetchVouchers(currentPage);
+        } else {
+            toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
+            setTimeout(() => {
+                navigate("/loginadmin");
+            }, 2000);
+        }
+    }, [adminToken, navigate, currentPage, fetchVouchers]);
+
+    // Xử lý tìm kiếm
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        setIsSearching(true);
+        try {
             setCurrentPage(1);
             let sortKey = "";
             let sortValue = "";
@@ -189,29 +213,16 @@ const VoucherControl = () => {
                 default:
                     break;
             }
-            fetchVouchers(1, value, sortKey, sortValue);
-        }, 500),
-        [sortOption, fetchVouchers]
-    );
-
-    // Khởi tạo dữ liệu
-    useEffect(() => {
-        const token = adminToken || localStorage.getItem("adminToken");
-        if (token) {
-            fetchVouchers(currentPage);
-        } else {
-            toast.error("Vui lòng đăng nhập để tiếp tục!", { position: "top-right" });
-            setTimeout(() => {
-                navigate("/loginadmin");
-            }, 2000);
+            const normalizedValue = normalizeSearchText(searchText);
+            await fetchVouchers(1, normalizedValue, sortKey, sortValue);
+        } finally {
+            setIsSearching(false);
         }
-    }, [adminToken, navigate, currentPage, fetchVouchers]);
+    };
 
-    // Xử lý tìm kiếm
+    // Xử lý thay đổi văn bản tìm kiếm
     const handleSearchTextChange = (e) => {
-        const value = e.target.value;
-        setSearchText(value);
-        debouncedSearch(value);
+        setSearchText(e.target.value);
     };
 
     // Xử lý thay đổi sắp xếp
@@ -286,7 +297,8 @@ const VoucherControl = () => {
             default:
                 break;
         }
-        fetchVouchers(1, searchText, sortKey, sortValue);
+        const normalizedValue = normalizeSearchText(searchText);
+        fetchVouchers(1, normalizedValue, sortKey, sortValue);
         if (sortKey && sortValue) {
             setSortModel([{ field: sortField, sort: sortValue }]);
         } else {
@@ -332,11 +344,13 @@ const VoucherControl = () => {
             }
             if (sortKey) {
                 setSortOption(sortOptionValue);
-                fetchVouchers(1, searchText, sortKey, sort);
+                const normalizedValue = normalizeSearchText(searchText);
+                fetchVouchers(1, normalizedValue, sortKey, sort);
             }
         } else {
             setSortOption("none");
-            fetchVouchers(1, searchText);
+            const normalizedValue = normalizeSearchText(searchText);
+            fetchVouchers(1, normalizedValue);
         }
     };
 
@@ -397,7 +411,8 @@ const VoucherControl = () => {
             default:
                 break;
         }
-        fetchVouchers(value, searchText, sortKey, sortValue);
+        const normalizedValue = normalizeSearchText(searchText);
+        fetchVouchers(value, normalizedValue, sortKey, sortValue);
     };
 
     const handleOpen = () => {
@@ -500,7 +515,8 @@ const VoucherControl = () => {
         try {
             const response = await createVoucher(newVoucher);
             if (response.code === 200) {
-                fetchVouchers(currentPage);
+                const normalizedValue = normalizeSearchText(searchText);
+                fetchVouchers(currentPage, normalizedValue);
                 handleClose();
                 toast.success("Thêm voucher thành công!", { position: "top-right" });
             } else {
@@ -545,7 +561,8 @@ const VoucherControl = () => {
         try {
             const response = await updateVoucher(currentId, newVoucher);
             if (response.code === 200) {
-                fetchVouchers(currentPage);
+                const normalizedValue = normalizeSearchText(searchText);
+                fetchVouchers(currentPage, normalizedValue);
                 handleClose();
                 toast.success("Cập nhật voucher thành công!", { position: "top-right" });
             } else {
@@ -571,7 +588,8 @@ const VoucherControl = () => {
         try {
             const response = await deleteVoucher(deleteVoucherId);
             if (response.code === 200) {
-                fetchVouchers(currentPage);
+                const normalizedValue = normalizeSearchText(searchText);
+                fetchVouchers(currentPage, normalizedValue);
                 toast.success("Xóa voucher thành công!", { position: "top-right" });
             } else {
                 toast.error(response.message || "Xóa voucher thất bại!", { position: "top-right" });
@@ -590,7 +608,7 @@ const VoucherControl = () => {
         {
             field: "stt",
             headerName: "STT",
-            flex: 0.3,
+            flex: 0.5,
             sortable: true,
         },
         {
@@ -631,7 +649,6 @@ const VoucherControl = () => {
                 const status = params.value;
                 const displayText = status === "expired" ? "Đã hết hạn" : "Hoạt động";
                 const bgColor = status === "expired" ? "red" : "green";
-                const hoverColor = status === "expired" ? "darkred" : "darkgreen";
                 return (
                     <Typography
                         sx={{
@@ -750,16 +767,16 @@ const VoucherControl = () => {
                                     width: 300,
                                     backgroundColor: colors.primary[400],
                                 }}
-                                onSubmit={(e) => e.preventDefault()}
+                                onSubmit={handleSearch}
                             >
                                 <InputBase
                                     sx={{ ml: 1, flex: 1 }}
-                                    placeholder="Tìm kiếm voucher (tiêu đề, mã, mô tả)"
+                                    placeholder="Tìm kiếm voucher (nhấn Enter)"
                                     value={searchText}
                                     onChange={handleSearchTextChange}
                                 />
-                                <IconButton sx={{ p: "10px" }}>
-                                    <SearchIcon />
+                                <IconButton type="submit" sx={{ p: "10px" }} disabled={isSearching}>
+                                    {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
                                 </IconButton>
                             </Paper>
                             <Button

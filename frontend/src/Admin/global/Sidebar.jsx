@@ -162,7 +162,7 @@ const Sidebar = () => {
               Quản lý
             </Typography>
             <Item
-              title="Quản lý danh mục"
+              title="Quản lý danh mục tour"
               to="/admin/category"
               icon={<FormatListBulletedIcon />}
               selected={selected}
@@ -202,7 +202,7 @@ const Sidebar = () => {
             />
 
             <Item
-              title="Quản lý Review"
+              title="Quản lý đánh giá"
               to="/admin/review"
               icon={<RateReviewOutlinedIcon />}
               selected={selected}

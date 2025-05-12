@@ -1172,6 +1172,7 @@ const TourControl = () => {
                                         PaperProps: {
                                             sx: {
                                                 maxHeight: 250,
+                                                maxWidth: 160,
                                                 overflowY: "auto",
                                             },
                                         },

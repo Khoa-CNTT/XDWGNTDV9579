@@ -518,14 +518,7 @@ const ContactsControl = () => {
             variant="contained"
             size="small"
             onClick={() => handleChangeStatus(row._id, row.status)}
-            sx={{
-              backgroundColor: row.status === "active" ? "green" : "red",
-              color: "white",
-              fontWeight: "bold",
-              "&:hover": {
-                backgroundColor: row.status === "active" ? "darkgreen" : "darkred",
-              },
-            }}
+            color={row.status === "active" ? "success" : "warning"}
             disabled={loading}
           >
             {row.status === "active" ? "Hoạt động" : "Tạm ngưng"}
