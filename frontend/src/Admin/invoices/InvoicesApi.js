@@ -3,55 +3,51 @@ import api from "../../utils/api";
 const BASE_URL = "http://localhost:3000/api/v1/admin/orders";
 
 // Lấy danh sách hóa đơn
-export const getInvoices = async (params = {}) => {
+export const getInvoices = async (adminToken, params = {}) => {
+    if (!adminToken) {
+        throw new Error("Token không hợp lệ hoặc thiếu!");
+    }
     try {
         const response = await api.get(BASE_URL, {
             params,
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${adminToken}`
             }
         });
         console.log("getInvoices response:", response.data);
 
-        // Kiểm tra nếu response là mảng rỗng
-        if (Array.isArray(response.data) && response.data.length === 0) {
-            return [];
+        // Kiểm tra dữ liệu trả về
+        if (!response.data || typeof response.data !== 'object') {
+            throw new Error("Dữ liệu trả về không hợp lệ!");
         }
 
-        // Kiểm tra nếu có lỗi từ backend
+        // Nếu không có hóa đơn
+        if (!response.data.orders || response.data.orders.length === 0) {
+            return { orders: [], totalPage: 1, totalRecords: 0 };
+        }
+
+        // Kiểm tra lỗi từ backend
         if (response.data.code === 400) {
-            throw new Error(response.data.message);
+            throw new Error(response.data.message || "Lỗi từ server!");
         }
 
         return response.data;
     } catch (error) {
         console.error("getInvoices error:", error);
-        throw error;
-    }
-};
-
-// Thay đổi trạng thái hóa đơn
-export const changeInvoiceStatus = async (id, status) => {
-    try {
-        const response = await api.patch(`${BASE_URL}/changeStatus/${status}/${id}`, null, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-            }
-        });
-        console.log("changeInvoiceStatus response:", response.data);
-        return response.data;
-    } catch (error) {
-        console.error("changeInvoiceStatus error:", error);
-        throw error;
+        const errorMessage = error.response?.data?.message || error.message || "Không thể tải danh sách hóa đơn!";
+        throw new Error(errorMessage);
     }
 };
 
 // Lấy chi tiết hóa đơn
-export const getInvoiceDetail = async (id) => {
+export const getInvoiceDetail = async (adminToken, id) => {
+    if (!adminToken) {
+        throw new Error("Token không hợp lệ hoặc thiếu!");
+    }
     try {
         const response = await api.get(`${BASE_URL}/detail/${id}`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${adminToken}`
             }
         });
         console.log("getInvoiceDetail response:", response.data);
@@ -63,27 +59,20 @@ export const getInvoiceDetail = async (id) => {
 };
 
 // Xóa hóa đơn
-export const deleteInvoice = async (id) => {
+export const deleteInvoice = async (adminToken, id) => {
+    if (!adminToken) {
+        throw new Error("Token không hợp lệ hoặc thiếu!");
+    }
     try {
         const response = await api.delete(`${BASE_URL}/delete/${id}`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${adminToken}`
             }
         });
         console.log("deleteInvoice response:", response.data);
         return response.data;
     } catch (error) {
         console.error("deleteInvoice error:", error);
-        throw error;
-    }
-};
-
-// Lấy dữ liệu thống kê doanh thu
-export const getRevenueStatistics = async (params) => {
-    try {
-        const response = await api.get(`${BASE_URL}/statistics`, { params });
-        return response.data;
-    } catch (error) {
         throw error;
     }
 };

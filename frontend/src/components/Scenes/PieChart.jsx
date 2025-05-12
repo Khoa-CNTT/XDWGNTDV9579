@@ -1,21 +1,22 @@
 import { ResponsivePie } from "@nivo/pie";
 import { tokens } from "../../theme";
 import { useTheme, Typography, Box, useMediaQuery, CircularProgress } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getInvoices } from "../../Admin/invoices/InvoicesApi";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
+import { useAdminAuth } from "../../context/AdminContext";
 
-const PieChart = ({ isDashboard = false }) => {
+const PieChart = ({ isDashboard = false, selectedYear }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
+  const colors = useMemo(() => tokens(theme.palette.mode), [theme.palette.mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
+  const { adminToken } = useAdminAuth();
   const [pieData, setPieData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const adminToken = localStorage.getItem("adminToken");
 
   useEffect(() => {
     const fetchPieData = async () => {
@@ -29,35 +30,43 @@ const PieChart = ({ isDashboard = false }) => {
       setLoading(true);
       setErrorMessage("");
       try {
-        const today = new Date();
-        const currentMonth = today.getMonth() + 1;
-        const currentYear = today.getFullYear();
-
-        const invoicesData = await getInvoices({
+        const invoicesData = await getInvoices(adminToken, {
           page: 1,
           limit: 50,
-          status: "paid", // Sửa từ "confirmed" thành "paid"
-          year: currentYear,
-          month: currentMonth,
-        }, adminToken);
+          status: "paid",
+        });
         if (!invoicesData || !Array.isArray(invoicesData.orders)) {
           throw new Error("Dữ liệu hóa đơn không hợp lệ!");
         }
 
+        // Lọc dữ liệu theo năm được chọn
+        const filteredInvoices = invoicesData.orders.filter((invoice) => {
+          const invoiceDate = new Date(invoice.createdAt);
+          const invoiceYear = invoiceDate.getFullYear();
+          return invoiceYear === selectedYear;
+        });
+
+        console.log("Filtered invoices for year", selectedYear, ":", JSON.stringify(filteredInvoices, null, 2));
+
         let tourRevenue = 0;
         let hotelRevenue = 0;
-        invoicesData.orders.forEach((invoice) => {
+        filteredInvoices.forEach((invoice) => {
           if (invoice.tours?.length > 0) {
             invoice.tours.forEach((tour) => {
               const stock = tour.timeStarts?.[0]?.stock || 0;
-              tourRevenue += (tour.price || 0) * stock;
+              const price = tour.price || 0;
+              tourRevenue += price * stock;
+              console.log(`Tour: stock=${stock}, price=${price}, revenue=${price * stock}`);
             });
           }
           if (invoice.hotels?.length > 0) {
             invoice.hotels.forEach((hotel) => {
               if (hotel.rooms?.length > 0) {
                 hotel.rooms.forEach((room) => {
-                  hotelRevenue += (room.price || 0) * (room.quantity || 0);
+                  const quantity = room.quantity || 0;
+                  const price = room.price || 0;
+                  hotelRevenue += price * quantity;
+                  console.log(`Hotel room: quantity=${quantity}, price=${price}, revenue=${price * quantity}`);
                 });
               }
             });
@@ -65,16 +74,18 @@ const PieChart = ({ isDashboard = false }) => {
         });
 
         const totalRevenue = tourRevenue + hotelRevenue;
+        console.log(`Total Revenue for year ${selectedYear}: tour=${tourRevenue}, hotel=${hotelRevenue}, total=${totalRevenue}`);
+
         if (totalRevenue === 0) {
-          setErrorMessage(`Không có dữ liệu doanh thu cho tháng ${currentMonth}/${currentYear}.`);
+          setErrorMessage(`Không có dữ liệu doanh thu cho năm ${selectedYear}.`);
           setPieData([]);
-          toast.info(`Không có dữ liệu doanh thu cho tháng ${currentMonth}/${currentYear}.`, { position: "top-right" });
+          toast.info(`Không có dữ liệu doanh thu cho năm ${selectedYear}.`, { position: "top-right" });
         } else {
-          setPieData([
+          const newPieData = [
             {
               id: "Tour",
               label: "Tour",
-              value: tourRevenue / 1000,
+              value: tourRevenue / 1000, // Chia cho 1000 để hiển thị đơn vị K VNĐ
               color: colors.blueAccent[700],
             },
             {
@@ -83,7 +94,9 @@ const PieChart = ({ isDashboard = false }) => {
               value: hotelRevenue / 1000,
               color: colors.greenAccent[500],
             },
-          ]);
+          ];
+          setPieData(newPieData);
+          console.log("Pie Data:", JSON.stringify(newPieData, null, 2));
         }
       } catch (err) {
         console.error("Fetch pie data error:", err);
@@ -98,10 +111,11 @@ const PieChart = ({ isDashboard = false }) => {
         }
       } finally {
         setLoading(false);
+        console.log("Finished fetching pie data for year", selectedYear);
       }
     };
     fetchPieData();
-  }, [adminToken, navigate]);
+  }, [adminToken, navigate, selectedYear]);
 
   return (
     <Box height="100%" position="relative">
@@ -157,7 +171,7 @@ const PieChart = ({ isDashboard = false }) => {
           arcLabelsRadiusOffset={0.4}
           arcLabelsSkipAngle={7}
           arcLabelsTextColor={{ from: "color", modifiers: [["darker", 2]] }}
-          valueFormat={(value) => `${Math.round(value)} VNĐ`}
+          valueFormat={(value) => `${Math.round(value)}K VNĐ`}
           defs={[
             {
               id: "dots",

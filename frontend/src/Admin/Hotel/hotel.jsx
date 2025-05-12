@@ -15,6 +15,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { Formik } from "formik";
@@ -32,7 +33,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate } from "react-router-dom";
-import { debounce } from "lodash";
 
 const Hotels = () => {
   const theme = useTheme();
@@ -49,6 +49,7 @@ const Hotels = () => {
   const [selectedHotel, setSelectedHotel] = useState(null);
   const [openRoomModal, setOpenRoomModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const limitItems = 10;
   const [totalPages, setTotalPages] = useState(1);
@@ -65,9 +66,7 @@ const Hotels = () => {
           params.sortKey = sortKey;
           params.sortValue = sortValue;
         }
-        console.log("Fetching hotels with params:", params);
         const response = await getHotels(token, params);
-        console.log("API response:", response);
         if (response.code === 200 && Array.isArray(response.data)) {
           const totalRecords = response.totalRecords || response.data.length;
           const formattedHotels = response.data.map((hotel, index) => {
@@ -97,7 +96,6 @@ const Hotels = () => {
           setTotalPages(1);
         }
       } catch (err) {
-        console.error("Fetch hotels error:", err);
         if (err.response?.status === 400) {
           toast.error("Bạn không có quyền xem danh sách khách sạn. Vui lòng kiểm tra quyền tài khoản!", {
             position: "top-right",
@@ -120,13 +118,11 @@ const Hotels = () => {
     [adminToken, navigate, limitItems]
   );
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce((value, status, sortKey, sortValue) => {
-      setCurrentPage(1);
-      fetchHotels(1, value, status, sortKey, sortValue);
-    }, 500),
-    [fetchHotels]
+  const refreshHotels = useCallback(
+    async (page = 1, searchQuery = "", status = statusFilter, sortKey = "", sortValue = "") => {
+      await fetchHotels(page, searchQuery, status, sortKey, sortValue);
+    },
+    [fetchHotels, statusFilter]
   );
 
   useEffect(() => {
@@ -141,56 +137,65 @@ const Hotels = () => {
     }
   }, [adminToken, navigate, currentPage, fetchHotels]);
 
-  const handleSearchTextChange = (e) => {
-    const value = e.target.value;
-    setSearchText(value);
-    let sortKey = "";
-    let sortValue = "";
-    switch (sortOption) {
-      case "stt_asc":
-        sortKey = "_id";
-        sortValue = "asc";
-        break;
-      case "stt_desc":
-        sortKey = "_id";
-        sortValue = "desc";
-        break;
-      case "name_asc":
-        sortKey = "name";
-        sortValue = "asc";
-        break;
-      case "name_desc":
-        sortKey = "name";
-        sortValue = "desc";
-        break;
-      case "city_asc":
-        sortKey = "location.city";
-        sortValue = "asc";
-        break;
-      case "city_desc":
-        sortKey = "location.city";
-        sortValue = "desc";
-        break;
-      case "address_asc":
-        sortKey = "location.address";
-        sortValue = "asc";
-        break;
-      case "address_desc":
-        sortKey = "location.address";
-        sortValue = "desc";
-        break;
-      case "status_asc":
-        sortKey = "status";
-        sortValue = "asc";
-        break;
-      case "status_desc":
-        sortKey = "status";
-        sortValue = "desc";
-        break;
-      default:
-        break;
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    setIsSearching(true);
+    try {
+      setCurrentPage(1);
+      let sortKey = "";
+      let sortValue = "";
+      switch (sortOption) {
+        case "stt_asc":
+          sortKey = "_id";
+          sortValue = "asc";
+          break;
+        case "stt_desc":
+          sortKey = "_id";
+          sortValue = "desc";
+          break;
+        case "name_asc":
+          sortKey = "name";
+          sortValue = "asc";
+          break;
+        case "name_desc":
+          sortKey = "name";
+          sortValue = "desc";
+          break;
+        case "city_asc":
+          sortKey = "location.city";
+          sortValue = "asc";
+          break;
+        case "city_desc":
+          sortKey = "location.city";
+          sortValue = "desc";
+          break;
+        case "address_asc":
+          sortKey = "location.address";
+          sortValue = "asc";
+          break;
+        case "address_desc":
+          sortKey = "location.address";
+          sortValue = "desc";
+          break;
+        case "status_asc":
+          sortKey = "status";
+          sortValue = "asc";
+          break;
+        case "status_desc":
+          sortKey = "status";
+          sortValue = "desc";
+          break;
+        default:
+          break;
+      }
+      await refreshHotels(1, searchText, statusFilter, sortKey, sortValue);
+    } finally {
+      setIsSearching(false);
     }
-    debouncedSearch(value, statusFilter, sortKey, sortValue);
+  };
+
+  const handleSearchTextChange = (e) => {
+    setSearchText(e.target.value);
   };
 
   const handleStatusFilterChange = (event) => {
@@ -243,7 +248,7 @@ const Hotels = () => {
       default:
         break;
     }
-    fetchHotels(1, searchText, newStatus, sortKey, sortValue);
+    refreshHotels(1, searchText, newStatus, sortKey, sortValue);
   };
 
   const handleSortChange = (event) => {
@@ -307,7 +312,7 @@ const Hotels = () => {
       default:
         break;
     }
-    fetchHotels(1, searchText, statusFilter, sortKey, sortValue);
+    refreshHotels(1, searchText, statusFilter, sortKey, sortValue);
     if (sortKey && sortValue) {
       setSortModel([{ field: sortField, sort: sortValue }]);
     } else {
@@ -348,11 +353,11 @@ const Hotels = () => {
       }
       if (sortKey) {
         setSortOption(sortOptionValue);
-        fetchHotels(1, searchText, statusFilter, sortKey, sort);
+        refreshHotels(1, searchText, statusFilter, sortKey, sort);
       }
     } else {
       setSortOption("none");
-      fetchHotels(1, searchText, statusFilter);
+      refreshHotels(1, searchText, statusFilter);
     }
   };
 
@@ -362,7 +367,7 @@ const Hotels = () => {
       const newStatus = currentStatus === "active" ? "inactive" : "active";
       const response = await changeHotelStatus(hotelId, newStatus, token);
       if (response.code === 200) {
-        fetchHotels(currentPage, searchText, statusFilter);
+        refreshHotels(currentPage, searchText, statusFilter);
         toast.success("Cập nhật trạng thái thành công!", { position: "top-right" });
       } else {
         toast.error(response.message || "Cập nhật trạng thái thất bại!", { position: "top-right" });
@@ -380,7 +385,7 @@ const Hotels = () => {
         const token = adminToken || localStorage.getItem("adminToken");
         const response = await deleteHotel(hotelId, token);
         if (response.code === 200) {
-          fetchHotels(currentPage, searchText, statusFilter);
+          refreshHotels(currentPage, searchText, statusFilter);
           toast.success("Xóa khách sạn thành công!", { position: "top-right" });
         } else {
           toast.error(response.message || "Xóa khách sạn thất bại!", { position: "top-right" });
@@ -439,7 +444,7 @@ const Hotels = () => {
       default:
         break;
     }
-    fetchHotels(value, searchText, statusFilter, sortKey, sortValue);
+    refreshHotels(value, searchText, statusFilter, sortKey, sortValue);
   };
 
   const handleOpenModal = (hotel = null) => {
@@ -618,7 +623,7 @@ const Hotels = () => {
           resetForm();
           setImagePreviews([]);
           onClose();
-          fetchHotels(currentPage, searchText, statusFilter);
+          refreshHotels(currentPage, searchText, statusFilter);
         } else {
           toast.error(response.message || "Thao tác thất bại!", { position: "top-right" });
         }
@@ -650,13 +655,13 @@ const Hotels = () => {
           initialValues={
             hotel
               ? {
-                  name: hotel.name || "",
-                  description: hotel.description || "",
-                  city: hotel.location?.city || "",
-                  country: hotel.location?.country || "",
-                  address: hotel.location?.address || "",
-                  images: [],
-                }
+                name: hotel.name || "",
+                description: hotel.description || "",
+                city: hotel.location?.city || "",
+                country: hotel.location?.country || "",
+                address: hotel.location?.address || "",
+                images: [],
+              }
               : initialValues
           }
           validationSchema={checkoutSchema}
@@ -844,7 +849,8 @@ const Hotels = () => {
                   <MenuItem value="city_desc">Thành phố: Giảm dần</MenuItem>
                   <MenuItem value="address_asc">Địa chỉ: Tăng dần</MenuItem>
                   <MenuItem value="address_desc">Địa chỉ: Giảm dần</MenuItem>
-                 
+                  <MenuItem value="status_asc">Trạng thái: Tăng dần</MenuItem>
+                  <MenuItem value="status_desc">Trạng thái: Giảm dần</MenuItem>
                 </Select>
               </FormControl>
               <FormControl sx={{ width: 150 }}>
@@ -871,10 +877,7 @@ const Hotels = () => {
                   width: 300,
                   backgroundColor: colors.primary[400],
                 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSearchTextChange({ target: { value: searchText } });
-                }}
+                onSubmit={handleSearch}
               >
                 <InputBase
                   sx={{ ml: 1, flex: 1 }}
@@ -882,8 +885,8 @@ const Hotels = () => {
                   value={searchText}
                   onChange={handleSearchTextChange}
                 />
-                <IconButton type="submit" sx={{ p: "10px" }}>
-                  <SearchIcon />
+                <IconButton type="submit" sx={{ p: "10px" }} disabled={isSearching}>
+                  {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
                 </IconButton>
               </Paper>
               <Button
@@ -1004,7 +1007,7 @@ const Hotels = () => {
               setSelectedHotel(null);
             }}
             onSuccess={(newHotel) => {
-              fetchHotels(currentPage, searchText, statusFilter);
+              refreshHotels(currentPage, searchText, statusFilter);
               setOpenModal(false);
               setSelectedHotel(null);
             }}
@@ -1034,7 +1037,7 @@ const Hotels = () => {
               selectedHotelId={selectedHotel._id}
               selectedHotelName={selectedHotel.name}
               onSuccess={() => {
-                fetchHotels(currentPage, searchText, statusFilter);
+                refreshHotels(currentPage, searchText, statusFilter);
               }}
             />
           </Box>

@@ -6,17 +6,18 @@ import { getInvoices } from "../../Admin/invoices/InvoicesApi";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
+import { useAdminAuth } from "../../context/AdminContext";
 
 const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
   const theme = useTheme();
   const colors = useMemo(() => tokens(theme.palette.mode), [theme.palette.mode]);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
+  const { adminToken } = useAdminAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const adminToken = localStorage.getItem("adminToken");
-  const [tickValues, setTickValues] = useState([0, 1, 2, 3, 4, 5, 6]); // State cho tickValues động
+  const [tickValues, setTickValues] = useState([0, 1, 2, 3, 4, 5, 6]);
 
   useEffect(() => {
     const fetchRevenueData = async () => {
@@ -32,13 +33,13 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
       try {
         console.log("Fetching invoice data for year:", selectedYear, "month:", selectedMonth);
         const params = {
-          status: "paid", // Lấy hóa đơn đã thanh toán
+          status: "paid",
           year: selectedYear,
-          month: selectedMonth || undefined, // Omit month for yearly data
+          month: selectedMonth || undefined,
           page: 1,
           limit: 50,
         };
-        const response = await getInvoices(params, adminToken);
+        const response = await getInvoices(adminToken, params);
         console.log("API Response:", JSON.stringify(response, null, 2));
 
         if (!response || !Array.isArray(response.orders)) {
@@ -48,12 +49,11 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         if (response.orders.length === 0) {
           setErrorMessage(`Không có dữ liệu doanh thu cho ${selectedMonth ? `tháng ${selectedMonth}/${selectedYear}` : `năm ${selectedYear}`}.`);
           setData([]);
-          setTickValues([0, 1, 2, 3, 4, 5, 6]); // Mặc định khi không có dữ liệu
+          setTickValues([0, 1, 2, 3, 4, 5, 6]);
           toast.info(`Không có dữ liệu doanh thu cho ${selectedMonth ? `tháng ${selectedMonth}/${selectedYear}` : `năm ${selectedYear}`}.`, { position: "top-right" });
           return;
         }
 
-        // Initialize data structures
         const tourData = {
           id: "Tours",
           color: colors.blueAccent[700],
@@ -66,7 +66,6 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         };
 
         if (selectedMonth) {
-          // Daily data for a specific month
           const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
           const dailyRevenue = Array.from({ length: daysInMonth }, () => ({
             tourRevenue: 0,
@@ -75,7 +74,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
 
           response.orders.forEach((invoice) => {
             const createdAt = new Date(invoice.createdAt);
-            const day = createdAt.getDate() - 1; // 0-based index for array
+            const day = createdAt.getDate() - 1;
             if (
               createdAt.getFullYear() === selectedYear &&
               createdAt.getMonth() + 1 === selectedMonth &&
@@ -103,7 +102,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
           for (let day = 1; day <= daysInMonth; day++) {
             tourData.data.push({
               x: `${day}/${selectedMonth}/${selectedYear}`,
-              y: dailyRevenue[day - 1].tourRevenue / 1000000, // Convert to millions VND
+              y: dailyRevenue[day - 1].tourRevenue / 1000000,
             });
             hotelData.data.push({
               x: `${day}/${selectedMonth}/${selectedYear}`,
@@ -111,7 +110,6 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
             });
           }
         } else {
-          // Monthly data for the entire year
           const monthlyRevenue = Array(12).fill().map(() => ({
             tourRevenue: 0,
             hotelRevenue: 0,
@@ -119,7 +117,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
 
           response.orders.forEach((invoice) => {
             const createdAt = new Date(invoice.createdAt);
-            const month = createdAt.getMonth(); // 0-based index
+            const month = createdAt.getMonth();
             if (createdAt.getFullYear() === selectedYear) {
               if (invoice.tours?.length > 0) {
                 invoice.tours.forEach((tour) => {
@@ -154,16 +152,14 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         const formattedData = [tourData, hotelData];
         console.log("Formatted Data:", JSON.stringify(formattedData, null, 2));
 
-        // Tìm giá trị lớn nhất trong dữ liệu
         const maxValue = formattedData.length > 0
           ? Math.max(
             ...formattedData.flatMap(series => series.data.map(point => point.y))
           )
-          : 6; // Giá trị mặc định nếu không có dữ liệu
+          : 6;
 
-        // Tạo tickValues động
-        const step = 2; // Khoảng cách giữa các nhãn (2 triệu VNĐ)
-        const maxTick = Math.ceil(maxValue / step) * step; // Làm tròn lên đến bội số của step
+        const step = 2;
+        const maxTick = Math.ceil(maxValue / step) * step;
         const newTickValues = Array.from(
           { length: Math.floor(maxTick / step) + 1 },
           (_, i) => i * step
@@ -176,7 +172,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         const errorMsg = error.message || `Lỗi kết nối API: ${error.response?.data?.message || error.message}`;
         setErrorMessage(errorMsg);
         setData([]);
-        setTickValues([0, 1, 2, 3, 4, 5, 6]); // Mặc định khi có lỗi
+        setTickValues([0, 1, 2, 3, 4, 5, 6]);
         toast.error(errorMsg, { position: "top-right" });
         if (error.response?.status === 401) {
           toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
@@ -188,7 +184,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
       }
     };
     fetchRevenueData();
-  }, [selectedYear, selectedMonth, adminToken, navigate]);
+  }, [selectedYear, selectedMonth, adminToken, navigate, colors]);
 
   return (
     <Box height="100%" position="relative" sx={{ overflow: "visible" }}>
@@ -256,7 +252,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
               legend: isDashboard ? undefined : selectedMonth ? "Ngày" : "Tháng",
               legendOffset: isMobile ? 30 : 36,
               legendPosition: "middle",
-              format: (value) => value.split("/")[selectedMonth ? 0 : 0], // Show day or month
+              format: (value) => value.split("/")[selectedMonth ? 0 : 0],
             }}
             axisLeft={{
               tickSize: 5,
@@ -265,7 +261,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
               legend: isDashboard ? undefined : "Doanh thu (triệu VNĐ)",
               legendOffset: isMobile ? -25 : -40,
               legendPosition: "middle",
-              tickValues: tickValues, // Sử dụng state động
+              tickValues: tickValues,
               format: (value) => `${Math.round(value)}M`,
             }}
             enableGridX={false}
