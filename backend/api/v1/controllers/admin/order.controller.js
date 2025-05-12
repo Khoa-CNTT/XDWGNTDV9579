@@ -24,6 +24,19 @@ module.exports.index = async (req, res) => {
             ];
         }
 
+        if (req.query.startDate || req.query.endDate) {
+            find.createdAt = {};
+            if (req.query.startDate) {
+                find.createdAt.$gte = new Date(req.query.startDate);
+            }
+            if (req.query.endDate) {
+                const end = new Date(req.query.endDate);
+                end.setDate(end.getDate() + 1);
+                find.createdAt.$lt = end;
+            }
+        }
+
+
 
         if (req.query.status) {
             find.status = req.query.status;
@@ -55,6 +68,7 @@ module.exports.index = async (req, res) => {
         });
     }
 };
+
 
 // [PATCH]/api/v1/admin/orders/changeStatus/:status/:id
 module.exports.changeStatus = async (req, res) => {
