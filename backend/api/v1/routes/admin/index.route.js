@@ -11,6 +11,7 @@ const hotelRoutes = require("./hotel.route");
 const reviewRoutes = require("./review.route");
 const userRoutes = require("./user.route");
 const settingsRoutes = require("./setting.route");
+const dashBoardRoutes = require("./dashboard.route");
 
 const authMiddleware = require("../../middlewares/admin/auth.middleware");
 
@@ -29,4 +30,5 @@ module.exports = (app) => {
     app.use(version + PARTH_ADMIN + "/reviews", authMiddleware.requireAuth, reviewRoutes);
     app.use(version + PARTH_ADMIN + "/users", authMiddleware.requireAuth, userRoutes);
     app.use(version + PARTH_ADMIN + "/settings", authMiddleware.requireAuth, settingsRoutes);
+    app.use(version + PARTH_ADMIN + "/dashboard", authMiddleware.requireAuth, dashBoardRoutes);
 }
