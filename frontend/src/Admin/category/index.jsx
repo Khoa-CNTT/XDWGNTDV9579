@@ -46,7 +46,7 @@ const CategoryControl = () => {
     const [allCategories, setAllCategories] = useState([]);
     const [searchText, setSearchText] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [sortOption, setSortOption] = useState("none");
+    const [sortOption, setSortOption] = useState("stt_asc");
     const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
@@ -686,7 +686,6 @@ const CategoryControl = () => {
                                         },
                                     }}
                                 >
-                                    <MenuItem value="none">Không sắp xếp</MenuItem>
                                     <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                                     <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                     <MenuItem value="title_asc">Tiêu đề: Tăng dần</MenuItem>

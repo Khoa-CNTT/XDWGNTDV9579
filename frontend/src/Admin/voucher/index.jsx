@@ -46,7 +46,7 @@ const VoucherControl = () => {
     const [vouchers, setVouchers] = useState([]);
     const [allVouchers, setAllVouchers] = useState([]);
     const [searchText, setSearchText] = useState("");
-    const [sortOption, setSortOption] = useState("none");
+    const [sortOption, setSortOption] = useState("stt_asc");
     const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
@@ -743,7 +743,6 @@ const VoucherControl = () => {
                                         backgroundColor: colors.primary[400],
                                     }}
                                 >
-                                    <MenuItem value="none">Không sắp xếp</MenuItem>
                                     <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                                     <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                     <MenuItem value="code_asc">Mã voucher: Tăng dần</MenuItem>

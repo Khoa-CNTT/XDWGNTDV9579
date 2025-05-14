@@ -28,30 +28,18 @@ const LoginAdmin = () => {
             if (response.data.code === 200) {
                 const token = response.data.token;
 
-                // Gọi GET /api/v1/admin/accounts để lấy thông tin tài khoản
-                const accountsResponse = await api.get("/admin/accounts", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                console.log("Accounts response:", JSON.stringify(accountsResponse.data, null, 2));
-
-                // Lọc tài khoản dựa trên email
-                const account = accountsResponse.data.find(acc => acc.email === email);
-                if (!account) {
-                    toast.error("Không tìm thấy tài khoản với email này!");
-                    throw new Error("Không tìm thấy tài khoản!");
-                }
-
+                // Construct adminData from login response and form input
                 const adminData = {
-                    _id: account._id || "",
-                    email: account.email || email,
-                    fullName: account.fullName || "",
-                    phone: account.phone || "",
-                    avatar: account.avatar || "",
+                    email: email,
+                    fullName: response.data.fullName || "", // Use if backend provides fullName
+                    phone: response.data.phone || "",
+                    avatar: response.data.avatar || "",
+                    _id: response.data.accountId || "", // Use if backend provides account ID
                 };
                 console.log("Saving adminData to localStorage:", JSON.stringify(adminData, null, 2));
+
+                // Call loginAdmin to update context and localStorage
                 loginAdmin(adminData, token);
-                localStorage.setItem("adminInfo", JSON.stringify(adminData));
-                localStorage.setItem("adminToken", token);
                 toast.success("Đăng nhập thành công!");
                 navigate("/admin/dashboard");
             } else {
@@ -62,9 +50,7 @@ const LoginAdmin = () => {
             const errorMessage = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại!";
             setError(errorMessage);
             toast.error(errorMessage);
-            if (err.response?.status === 400 && errorMessage.includes("quyền")) {
-                toast.error("Vui lòng liên hệ quản trị viên để cấp quyền account_view!");
-            }
+            console.error("Login error:", err);
         } finally {
             setLoading(false);
         }

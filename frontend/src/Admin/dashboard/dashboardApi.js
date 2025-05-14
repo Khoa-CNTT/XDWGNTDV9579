@@ -22,9 +22,29 @@ export const getDashboardStats = async (adminToken, params = {}) => {
             throw new Error(response.data.message || "Lỗi khi lấy dữ liệu thống kê");
         }
 
-        return response.data.statistic;
+        const { statistic } = response.data;
+
+        // Map backend statistic to frontend expected format
+        return {
+            totalUsers: statistic.user.total || 0,
+            totalAvailableTours: statistic.tour.total || 0,
+            totalAvailableHotels: statistic.hotel.total || 0,
+            totalOrders: statistic.order.total || 0,
+            pendingOrders: statistic.order.pending || 0,
+            paidOrders: statistic.order.paid || 0,
+            cancelledOrders: statistic.order.cancel || 0,
+            totalReviews: statistic.review.total || 0,
+            averageRating: statistic.review.average || 0,
+            totalVouchers: statistic.voucher.total || 0,
+            validVouchers: statistic.voucher.valid || 0,
+            expiredVouchers: statistic.voucher.expire || 0,
+            totalCategories: statistic.category.total || 0,
+            totalAccounts: statistic.account.total || 0,
+            totalRoles: statistic.role.total || 0,
+        };
     } catch (error) {
         console.error("getDashboardStats error:", error.response?.data || error);
-        throw error;
+        const errorMessage = error.response?.data?.message || error.message || "Không thể tải dữ liệu thống kê!";
+        throw new Error(errorMessage);
     }
 };

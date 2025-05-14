@@ -16,6 +16,10 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { Formik } from "formik";
@@ -32,6 +36,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 
 const Hotels = () => {
@@ -43,7 +48,7 @@ const Hotels = () => {
   const [hotels, setHotels] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortOption, setSortOption] = useState("none");
+  const [sortOption, setSortOption] = useState("stt_asc");
   const [sortModel, setSortModel] = useState([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedHotel, setSelectedHotel] = useState(null);
@@ -53,6 +58,8 @@ const Hotels = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const limitItems = 10;
   const [totalPages, setTotalPages] = useState(1);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [hotelToDelete, setHotelToDelete] = useState(null);
 
   const fetchHotels = useCallback(
     async (page = 1, search = "", status = "all", sortKey = "", sortValue = "") => {
@@ -379,20 +386,31 @@ const Hotels = () => {
     }
   };
 
-  const handleDelete = async (hotelId) => {
-    if (window.confirm("Bạn có chắc muốn xóa khách sạn này?")) {
-      try {
-        const token = adminToken || localStorage.getItem("adminToken");
-        const response = await deleteHotel(hotelId, token);
-        if (response.code === 200) {
-          refreshHotels(currentPage, searchText, statusFilter);
-          toast.success("Xóa khách sạn thành công!", { position: "top-right" });
-        } else {
-          toast.error(response.message || "Xóa khách sạn thất bại!", { position: "top-right" });
-        }
-      } catch (err) {
-        toast.error(err.response?.data?.message || "Xóa khách sạn thất bại!", { position: "top-right" });
+  const handleOpenDeleteDialog = (hotelId) => {
+    setHotelToDelete(hotelId);
+    setOpenDeleteDialog(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setOpenDeleteDialog(false);
+    setHotelToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!hotelToDelete) return;
+    try {
+      const token = adminToken || localStorage.getItem("adminToken");
+      const response = await deleteHotel(hotelToDelete, token);
+      if (response.code === 200) {
+        refreshHotels(currentPage, searchText, statusFilter);
+        toast.success("Xóa khách sạn thành công!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Xóa khách sạn thất bại!", { position: "top-right" });
       }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Xóa khách sạn thất bại!", { position: "top-right" });
+    } finally {
+      handleCloseDeleteDialog();
     }
   };
 
@@ -493,14 +511,14 @@ const Hotels = () => {
     {
       field: "address",
       headerName: "Địa chỉ",
-      flex: 2.7,
+      flex: 2.5,
       sortable: true,
       renderCell: ({ row }) => row.location?.address || "N/A",
     },
     {
       field: "status",
       headerName: "Trạng thái",
-      flex: 1,
+      flex: 0.7,
       sortable: true,
       renderCell: ({ row }) => (
         <Button
@@ -515,29 +533,20 @@ const Hotels = () => {
     {
       field: "actions",
       headerName: "Hành động",
-      flex: 1,
+      flex: 1.1,
       renderCell: ({ row }) => (
-        <Box
-          sx={{
-            display: "flex",
-            mt: "22px",
-            gap: 1,
-          }}
-        >
-          <IconButton
+        <Box display="flex" gap={1} sx={{ alignItems: "center", height: "100%" }}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<VisibilityIcon />}
             onClick={() => handleManageRooms(row)}
-            sx={{
-              backgroundColor: "#808080",
-              color: "white",
-              "&:hover": {
-                backgroundColor: "#696969",
-              },
-            }}
           >
-            <VisibilityIcon />
-          </IconButton>
-          <IconButton
-            onClick={() => handleOpenModal(row)}
+            Xem
+          </Button>
+          <Button
+            variant="contained"
             sx={{
               backgroundColor: colors.blueAccent[300],
               color: "white",
@@ -545,21 +554,21 @@ const Hotels = () => {
                 backgroundColor: colors.blueAccent[200],
               },
             }}
+            size="small"
+            startIcon={<EditIcon />}
+            onClick={() => handleOpenModal(row)}
           >
-            <EditIcon />
-          </IconButton>
-          <IconButton
-            onClick={() => handleDelete(row._id)}
-            sx={{
-              backgroundColor: colors.redAccent[500],
-              color: "white",
-              "&:hover": {
-                backgroundColor: colors.redAccent[600],
-              },
-            }}
+            Sửa
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<DeleteIcon />}
+            onClick={() => handleOpenDeleteDialog(row._id)}
           >
-            <DeleteIcon />
-          </IconButton>
+            Xóa
+          </Button>
         </Box>
       ),
     },
@@ -567,17 +576,35 @@ const Hotels = () => {
 
   const HotelForm = ({ hotel, onClose, onSuccess }) => {
     const [imagePreviews, setImagePreviews] = useState(hotel?.images || []);
+    const [imageFiles, setImageFiles] = useState(hotel?.images ? hotel.images.map(url => ({ url })) : []);
     const [loading, setLoading] = useState(false);
 
     const handleImagesChange = (event, setFieldValue) => {
       const files = Array.from(event.target.files);
-      if (files.length + imagePreviews.length > 10) {
+      const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      const validFiles = files.filter(file => validImageTypes.includes(file.type));
+
+      if (validFiles.length + imageFiles.length > 10) {
         toast.error("Tối đa 10 ảnh!", { position: "top-right" });
         return;
       }
-      setFieldValue("images", files);
-      const previews = files.map((file) => URL.createObjectURL(file));
-      setImagePreviews([...imagePreviews, ...previews]);
+
+      if (validFiles.length < files.length) {
+        toast.warn("Một số file không phải định dạng ảnh hợp lệ!", { position: "top-right" });
+      }
+
+      setImageFiles(prev => [...prev, ...validFiles]);
+      setFieldValue("images", [...imageFiles, ...validFiles]);
+      const previews = validFiles.map(file => URL.createObjectURL(file));
+      setImagePreviews(prev => [...prev, ...previews]);
+    };
+
+    const handleRemoveImage = (index, setFieldValue) => {
+      const newPreviews = imagePreviews.filter((_, i) => i !== index);
+      const newFiles = imageFiles.filter((_, i) => i !== index);
+      setImagePreviews(newPreviews);
+      setImageFiles(newFiles);
+      setFieldValue("images", newFiles);
     };
 
     const handleFormSubmit = async (values, { resetForm }) => {
@@ -593,6 +620,12 @@ const Hotels = () => {
           return;
         }
 
+        // Kiểm tra ít nhất một ảnh
+        if (imageFiles.length === 0) {
+          toast.error("Vui lòng chọn ít nhất một ảnh!", { position: "top-right" });
+          return;
+        }
+
         const formData = new FormData();
         formData.append("name", values.name.trim());
         formData.append("description", values.description || "");
@@ -600,11 +633,20 @@ const Hotels = () => {
         formData.append("location[country]", values.country);
         formData.append("location[address]", values.address);
         formData.append("status", "active");
-        if (values.images && values.images.length > 0) {
-          values.images.forEach((file) => {
+
+        // Gửi tất cả ảnh (mới và cũ)
+        imageFiles.forEach((file, index) => {
+          if (file.url) {
+            // Gửi URL của ảnh cũ
+            formData.append(`images[${index}]`, file.url);
+          } else {
+            // Gửi file ảnh mới
             formData.append("images", file);
-          });
-        }
+          }
+        });
+
+        // Log dữ liệu gửi đi để debug
+        console.log("FormData gửi đi:", [...formData.entries()]);
 
         const token = adminToken || localStorage.getItem("adminToken");
         let response;
@@ -614,6 +656,8 @@ const Hotels = () => {
           response = await createHotel(formData, token);
         }
 
+        console.log("Phản hồi từ server:", response);
+
         if (response.code === 200) {
           toast.success(
             hotel ? "Cập nhật khách sạn thành công!" : "Tạo khách sạn thành công!",
@@ -622,6 +666,7 @@ const Hotels = () => {
           onSuccess(response.data);
           resetForm();
           setImagePreviews([]);
+          setImageFiles([]);
           onClose();
           refreshHotels(currentPage, searchText, statusFilter);
         } else {
@@ -633,6 +678,7 @@ const Hotels = () => {
           err.response?.data?.message ||
           "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại!";
         toast.error(errorMessage, { position: "top-right" });
+        console.error("Lỗi khi gửi yêu cầu:", err.response?.data || err);
         if (err.response?.status === 401) {
           toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!", {
             position: "top-right",
@@ -690,15 +736,32 @@ const Hotels = () => {
                   <Box display="flex" flexWrap="wrap" gap={1} mb={1}>
                     {imagePreviews.length > 0 ? (
                       imagePreviews.map((preview, index) => (
-                        <Avatar
-                          key={index}
-                          src={preview}
-                          alt={`Preview ${index}`}
-                          sx={{ width: 60, height: 60 }}
-                          onError={(e) => {
-                            e.target.src = "https://via.placeholder.com/60";
-                          }}
-                        />
+                        <Box key={index} sx={{ position: "relative" }}>
+                          <Avatar
+                            src={preview}
+                            alt={`Preview ${index}`}
+                            sx={{ width: 60, height: 60 }}
+                            onError={(e) => {
+                              e.target.src = "https://via.placeholder.com/60";
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            sx={{
+                              position: "absolute",
+                              top: -10,
+                              right: -10,
+                              backgroundColor: colors.redAccent[500],
+                              color: "white",
+                              "&:hover": {
+                                backgroundColor: colors.redAccent[700],
+                              },
+                            }}
+                            onClick={() => handleRemoveImage(index, setFieldValue)}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       ))
                     ) : (
                       <Typography variant="caption">Chưa có ảnh</Typography>
@@ -840,7 +903,7 @@ const Hotels = () => {
                     backgroundColor: colors.primary[400],
                   }}
                 >
-                  <MenuItem value="none">Không sắp xếp</MenuItem>
+                  {/* <MenuItem value="none">Không sắp xếp</MenuItem> */}
                   <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                   <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                   <MenuItem value="name_asc">Tên khách sạn: Tăng dần</MenuItem>
@@ -1043,6 +1106,31 @@ const Hotels = () => {
           </Box>
         </Modal>
       )}
+
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleCloseDeleteDialog}
+      >
+        <DialogTitle style={{ fontWeight: 'bold' }}>Xác nhận xóa khách sạn</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn xóa khách sạn này? Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} variant="contained">
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            autoFocus
+          >
+            Xóa
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

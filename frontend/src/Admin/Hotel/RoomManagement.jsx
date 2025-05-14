@@ -14,6 +14,8 @@ import {
     IconButton,
     DialogContent,
     Pagination,
+    DialogTitle,
+    DialogActions,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -24,6 +26,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { toast } from "react-toastify";
 import { Formik } from "formik";
 import * as yup from "yup";
@@ -44,6 +47,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
     const [loading, setLoading] = useState(false);
     const [openForm, setOpenForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
+    const [isView, setIsView] = useState(false);
     const [currentRoomId, setCurrentRoomId] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [openImageDialog, setOpenImageDialog] = useState(false);
@@ -51,6 +55,8 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
     const [currentPage, setCurrentPage] = useState(1);
     const limitItems = 10;
     const [totalPages, setTotalPages] = useState(1);
+    const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [roomToDelete, setRoomToDelete] = useState(null);
 
     const fetchHotels = async () => {
         setLoading(true);
@@ -169,40 +175,53 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         }
     };
 
-    const handleOpenForm = (room = null) => {
+    const handleOpenForm = (room = null, mode = 'edit') => {
         if (!selectedHotel?._id) {
             toast.error("Vui lòng chọn một khách sạn trước!");
             return;
         }
         setCurrentRoomId(room?._id || null);
-        setIsEdit(room !== null);
+        setIsEdit(mode === 'edit' && room !== null);
+        setIsView(mode === 'view');
         setOpenForm(true);
     };
 
     const handleCloseForm = () => {
         setOpenForm(false);
         setCurrentRoomId(null);
+        setIsEdit(false);
+        setIsView(false);
     };
 
-    const handleDelete = async (roomId) => {
-        if (!selectedHotel?._id) {
+    const handleOpenDeleteDialog = (roomId) => {
+        setRoomToDelete(roomId);
+        setOpenDeleteDialog(true);
+    };
+
+    const handleCloseDeleteDialog = () => {
+        setOpenDeleteDialog(false);
+        setRoomToDelete(null);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!selectedHotel?._id || !roomToDelete) {
             toast.error("Vui lòng chọn một khách sạn trước!");
             return;
         }
-        if (window.confirm("Bạn có chắc muốn xóa phòng này?")) {
-            try {
-                const token = adminToken || localStorage.getItem("adminToken");
-                const response = await deleteRoom(selectedHotel._id, roomId, token);
-                if (response.code === 200) {
-                    fetchRooms(selectedHotel._id, currentPage);
-                    toast.success("Xóa phòng thành công!");
-                    onSuccess();
-                } else {
-                    toast.error(response.message || "Xóa phòng thất bại!");
-                }
-            } catch (err) {
-                toast.error(err.response?.data?.message || "Xóa phòng thất bại!");
+        try {
+            const token = adminToken || localStorage.getItem("adminToken");
+            const response = await deleteRoom(selectedHotel._id, roomToDelete, token);
+            if (response.code === 200) {
+                fetchRooms(selectedHotel._id, currentPage);
+                toast.success("Xóa phòng thành công!");
+                onSuccess();
+            } else {
+                toast.error(response.message || "Xóa phòng thất bại!");
             }
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Xóa phòng thất bại!");
+        } finally {
+            handleCloseDeleteDialog();
         }
     };
 
@@ -278,7 +297,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         {
             field: "price",
             headerName: "Giá (VND)",
-            flex: 1,
+            flex: 0.6,
             renderCell: ({ value }) => (value ? value.toLocaleString("vi-VN") : "N/A"),
         },
         { field: "amenities", headerName: "Tiện nghi", flex: 1 },
@@ -349,6 +368,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
             flex: 1,
             renderCell: ({ row }) => (
                 <Button
+                    size="small"
                     variant="contained"
                     color={row.status === "active" ? "success" : "warning"}
                     onClick={() => handleChangeStatus(row._id, row.status)}
@@ -360,33 +380,42 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
         {
             field: "actions",
             headerName: "Hành động",
-            flex: 1,
+            flex: 1.5,
             renderCell: ({ row }) => (
-                <Box display="flex" gap={1} sx={{ py: 1 }}>
-                    <IconButton
-                        onClick={() => handleOpenForm(row)}
+                <Box display="flex" gap={1} sx={{ alignItems: "center", mt: "20px" }}>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => handleOpenForm(row, 'view')}
+                    >
+                        Xem
+                    </Button>
+                    <Button
+                        variant="contained"
                         sx={{
-                            backgroundColor: colors.blueAccent[700],
+                            backgroundColor: colors.blueAccent[300],
                             color: "white",
                             "&:hover": {
-                                backgroundColor: colors.blueAccent[600],
+                                backgroundColor: colors.blueAccent[200],
                             },
                         }}
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleOpenForm(row, 'edit')}
                     >
-                        <EditIcon />
-                    </IconButton>
-                    <IconButton
-                        onClick={() => handleDelete(row._id)}
-                        sx={{
-                            backgroundColor: colors.redAccent[500],
-                            color: "white",
-                            "&:hover": {
-                                backgroundColor: colors.redAccent[600],
-                            },
-                        }}
+                        Sửa
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        size="small"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleOpenDeleteDialog(row._id)}
                     >
-                        <DeleteIcon />
-                    </IconButton>
+                        Xóa
+                    </Button>
                 </Box>
             ),
         },
@@ -394,6 +423,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
 
     const RoomForm = ({ room, onClose, onSuccess }) => {
         const [imagePreviews, setImagePreviews] = useState(room?.images || []);
+        const [imageFiles, setImageFiles] = useState(room?.images ? room.images.map(url => ({ url })) : []);
         const [formLoading, setFormLoading] = useState(false);
 
         const handleImagesChange = (event, setFieldValue) => {
@@ -401,7 +431,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
             const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
             const validFiles = files.filter(file => validImageTypes.includes(file.type));
 
-            if (validFiles.length + imagePreviews.length > 10) {
+            if (validFiles.length + imageFiles.length > 10) {
                 toast.error("Tối đa 10 ảnh!");
                 return;
             }
@@ -410,18 +440,25 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                 toast.warn("Một số file không phải định dạng ảnh hợp lệ!");
             }
 
-            setFieldValue("images", validFiles);
+            setImageFiles(prev => [...prev, ...validFiles]);
+            setFieldValue("images", [...imageFiles, ...validFiles]);
             const previews = validFiles.map(file => URL.createObjectURL(file));
-            setImagePreviews([...imagePreviews, ...previews]);
+            setImagePreviews(prev => [...prev, ...previews]);
+        };
+
+        const handleRemoveImage = (index, setFieldValue) => {
+            const newPreviews = imagePreviews.filter((_, i) => i !== index);
+            const newFiles = imageFiles.filter((_, i) => i !== index);
+            setImagePreviews(newPreviews);
+            setImageFiles(newFiles);
+            setFieldValue("images", newFiles);
         };
 
         const handleFormSubmit = async (values) => {
             setFormLoading(true);
             try {
-                const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-                const validImages = values.images?.filter(file => validImageTypes.includes(file.type)) || [];
-
-                if (!room && validImages.length === 0) {
+                // Kiểm tra ít nhất một ảnh
+                if (imageFiles.length === 0) {
                     toast.error("Vui lòng chọn ít nhất một ảnh hợp lệ!");
                     setFormLoading(false);
                     return;
@@ -432,20 +469,31 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                 formData.append("price", parseFloat(values.price));
                 formData.append("amenities", values.amenities);
                 formData.append("availableRooms", parseInt(values.availableRooms));
-                if (validImages.length > 0) {
-                    validImages.forEach(file => formData.append("images", file));
-                }
+
+                // Gửi tất cả ảnh (mới và cũ)
+                imageFiles.forEach((file, index) => {
+                    if (file.url) {
+                        formData.append(`images[${index}]`, file.url);
+                    } else {
+                        formData.append("images", file);
+                    }
+                });
+
+                // Log dữ liệu gửi đi để debug
+                console.log("FormData gửi đi:", [...formData.entries()]);
 
                 const token = adminToken || localStorage.getItem("adminToken");
                 let response;
-                if (room) {
+                if (room && isEdit) {
                     response = await updateRoom(selectedHotel._id, room._id, formData, token);
                 } else {
                     response = await createRoom(selectedHotel._id, formData, token);
                 }
 
+                console.log("Phản hồi từ server:", response);
+
                 if (response.code === 200) {
-                    toast.success(room ? "Cập nhật phòng thành công!" : "Thêm phòng thành công!");
+                    toast.success(room && isEdit ? "Cập nhật phòng thành công!" : "Thêm phòng thành công!");
                     onSuccess(response.data);
                     onClose();
                     fetchRooms(selectedHotel._id, currentPage);
@@ -454,7 +502,8 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                 }
             } catch (err) {
                 if (err.response?.status === 400) {
-                    const errorMessage = err.response?.data?.message ||
+                    const errorMessage =
+                        err.response?.data?.message ||
                         err.response?.data?.errors?.join(", ") ||
                         "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại!";
                     toast.error(errorMessage);
@@ -465,6 +514,7 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                 } else {
                     toast.error(err.response?.data?.message || "Thao tác thất bại!");
                 }
+                console.error("Lỗi khi gửi yêu cầu:", err.response?.data || err);
             } finally {
                 setFormLoading(false);
             }
@@ -472,145 +522,179 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
 
         return (
             <Box>
-                <Typography variant="h4" mb={2}>
-                    {room ? "Chỉnh sửa phòng" : "Thêm phòng mới"}
-                </Typography>
-                <Formik
-                    onSubmit={handleFormSubmit}
-                    initialValues={room ? {
-                        name: room.name || "",
-                        price: room.price ? room.price.toString() : "",
-                        amenities: room.amenities || "",
-                        availableRooms: room.availableRooms ? room.availableRooms.toString() : "",
-                        images: null,
-                    } : initialValues}
-                    validationSchema={roomSchema}
-                >
-                    {({
-                        values,
-                        errors,
-                        touched,
-                        handleBlur,
-                        handleChange,
-                        handleSubmit,
-                        setFieldValue,
-                    }) => (
-                        <form onSubmit={handleSubmit}>
-                            <Box
-                                display="grid"
-                                gap="20px"
-                                gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                                sx={{ "& > div": { gridColumn: "span 4" } }}
-                            >
-                                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                    <Typography variant="body1" mb={1}>
-                                        Ảnh phòng
-                                    </Typography>
-                                    <Box display="flex" flexWrap="wrap" gap={1} mb={1}>
-                                        {imagePreviews.length > 0 ? (
-                                            imagePreviews.map((preview, index) => (
-                                                <Avatar
-                                                    key={index}
-                                                    src={preview}
-                                                    alt={`Preview ${index}`}
-                                                    sx={{ width: 60, height: 60 }}
-                                                    onError={(e) => {
-                                                        e.target.src = FALLBACK_IMAGE;
-                                                    }}
+                <DialogTitle>
+                    {isView ? "Chi tiết phòng" : (room && isEdit ? "Chỉnh sửa phòng" : "Thêm phòng mới")}
+                </DialogTitle>
+                <DialogContent>
+                    <Formik
+                        onSubmit={handleFormSubmit}
+                        initialValues={
+                            room
+                                ? {
+                                    name: room.name || "",
+                                    price: room.price ? room.price.toString() : "",
+                                    amenities: room.amenities || "",
+                                    availableRooms: room.availableRooms ? room.availableRooms.toString() : "",
+                                    images: [],
+                                }
+                                : initialValues
+                        }
+                        validationSchema={roomSchema}
+                        enableReinitialize
+                    >
+                        {({
+                            values,
+                            errors,
+                            touched,
+                            handleBlur,
+                            handleChange,
+                            handleSubmit,
+                            setFieldValue,
+                        }) => (
+                            <form onSubmit={handleSubmit}>
+                                <Box
+                                    display="grid"
+                                    gap="20px"
+                                    gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                                    sx={{ "& > div": { gridColumn: "span 4" } }}
+                                >
+                                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                        <Typography variant="body1" mb={1}>
+                                            Ảnh phòng
+                                        </Typography>
+                                        <Box display="flex" flexWrap="wrap" gap={1} mb={1}>
+                                            {imagePreviews.length > 0 ? (
+                                                imagePreviews.map((preview, index) => (
+                                                    <Box key={index} sx={{ position: "relative" }}>
+                                                        <Avatar
+                                                            src={preview}
+                                                            alt={`Preview ${index}`}
+                                                            sx={{ width: 60, height: 60 }}
+                                                            onError={(e) => {
+                                                                e.target.src = FALLBACK_IMAGE;
+                                                            }}
+                                                        />
+                                                        {!isView && (
+                                                            <IconButton
+                                                                size="small"
+                                                                sx={{
+                                                                    position: "absolute",
+                                                                    top: -10,
+                                                                    right: -10,
+                                                                    backgroundColor: colors.redAccent[500],
+                                                                    color: "white",
+                                                                    "&:hover": {
+                                                                        backgroundColor: colors.redAccent[700],
+                                                                    },
+                                                                }}
+                                                                onClick={() => handleRemoveImage(index, setFieldValue)}
+                                                            >
+                                                                <CloseIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                ))
+                                            ) : (
+                                                <Typography variant="caption">Chưa có ảnh</Typography>
+                                            )}
+                                        </Box>
+                                        {!isView && (
+                                            <Button
+                                                variant="contained"
+                                                component="label"
+                                                color="primary"
+                                                sx={{ mb: 1 }}
+                                            >
+                                                Chọn ảnh (tối đa 10)
+                                                <input
+                                                    type="file"
+                                                    hidden
+                                                    multiple
+                                                    accept="image/*"
+                                                    onChange={(e) => handleImagesChange(e, setFieldValue)}
                                                 />
-                                            ))
-                                        ) : (
-                                            <Typography variant="caption">Chưa có ảnh</Typography>
+                                            </Button>
                                         )}
                                     </Box>
+
+                                    <TextField
+                                        fullWidth
+                                        variant="filled"
+                                        type="text"
+                                        label="Tên phòng"
+                                        onBlur={handleBlur}
+                                        onChange={handleChange}
+                                        value={values.name}
+                                        name="name"
+                                        error={!!touched.name && !!errors.name}
+                                        helperText={touched.name && errors.name}
+                                        disabled={isView}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        variant="filled"
+                                        type="number"
+                                        label="Giá phòng (VND)"
+                                        onBlur={handleBlur}
+                                        onChange={handleChange}
+                                        value={values.price}
+                                        name="price"
+                                        error={!!touched.price && !!errors.price}
+                                        helperText={touched.price && errors.price}
+                                        disabled={isView}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        variant="filled"
+                                        type="text"
+                                        label="Tiện nghi"
+                                        onBlur={handleBlur}
+                                        onChange={handleChange}
+                                        value={values.amenities}
+                                        name="amenities"
+                                        error={!!touched.amenities && !!errors.amenities}
+                                        helperText={touched.amenities && errors.amenities}
+                                        multiline
+                                        rows={3}
+                                        disabled={isView}
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        variant="filled"
+                                        type="number"
+                                        label="Số phòng sẵn có"
+                                        onBlur={handleBlur}
+                                        onChange={handleChange}
+                                        value={values.availableRooms}
+                                        name="availableRooms"
+                                        error={!!touched.availableRooms && !!errors.availableRooms}
+                                        helperText={touched.availableRooms && errors.availableRooms}
+                                        disabled={isView}
+                                    />
+                                </Box>
+                                <Box display="flex" justifyContent="end" mt="20px" gap={2}>
                                     <Button
                                         variant="contained"
-                                        component="label"
-                                        color="primary"
-                                        sx={{ mb: 1 }}
+                                        onClick={onClose}
+                                        disabled={formLoading}
                                     >
-                                        Chọn ảnh (tối đa 10)
-                                        <input
-                                            type="file"
-                                            hidden
-                                            multiple
-                                            accept="image/*"
-                                            onChange={(e) => handleImagesChange(e, setFieldValue)}
-                                        />
+                                        {isView ? "Đóng" : "Hủy"}
                                     </Button>
+                                    {!isView && (
+                                        <Button
+                                            type="submit"
+                                            color="secondary"
+                                            variant="contained"
+                                            disabled={formLoading}
+                                        >
+                                            {formLoading ? "Đang xử lý..." : (room && isEdit ? "Cập nhật" : "Thêm")}
+                                        </Button>
+                                    )}
                                 </Box>
-
-                                <TextField
-                                    fullWidth
-                                    variant="filled"
-                                    type="text"
-                                    label="Tên phòng"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={values.name}
-                                    name="name"
-                                    error={!!touched.name && !!errors.name}
-                                    helperText={touched.name && errors.name}
-                                />
-                                <TextField
-                                    fullWidth
-                                    variant="filled"
-                                    type="number"
-                                    label="Giá phòng (VND)"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={values.price}
-                                    name="price"
-                                    error={!!touched.price && !!errors.price}
-                                    helperText={touched.price && errors.price}
-                                />
-                                <TextField
-                                    fullWidth
-                                    variant="filled"
-                                    type="text"
-                                    label="Tiện nghi"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={values.amenities}
-                                    name="amenities"
-                                    error={!!touched.amenities && !!errors.amenities}
-                                    helperText={touched.amenities && errors.amenities}
-                                    multiline
-                                    rows={3}
-                                />
-                                <TextField
-                                    fullWidth
-                                    variant="filled"
-                                    type="number"
-                                    label="Số phòng sẵn có"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={values.availableRooms}
-                                    name="availableRooms"
-                                    error={!!touched.availableRooms && !!errors.availableRooms}
-                                    helperText={touched.availableRooms && errors.availableRooms}
-                                />
-                            </Box>
-                            <Box display="flex" justifyContent="end" mt="20px" gap={2}>
-                                <Button
-                                    variant="contained"
-                                    onClick={onClose}
-                                    disabled={formLoading}
-                                >
-                                    Hủy
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    color="secondary"
-                                    variant="contained"
-                                    disabled={formLoading}
-                                >
-                                    {formLoading ? "Đang xử lý..." : room ? "Cập nhật" : "Thêm"}
-                                </Button>
-                            </Box>
-                        </form>
-                    )}
-                </Formik>
+                            </form>
+                        )}
+                    </Formik>
+                </DialogContent>
             </Box>
         );
     };
@@ -831,6 +915,31 @@ const RoomManagement = ({ open = false, onClose, hotel: propHotel, selectedHotel
                     )}
                 </DialogContent>
             </Dialog>
+
+            <Dialog
+                open={openDeleteDialog}
+                onClose={handleCloseDeleteDialog}
+            >
+                <DialogTitle style={{ fontWeight: 'bold' }}>Xác nhận xóa phòng</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Bạn có chắc chắn muốn xóa phòng này? Hành động này không thể hoàn tác.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDeleteDialog} variant="contained">
+                        Hủy
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        color="error"
+                        variant="contained"
+                        autoFocus
+                    >
+                        Xóa
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
@@ -854,7 +963,7 @@ const initialValues = {
     price: "",
     amenities: "",
     availableRooms: "",
-    images: null,
+    images: [],
 };
 
 export default RoomManagement;

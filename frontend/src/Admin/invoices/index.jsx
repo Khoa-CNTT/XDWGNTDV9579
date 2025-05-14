@@ -50,7 +50,7 @@ const InvoicesControl = () => {
   const [searchText, setSearchText] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOption, setSortOption] = useState("none");
+  const [sortOption, setSortOption] = useState("stt_asc");
   const [sortModel, setSortModel] = useState([]);
   const [openDetail, setOpenDetail] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
@@ -59,6 +59,8 @@ const InvoicesControl = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const limitItems = 10;
   const [totalPages, setTotalPages] = useState(1);
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
 
   // Lấy danh sách hóa đơn
   const fetchInvoices = useCallback(
@@ -511,24 +513,36 @@ const InvoicesControl = () => {
 
   // Xóa hóa đơn
   const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa hóa đơn này?")) {
-      setLoading(true);
-      try {
-        const response = await deleteInvoice(adminToken, id);
-        if (response.code === 200) {
-          fetchInvoices(currentPage);
-          toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
-        } else {
-          toast.error(response.message || "Xóa hóa đơn thất bại!", { position: "top-right" });
-        }
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
-        toast.error(errorMessage, { position: "top-right" });
-        console.error("Delete invoice error:", err.response?.data);
-      } finally {
-        setLoading(false);
+    setInvoiceToDelete(id);
+    setOpenDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!invoiceToDelete) return;
+
+    setLoading(true);
+    try {
+      const response = await deleteInvoice(adminToken, invoiceToDelete);
+      if (response.code === 200) {
+        fetchInvoices(currentPage);
+        toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Xóa hóa đơn thất bại!", { position: "top-right" });
       }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
+      toast.error(errorMessage, { position: "top-right" });
+      console.error("Delete invoice error:", err.response?.data);
+    } finally {
+      setLoading(false);
+      setOpenDeleteConfirm(false);
+      setInvoiceToDelete(null);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setOpenDeleteConfirm(false);
+    setInvoiceToDelete(null);
   };
 
   // Hàm xử lý in hóa đơn
@@ -716,7 +730,6 @@ const InvoicesControl = () => {
                     backgroundColor: colors.primary[400],
                   }}
                 >
-                  <MenuItem value="none">Không sắp xếp</MenuItem>
                   <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                   <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                   <MenuItem value="orderCode_asc">Mã hóa đơn: Tăng dần</MenuItem>
@@ -762,6 +775,7 @@ const InvoicesControl = () => {
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     width: 150,
+                    borderRadius: "6px",
                     backgroundColor: colors.primary[400],
                     "& .MuiOutlinedInput-root": {
                       "& fieldset": { borderColor: "transparent" },
@@ -779,6 +793,7 @@ const InvoicesControl = () => {
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     width: 150,
+                    borderRadius: "6px",
                     backgroundColor: colors.primary[400],
                     "& .MuiOutlinedInput-root": {
                       "& fieldset": { borderColor: "transparent" },
@@ -1012,6 +1027,39 @@ const InvoicesControl = () => {
             sx={{ fontWeight: "bold" }}
           >
             Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openDeleteConfirm}
+        onClose={handleCancelDelete}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.3rem", textAlign: "center" }}>
+          Xác nhận xóa
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn xóa hóa đơn này không?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCancelDelete}
+            color="primary"
+            variant="outlined"
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : "Xóa"}
           </Button>
         </DialogActions>
       </Dialog>
