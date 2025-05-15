@@ -17,7 +17,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [tickValues, setTickValues] = useState([0, 1, 2, 3, 4, 5, 6]);
+  const [tickValues, setTickValues] = useState([0, 5, 10, 15, 20, 25, 30]);
 
   useEffect(() => {
     const fetchRevenueData = async () => {
@@ -49,7 +49,6 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         if (response.orders.length === 0) {
           setErrorMessage(`Không có dữ liệu doanh thu cho ${selectedMonth ? `tháng ${selectedMonth}/${selectedYear}` : `năm ${selectedYear}`}.`);
           setData([]);
-          setTickValues([0, 1, 2, 3, 4, 5, 6]);
           toast.info(`Không có dữ liệu doanh thu cho ${selectedMonth ? `tháng ${selectedMonth}/${selectedYear}` : `năm ${selectedYear}`}.`, { position: "top-right" });
           return;
         }
@@ -100,51 +99,56 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
           });
 
           for (let day = 1; day <= daysInMonth; day++) {
+            const tourRev = dailyRevenue[day - 1].tourRevenue / 1000000;
+            const hotelRev = dailyRevenue[day - 1].hotelRevenue / 1000000;
+            const xLabel = `${day}/${selectedMonth}/${selectedYear}`;
             tourData.data.push({
-              x: `${day}/${selectedMonth}/${selectedYear}`,
-              y: dailyRevenue[day - 1].tourRevenue / 1000000,
+              x: xLabel,
+              y: tourRev,
             });
             hotelData.data.push({
-              x: `${day}/${selectedMonth}/${selectedYear}`,
-              y: dailyRevenue[day - 1].hotelRevenue / 1000000,
+              x: xLabel,
+              y: hotelRev,
             });
           }
         } else {
-          const monthlyRevenue = Array(12).fill().map(() => ({
-            tourRevenue: 0,
-            hotelRevenue: 0,
-          }));
-
-          response.orders.forEach((invoice) => {
-            const createdAt = new Date(invoice.createdAt);
-            const month = createdAt.getMonth();
-            if (createdAt.getFullYear() === selectedYear) {
-              if (invoice.tours?.length > 0) {
-                invoice.tours.forEach((tour) => {
-                  const stock = tour.timeStarts?.[0]?.stock || 0;
-                  monthlyRevenue[month].tourRevenue += (tour.price || 0) * stock;
-                });
-              }
-              if (invoice.hotels?.length > 0) {
-                invoice.hotels.forEach((hotel) => {
-                  if (hotel.rooms?.length > 0) {
-                    hotel.rooms.forEach((room) => {
-                      monthlyRevenue[month].hotelRevenue += (room.price || 0) * (room.quantity || 0);
-                    });
-                  }
-                });
-              }
-            }
-          });
-
           for (let month = 1; month <= 12; month++) {
+            const monthlyRevenue = {
+              tourRevenue: 0,
+              hotelRevenue: 0,
+            };
+
+            response.orders.forEach((invoice) => {
+              const createdAt = new Date(invoice.createdAt);
+              if (createdAt.getFullYear() === selectedYear && createdAt.getMonth() + 1 === month) {
+                if (invoice.tours?.length > 0) {
+                  invoice.tours.forEach((tour) => {
+                    const stock = tour.timeStarts?.[0]?.stock || 0;
+                    monthlyRevenue.tourRevenue += (tour.price || 0) * stock;
+                  });
+                }
+                if (invoice.hotels?.length > 0) {
+                  invoice.hotels.forEach((hotel) => {
+                    if (hotel.rooms?.length > 0) {
+                      hotel.rooms.forEach((room) => {
+                        monthlyRevenue.hotelRevenue += (room.price || 0) * (room.quantity || 0);
+                      });
+                    }
+                  });
+                }
+              }
+            });
+
+            const tourRev = monthlyRevenue.tourRevenue / 1000000;
+            const hotelRev = monthlyRevenue.hotelRevenue / 1000000;
+            const xLabel = `${month}/${selectedYear}`;
             tourData.data.push({
-              x: `${month}/${selectedYear}`,
-              y: monthlyRevenue[month - 1].tourRevenue / 1000000,
+              x: xLabel,
+              y: tourRev,
             });
             hotelData.data.push({
-              x: `${month}/${selectedYear}`,
-              y: monthlyRevenue[month - 1].hotelRevenue / 1000000,
+              x: xLabel,
+              y: hotelRev,
             });
           }
         }
@@ -153,17 +157,9 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         console.log("Formatted Data:", JSON.stringify(formattedData, null, 2));
 
         const maxValue = formattedData.length > 0
-          ? Math.max(
-            ...formattedData.flatMap(series => series.data.map(point => point.y))
-          )
-          : 6;
-
-        const step = 2;
-        const maxTick = Math.ceil(maxValue / step) * step;
-        const newTickValues = Array.from(
-          { length: Math.floor(maxTick / step) + 1 },
-          (_, i) => i * step
-        );
+          ? Math.max(...formattedData.flatMap(series => series.data.map(point => point.y)))
+          : 30;
+        const newTickValues = Array.from({ length: Math.floor(maxValue / 5) + 1 }, (_, i) => i * 5);
 
         setTickValues(newTickValues);
         setData(formattedData);
@@ -172,7 +168,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         const errorMsg = error.message || `Lỗi kết nối API: ${error.response?.data?.message || error.message}`;
         setErrorMessage(errorMsg);
         setData([]);
-        setTickValues([0, 1, 2, 3, 4, 5, 6]);
+        setTickValues([0, 5, 10, 15, 20, 25, 30]);
         toast.error(errorMsg, { position: "top-right" });
         if (error.response?.status === 401) {
           toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
@@ -201,7 +197,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
         theme="light"
         limit={3}
       />
-      <Box height={isMobile ? "150px" : isDashboard ? "180px" : "360px"} sx={{ width: "100%" }}>
+      <Box height={isMobile ? "200px" : isDashboard ? "250px" : "400px"} sx={{ width: "100%" }}>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="100%">
             <CircularProgress />
@@ -271,6 +267,7 @@ const LineChart = ({ isDashboard = false, selectedYear, selectedMonth }) => {
             pointBorderWidth={2}
             pointBorderColor={{ from: "serieColor" }}
             pointLabelYOffset={-12}
+            enablePointLabel={false}
             useMesh={true}
             legends={isMobile || isDashboard ? [] : [
               {

@@ -975,10 +975,11 @@ const Dashboard = () => {
               </Button>
             </Box>
           </Box>
-          <Box height={isMobile ? "400px" : "800px"} mt="50px" sx={{ width: "100%", overflow: "visible" }}>
+          <Box height={isMobile ? "400px" : "800px"} mt="0px" sx={{ width: "100%", overflow: "visible" }}>
             <LineChart isDashboard={true} selectedYear={selectedYear} selectedMonth={selectedMonth} />
           </Box>
         </Box>
+
         <Box
           gridColumn={isMobile ? "span 1" : "span 4"}
           gridRow="span 2"
@@ -1091,13 +1092,14 @@ const Dashboard = () => {
             display="flex"
             flexDirection="column"
             alignItems="center"
-            mt="25px"
+            mt="20px"
           >
             <Box height={isMobile ? "150px" : "230px"} width="100%">
               <PieChart isDashboard={true} selectedYear={selectedYear} />
             </Box>
           </Box>
         </Box>
+
         <Box
           gridColumn={isMobile ? "span 1" : "span 4"}
           gridRow="span 2"
@@ -1144,6 +1146,7 @@ const Dashboard = () => {
             </Box>
           )}
         </Box>
+
         <Box
           gridColumn={isMobile ? "span 1" : "span 4"}
           gridRow="span 2"
