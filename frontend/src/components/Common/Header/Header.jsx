@@ -149,11 +149,11 @@ const Header = () => {
                     <div
                       className="dropdown-item"
                       onClick={() => {
-                        navigate("/invoices");
+                        navigate("/orders");
                         setShowUserDropdown(false);
                       }}
                     >
-                      Hóa đơn
+                      Đơn hàng của tôi
                     </div>
                     <div
                       className="dropdown-item"
@@ -176,9 +176,9 @@ const Header = () => {
                 <span className="login-text">Đăng nhập</span>
               </NavLink>
             )}
-            <NavLink className="primaryBtn d-none d-sm-inline-block" to="/booking">
+            {/* <NavLink className="primaryBtn d-none d-sm-inline-block" to="/booking">
               Đặt vé ngay
-            </NavLink>
+            </NavLink> */}
             <li className="d-inline-block d-lg-none ms-3 toggle_btn">
               <i className={open ? "bi bi-x-lg" : "bi bi-list"} onClick={toggleMenu}></i>
             </li>

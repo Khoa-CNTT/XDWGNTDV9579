@@ -47,7 +47,6 @@ const Gallery = () => {
           setImages(fallbackImages);
         }
       } catch (error) {
-        toast.error("Không thể tải bộ sưu tập ảnh. Sử dụng dữ liệu mặc định.");
         setImages(fallbackImages);
       } finally {
         setLoading(false);

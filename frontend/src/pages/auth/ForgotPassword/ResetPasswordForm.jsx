@@ -10,7 +10,7 @@ const ResetPasswordForm = () => {
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("resetToken") || null); // Lưu token vào localStorage
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
@@ -25,8 +25,8 @@ const ResetPasswordForm = () => {
     const emailFromQuery = params.get("email");
     if (emailFromQuery) {
       setEmail(decodeURIComponent(emailFromQuery));
-      // Giả định OTP có thời hạn 5 phút (300 giây)
-      const expiryTime = new Date().getTime() + 300000; // 5 phút
+      // Đồng bộ thời gian hết hạn OTP với backend (180 giây)
+      const expiryTime = new Date().getTime() + 180000; // 180 giây = 3 phút
       setOtpExpiry(expiryTime);
     } else {
       toast.error("Không tìm thấy email. Vui lòng quay lại trang quên mật khẩu!");
@@ -89,7 +89,7 @@ const ResetPasswordForm = () => {
       if (!password.trim()) newErrors.password = "Mật khẩu không được để trống";
       else if (password.length < 6) newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
       if (!confirmPassword.trim()) newErrors.confirmPassword = "Xác nhận mật khẩu không được để trống";
-      else if (confirmPassword !== password) newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+      else if (confirmPassword !== password) newErrors.confirmPassword = "Mật khẩu không khớp";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -115,28 +115,44 @@ const ResetPasswordForm = () => {
         // Bước 1: Xác thực OTP
         const otpResult = await verifyOtp(email, otp);
         toast.success(otpResult.message || "Xác thực OTP thành công!");
-        setToken(otpResult.token); // Lưu token để dùng cho bước reset
+        setToken(otpResult.token);
+        localStorage.setItem("resetToken", otpResult.token); // Lưu token vào localStorage
       } else {
         // Bước 2: Đặt lại mật khẩu
         const resetResult = await resetPassword(token, password);
         toast.success(resetResult.message || "Đặt lại mật khẩu thành công!");
+        localStorage.removeItem("resetToken"); // Xóa token sau khi reset thành công
         setTimeout(() => navigate("/login"), 2000);
       }
     } catch (error) {
       const errorMessage = error.message || "Có lỗi xảy ra. Vui lòng thử lại.";
       toast.error(errorMessage);
+      if (error.message === "Mã OTP không đúng" && !otpExpiry) {
+        toast.warn("Mã OTP có thể đã hết hạn. Vui lòng gửi lại mã mới!");
+      }
+      if (error.message.includes("Token không hợp lệ")) {
+        localStorage.removeItem("resetToken");
+        setToken(null);
+        navigate("/forgot-password");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
+    if (otpExpiry && new Date().getTime() < otpExpiry) {
+      const remainingSeconds = Math.floor((otpExpiry - new Date().getTime()) / 1000);
+      toast.info(`Vui lòng chờ ${remainingSeconds} giây trước khi gửi lại OTP!`);
+      return;
+    }
+
     setResendLoading(true);
     try {
       const result = await forgotPassword(email);
       toast.success(result.message || "Đã gửi lại mã OTP qua email!");
       // Cập nhật thời gian hết hạn mới
-      const expiryTime = new Date().getTime() + 300000; // 5 phút
+      const expiryTime = new Date().getTime() + 180000; // 180 giây = 3 phút
       setOtpExpiry(expiryTime);
       setOtp(""); // Xóa OTP cũ
       setTouched({ ...touched, otp: false });
@@ -163,11 +179,7 @@ const ResetPasswordForm = () => {
     <form onSubmit={handleSubmit} className="reset-password-form">
       <div className={`input-group ${errors.email ? "input-error" : ""}`}>
         <label>Email:</label>
-        <input
-          type="email"
-          value={email}
-          disabled={true}
-        />
+        <input type="email" value={email} disabled={true} />
       </div>
 
       <div className={`input-group ${errors.otp ? "input-error" : ""}`}>

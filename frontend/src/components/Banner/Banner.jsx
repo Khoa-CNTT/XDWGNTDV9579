@@ -37,7 +37,6 @@ const Banner = () => {
 
         if (slidesData.length) setSlides(slidesData);
       } catch (error) {
-        toast.error("Không thể tải banner. Sử dụng dữ liệu mặc định.");
       }
     };
 

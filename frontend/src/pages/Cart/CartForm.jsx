@@ -1,36 +1,38 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Form, Button, Spinner } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 import api from "../../utils/api";
-import "./cart.css";
 
 const CartForm = ({ totalPrice }) => {
   const { user } = useAuth();
-  const { cart, checkout, fetchCart, clearCart, isLoading } = useCart(); // Thêm `cart` vào đây
+  const { cart, fetchCart, isLoading } = useCart();
   const navigate = useNavigate();
   const [voucherCode, setVoucherCode] = useState("");
   const [customer, setCustomer] = useState({
     fullName: "",
     phone: "",
+    email: "",
     note: "",
   });
-  const [errors, setErrors] = useState({ fullName: "", phone: "", note: "" });
+  const [errors, setErrors] = useState({ fullName: "", phone: "", email: "", note: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) {
       setCustomer({
         fullName: user.fullName || "",
         phone: user.phone || "",
+        email: user.email || "",
         note: "",
       });
     }
   }, [user]);
 
   const validateForm = () => {
-    const newErrors = { fullName: "", phone: "", note: "" };
+    const newErrors = { fullName: "", phone: "", email: "", note: "" };
     let isValid = true;
 
     if (!customer.fullName.trim()) {
@@ -44,6 +46,35 @@ const CartForm = ({ totalPrice }) => {
     } else if (!/^\d{10,11}$/.test(customer.phone)) {
       newErrors.phone = "Số điện thoại không hợp lệ!";
       isValid = false;
+    }
+
+    for (const tour of cart.tours) {
+      for (const time of tour.timeStarts) {
+        if (time.quantity > time.stock) {
+          newErrors.note = `Số lượng tour ${tour.tourInfo.title} vượt quá số lượng còn lại (${time.stock})!`;
+          isValid = false;
+        }
+        if (new Date(time.timeDepart) < new Date()) {
+          newErrors.note = `Thời gian khởi hành của tour ${tour.tourInfo.title} không hợp lệ (ngày trong quá khứ)!`;
+          isValid = false;
+        }
+      }
+    }
+    for (const hotel of cart.hotels) {
+      for (const room of hotel.rooms) {
+        if (room.quantity > room.roomInfo.availableRooms) {
+          newErrors.note = `Số lượng phòng ${room.roomInfo.name} vượt quá số lượng còn lại (${room.roomInfo.availableRooms})!`;
+          isValid = false;
+        }
+        if (new Date(room.checkIn) < new Date() || new Date(room.checkOut) < new Date()) {
+          newErrors.note = `Ngày check-in/check-out của phòng ${room.roomInfo.name} không hợp lệ (ngày trong quá khứ)!`;
+          isValid = false;
+        }
+        if (new Date(room.checkOut) <= new Date(room.checkIn)) {
+          newErrors.note = `Ngày check-out phải sau ngày check-in cho phòng ${room.roomInfo.name}!`;
+          isValid = false;
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -62,51 +93,68 @@ const CartForm = ({ totalPrice }) => {
       return;
     }
 
-    if (totalPrice === 0) {
-      toast.error("Tổng tiền bằng 0, không thể thanh toán!");
+    if (totalPrice <= 0) {
+      toast.error("Tổng tiền không hợp lệ, không thể thanh toán!");
       return;
     }
 
     if (!validateForm()) {
-      toast.error("Vui lòng điền đầy đủ và chính xác thông tin!");
+      toast.error("Vui lòng kiểm tra thông tin trước khi thanh toán!");
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      await fetchCart(); // Đồng bộ giỏ hàng trước khi thanh toán
+      await fetchCart();
 
-      // Tạo đơn hàng
       const orderData = {
-        fullName: customer.fullName,
-        phone: customer.phone,
-        note: customer.note,
-        voucherCode: voucherCode || undefined,
+        userInfor: {
+          fullName: customer.fullName,
+          phone: customer.phone,
+          email: customer.email,
+          note: customer.note,
+        },
+        tours: cart.tours.map((tour) => ({
+          tour_id: tour.tour_id,
+          price: tour.priceNew || tour.tourInfo?.price || 0,
+          discount: tour.discount || 0,
+          timeStarts: tour.timeStarts.map((time) => ({
+            timeDepart: time.timeDepart,
+            stock: time.quantity,
+          })),
+        })),
+        hotels: cart.hotels.map((hotel) => ({
+          hotel_id: hotel.hotel_id,
+          rooms: hotel.rooms.map((room) => ({
+            room_id: room.room_id,
+            price: room.roomInfo?.price || room.price || 0,
+            quantity: room.quantity,
+            checkIn: room.checkIn,
+            checkOut: room.checkOut,
+          })),
+        })),
+        voucherCode: voucherCode.trim() || undefined,
+        totalPrice,
       };
 
       const orderResponse = await api.post("/api/v1/checkout/order", orderData);
-      const orderId = orderResponse.data.order._id;
-
+      const orderId = orderResponse.data.order?._id;
       if (!orderId) {
-        throw new Error("Không thể tạo đơn hàng!");
+        throw new Error("Không thể tạo đơn hàng: orderId không tồn tại!");
       }
 
-      // Tạo URL thanh toán VNPay
       const paymentResponse = await api.post(`/api/v1/checkout/payment/${orderId}`);
       const paymentUrl = paymentResponse.data.paymentUrl;
-
       if (paymentUrl) {
-        await clearCart(); // Xóa giỏ hàng trước khi chuyển hướng
-        window.location.href = paymentUrl; // Chuyển hướng đến VNPay
+        window.location.href = paymentUrl; // Redirect trực tiếp đến VNPay
       } else {
-        await clearCart(); // Xóa giỏ hàng nếu không cần thanh toán
-        toast.success("Đặt hàng thành công nhưng không cần thanh toán!");
-        navigate("/payment-success");
+        throw new Error("Không nhận được URL thanh toán từ VNPay!");
       }
     } catch (error) {
-      console.error("Lỗi khi thanh toán:", error.response?.data || error);
-      toast.error(
-        error.response?.data?.message || error.message || "Có lỗi xảy ra khi tạo đơn hàng!"
-      );
+      console.error("Lỗi khi thanh toán:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || error.message || "Có lỗi xảy ra khi tạo đơn hàng!");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -129,9 +177,22 @@ const CartForm = ({ totalPrice }) => {
             onChange={handleInputChange}
             placeholder="Nhập họ và tên"
             isInvalid={!!errors.fullName}
-            disabled={isLoading}
+            disabled={isLoading || isSubmitting}
           />
           <Form.Control.Feedback type="invalid">{errors.fullName}</Form.Control.Feedback>
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Email</Form.Label>
+          <Form.Control
+            type="text"
+            name="email"
+            value={customer.email}
+            onChange={handleInputChange}
+            placeholder="Nhập email"
+            isInvalid={!!errors.email}
+            disabled={isLoading || isSubmitting}
+          />
+          <Form.Control.Feedback type="invalid">{errors.email}</Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Số điện thoại</Form.Label>
@@ -142,7 +203,7 @@ const CartForm = ({ totalPrice }) => {
             onChange={handleInputChange}
             placeholder="Nhập số điện thoại"
             isInvalid={!!errors.phone}
-            disabled={isLoading}
+            disabled={isLoading || isSubmitting}
           />
           <Form.Control.Feedback type="invalid">{errors.phone}</Form.Control.Feedback>
         </Form.Group>
@@ -156,7 +217,7 @@ const CartForm = ({ totalPrice }) => {
             onChange={handleInputChange}
             placeholder="Nhập ghi chú (nếu có)"
             isInvalid={!!errors.note}
-            disabled={isLoading}
+            disabled={isLoading || isSubmitting}
           />
           <Form.Control.Feedback type="invalid">{errors.note}</Form.Control.Feedback>
         </Form.Group>
@@ -167,7 +228,7 @@ const CartForm = ({ totalPrice }) => {
             placeholder="Nhập mã giảm giá"
             value={voucherCode}
             onChange={(e) => setVoucherCode(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isSubmitting}
           />
           <small className="text-muted">Mã giảm giá sẽ được áp dụng khi tạo đơn hàng.</small>
         </Form.Group>
@@ -181,9 +242,9 @@ const CartForm = ({ totalPrice }) => {
           variant="primary"
           className="w-100"
           onClick={handleCheckout}
-          disabled={isLoading}
+          disabled={isLoading || isSubmitting}
         >
-          {isLoading ? <Spinner animation="border" size="sm" /> : "Thanh toán"}
+          {isSubmitting ? <Spinner animation="border" size="sm" /> : "Thanh toán"}
         </Button>
       </Form>
     </div>

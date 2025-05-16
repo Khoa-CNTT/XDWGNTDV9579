@@ -46,7 +46,7 @@ const CartPage = () => {
   ];
 
   const calculatedTotalPrice = cartItems.reduce(
-    (total, item) => total + item.price * item.quantity,
+    (total, item) => total + (item.price * item.quantity || 0),
     0
   );
   const totalPrice =
@@ -86,7 +86,9 @@ const CartPage = () => {
       <Breadcrumbs title="Giỏ hàng" pagename="Giỏ hàng" />
       <section className="cart_page py-5">
         <Container>
-          {cartItems.length === 0 ? (
+          {isLoading ? (
+            <Alert variant="info">Đang tải giỏ hàng...</Alert>
+          ) : cartItems.length === 0 ? (
             <Alert variant="info">Giỏ hàng của bạn đang trống.</Alert>
           ) : (
             <Row>
@@ -109,50 +111,50 @@ const CartPage = () => {
                         <tr key={item.id}>
                           <td>
                             <div className="cart-item-info">
-                              <img
-                                src={item.image}
-                                alt={item.title}
-                                className="cart-item-image"
-                              />
-                              <div>
-                                <h5>{item.title}</h5>
-                                <p>
-                                  Thời gian khởi hành:{" "}
-                                  {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
-                                </p>
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="cart-item-image"
+                                />
+                                <div>
+                                  <h5>{item.title}</h5>
+                                  <p>
+                                    Thời gian khởi hành:{" "}
+                                    {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td>{item.price.toLocaleString()} VNĐ</td>
-                          <td>
-                            <Form.Control
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                handleQuantityChange(item, parseInt(e.target.value))
-                              }
-                              min="1"
-                              style={{ width: "80px" }}
-                              disabled={isLoading}
-                            />
-                          </td>
-                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
-                          <td>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleRemoveItem(item)}
-                              disabled={isLoading}
-                            >
-                              {isLoading ? (
-                                <i className="bi bi-spinner bi-spin"></i>
-                              ) : (
-                                "Xóa"
-                              )}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>{item.price.toLocaleString()} VNĐ</td>
+                            <td>
+                              <Form.Control
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleQuantityChange(item, parseInt(e.target.value))
+                                }
+                                min="1"
+                                style={{ width: "80px" }}
+                                disabled={isLoading}
+                              />
+                            </td>
+                            <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                            <td>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => handleRemoveItem(item)}
+                                disabled={isLoading}
+                              >
+                                {isLoading ? (
+                                  <i className="bi bi-spinner bi-spin"></i>
+                                ) : (
+                                  "Xóa"
+                                )}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
                   </tbody>
                 </Table>
 

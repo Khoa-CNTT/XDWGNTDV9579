@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { debounce } from "lodash"; // Thêm lodash để debounce
+import { debounce } from "lodash";
 import api from "../utils/api";
 import { toast } from "react-toastify";
 
@@ -10,13 +10,12 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState({ tours: [], hotels: [], totalPrice: 0 });
   const [cartCount, setCartCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false); // Trạng thái loading để tránh spam yêu cầu
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetchCart();
   }, []);
 
-  // Debounce fetchCart để tránh gọi API quá nhanh
   const debouncedFetchCart = debounce(async () => {
     try {
       setIsLoading(true);
@@ -29,7 +28,6 @@ export const CartProvider = ({ children }) => {
         };
         setCart(cartData);
 
-        // Tính tổng số lượng dịch vụ
         const totalCount =
           cartData.tours.reduce(
             (sum, tour) =>
@@ -44,7 +42,6 @@ export const CartProvider = ({ children }) => {
             0
           );
         setCartCount(totalCount);
-        console.log("Cart count updated:", totalCount); // Log để gỡ lỗi
       }
     } catch (error) {
       console.error("Lỗi khi lấy giỏ hàng:", error.response?.data || error.message);
@@ -114,7 +111,6 @@ export const CartProvider = ({ children }) => {
   const removeFromCart = async (type, id, roomId) => {
     try {
       setIsLoading(true);
-      console.log("Calling removeFromCart with:", { type, id, roomId }); // Log để gỡ lỗi
       if (type === "tour") {
         await api.patch(`/carts/delete/${id}`);
       } else if (type === "room" && roomId) {
@@ -149,17 +145,13 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = async () => {
     try {
-      setIsLoading(true);
-      await api.patch("/carts/clear");
-      await fetchCart();
+      const response = await api.delete("/api/v1/carts"); // Thay PATCH bằng DELETE, điều chỉnh endpoint nếu cần
+      console.log("Clear cart response:", response.data);
+      setCart({ tours: [], hotels: [] });
       setCartCount(0);
-      toast.success("Đã xóa toàn bộ giỏ hàng!");
     } catch (error) {
-      console.error("Lỗi khi xóa giỏ hàng:", error.response?.data || error.message);
-      toast.error(error.response?.data?.message || "Không thể xóa giỏ hàng!");
-      throw error;
-    } finally {
-      setIsLoading(false);
+      console.error("Failed to clear cart:", error);
+      throw error; // Để xử lý lỗi ở cấp cao hơn
     }
   };
 

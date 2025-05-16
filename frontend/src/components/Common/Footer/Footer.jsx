@@ -81,8 +81,6 @@ const Footer = () => {
             <Col md="3" sm="6">
               <h4>🌍 Khám Phá</h4>
               <ListGroup variant="flush">
-                <ListGroup.Item><NavLink to="/tours">Tour Du Lịch</NavLink></ListGroup.Item>
-                <ListGroup.Item><NavLink to="/destinations">Điểm Đến</NavLink></ListGroup.Item>
                 <ListGroup.Item><NavLink to="/faq">Câu Hỏi Thường Gặp</NavLink></ListGroup.Item>
               </ListGroup>
             </Col>
@@ -90,7 +88,7 @@ const Footer = () => {
             <Col md="3" sm="6">
               <h4>📍 Thông Tin Liên Hệ</h4>
               <p><i className="bi bi-geo-alt"></i> Phú Lộc, Thừa Thiên Huế</p>
-              <p><i className="bi bi-envelope"></i> <a href="mailto:ngocthangthcs@gmail.com">ngocthangthcs@gmail.com</a></p>
+              <p><i className="bi bi-envelope"></i> <a href="mailto:ngocthangthcs@gmail.com">gotravel@gmail.com</a></p>
               <p><i className="bi bi-telephone"></i> <a href="tel:0779407905">0779 407 905</a></p>
               <div className="social-links mt-3">
                 <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-facebook"></i></a>

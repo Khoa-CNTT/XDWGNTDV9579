@@ -3,20 +3,18 @@ import Banner from "../../components/Banner/Banner";
 import AdvanceSearch from "../../components/AdvanceSearch/AdvanceSearch";
 import Features from "../../components/Features/Features";
 import { Container, Row, Col } from "react-bootstrap";
-import Slider from "react-slick";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
-import Gallery from "../../components/Gallery/Gallery";
-import Cards from "../../components/Cards/Cards";
 import PopularCard from "../../components/Cards/PopularCard";
 import HotelCard from "../../pages/HotelService/HotelCard";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
+import Gallery from "../../components/Gallery/Gallery";
 import "./home.css";
 
 const Home = () => {
-  const [tours, setTours] = useState([]);
-  const [hotels, setHotels] = useState([]);
+  const [topSallers, setTopSallers] = useState([]);
+  const [newTours, setNewTours] = useState([]);
+  const [topHotelSallers, setTopHotelSallers] = useState([]);
+  const [topRatedHotels, setTopRatedHotels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -26,90 +24,74 @@ const Home = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Gọi API để lấy danh sách tours với prefix /api/v1/
-      const tourResponse = await api.get("/api/v1/tours");
-      const fetchedTours = tourResponse.data || [];
+ const fetchData = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await api.get("/api/v1/");
+    const data = response.data; // Dữ liệu nằm trực tiếp trong response.data
 
-      // Chuyển đổi định dạng cho component Cards (Tour Nổi Bật)
-      const formattedTours = fetchedTours.map((tour) => ({
-        id: tour._id,
-        name: tour.title,
-        image: tour.images && tour.images.length > 0 ? tour.images[0] : "https://via.placeholder.com/300x200?text=Tour+Image",
-        tours: "Tour",
-        slug: tour.slug,
-      }));
-      setTours(formattedTours);
-
-      // Gọi API để lấy danh sách hotels với prefix /api/v1/
-      const hotelResponse = await api.get("/api/v1/hotels");
-      setHotels(hotelResponse.data || []);
-    } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu:", error);
-      setError("Không thể tải dữ liệu tours hoặc hotels. Vui lòng thử lại sau!");
-      toast.error("Không thể tải dữ liệu tours hoặc hotels!");
-    } finally {
-      setLoading(false);
+    if (!data || !data.topSallers || !data.newTours || !data.topHotelSallers || !data.topRatedHotels) {
+      throw new Error("Không nhận được dữ liệu đầy đủ từ API!");
     }
-  };
 
-  // Cấu hình slider cho Tour Nổi Bật và Hotel Nổi Bật
-  const sliderSettings = {
-    dots: false,
-    infinite: true,
-    autoplay: true,
-    slidesToShow: 4,
-    slidesToScroll: 1,
-    responsive: [
-      {
-        breakpoint: 1024,
-        settings: {
-          slidesToShow: 4,
-          slidesToScroll: 1,
-          infinite: false,
-          dots: true,
-          autoplay: true,
-        },
-      },
-      {
-        breakpoint: 991,
-        settings: {
-          slidesToShow: 3,
-          slidesToScroll: 1,
-          infinite: false,
-          dots: true,
-        },
-      },
-      {
-        breakpoint: 600,
-        settings: {
-          slidesToShow: 2,
-          slidesToScroll: 2,
-          autoplay: true,
-          prevArrow: false,
-          nextArrow: false,
-        },
-      },
-      {
-        breakpoint: 480,
-        settings: {
-          slidesToShow: 1,
-          slidesToScroll: 1,
-          prevArrow: false,
-          nextArrow: false,
-        },
-      },
-    ],
-  };
+    // Xử lý topSallers (Tour Phổ Biến)
+    const formattedTopSallers = (data.topSallers || []).map((tour) => ({
+      id: tour._id,
+      title: tour.title,
+      images: tour.images || [],
+      price: tour.price || 0,
+      discount: tour.discount || 0,
+      slug: tour.slug,
+      timeStarts: tour.timeStarts || [],
+    }));
+    setTopSallers(formattedTopSallers);
 
-  // Lọc dữ liệu cho các section
-  const featuredTours = tours.slice(0, 6); // 6 tour nổi bật
-  const popularTours = (tours || []).slice(0, 4); // 4 tour phổ biến
-  const featuredHotels = hotels.slice(0, 6); // 6 khách sạn nổi bật
-  const popularHotels = hotels.slice(0, 4); // 4 khách sạn phổ biến
+    // Xử lý newTours (Tour Nổi Bật)
+    const formattedNewTours = (data.newTours || []).map((tour) => ({
+      id: tour._id,
+      title: tour.title,
+      images: tour.images || [],
+      price: tour.price || 0,
+      discount: tour.discount || 0,
+      slug: tour.slug,
+      timeStarts: tour.timeStarts || [],
+    }));
+    setNewTours(formattedNewTours);
+
+    // Xử lý topHotelSallers (Hotel Phổ Biến)
+    const formattedTopHotelSallers = (data.topHotelSallers || []).map((hotel) => ({
+      _id: hotel._id,
+      name: hotel.name,
+      images: hotel.images || [],
+      location: hotel.location || { city: "Không xác định", country: "Không xác định" },
+    }));
+    setTopHotelSallers(formattedTopHotelSallers);
+
+    // Xử lý topRatedHotels (Hotel Nổi Bật)
+    const formattedTopRatedHotels = (data.topRatedHotels || []).map((item) => ({
+      _id: item.hotel._id,
+      name: item.hotel.name,
+      images: item.hotel.images || [],
+      location: item.hotel.location || { city: "Không xác định", country: "Không xác định" },
+      averageRating: item.averageRating || null,
+    }));
+    setTopRatedHotels(formattedTopRatedHotels);
+
+    console.log("Dữ liệu thành công:", {
+      topSallers: formattedTopSallers,
+      newTours: formattedNewTours,
+      topHotelSallers: formattedTopHotelSallers,
+      topRatedHotels: formattedTopRatedHotels,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy dữ liệu:", error);
+    setError("Không thể tải dữ liệu từ API. Vui lòng thử lại sau!");
+    toast.error("Không thể tải dữ liệu từ API!");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
@@ -117,8 +99,8 @@ const Home = () => {
       <AdvanceSearch />
       <Features />
 
-      {/* Tour Nổi Bật */}
-      <section className="tours_section slick_slider py-5">
+      {/* Tour Nổi Bật (newTours) */}
+      <section className="tours_section py-5">
         <Container>
           <Row>
             <Col md="12">
@@ -128,26 +110,30 @@ const Home = () => {
             </Col>
           </Row>
           <Row>
-            <Col md="12">
-              {loading ? (
+            {loading ? (
+              <Col>
                 <p>Đang tải tour nổi bật...</p>
-              ) : error ? (
+              </Col>
+            ) : error ? (
+              <Col>
                 <p>{error}</p>
-              ) : featuredTours.length === 0 ? (
+              </Col>
+            ) : newTours.length === 0 ? (
+              <Col>
                 <p>Không có tour nổi bật nào.</p>
-              ) : (
-                <Slider {...sliderSettings}>
-                  {featuredTours.map((destination, inx) => (
-                    <Cards destination={destination} key={inx} />
-                  ))}
-                </Slider>
-              )}
-            </Col>
+              </Col>
+            ) : (
+              newTours.map((tour, inx) => (
+                <Col md={3} sm={6} xs={12} className="mb-5" key={inx}>
+                  <PopularCard val={tour} />
+                </Col>
+              ))
+            )}
           </Row>
         </Container>
       </section>
 
-      {/* Tour Phổ Biến */}
+      {/* Tour Phổ Biến (topSallers) */}
       <section className="popular py-5">
         <Container>
           <Row>
@@ -166,12 +152,12 @@ const Home = () => {
               <Col>
                 <p>{error}</p>
               </Col>
-            ) : popularTours.length === 0 ? (
+            ) : topSallers.length === 0 ? (
               <Col>
                 <p>Không có tour phổ biến nào.</p>
               </Col>
             ) : (
-              popularTours.map((val, inx) => (
+              topSallers.map((val, inx) => (
                 <Col md={3} sm={6} xs={12} className="mb-5" key={inx}>
                   <PopularCard val={val} />
                 </Col>
@@ -181,8 +167,8 @@ const Home = () => {
         </Container>
       </section>
 
-      {/* Hotel Nổi Bật */}
-      <section className="hotels_section slick_slider py-5">
+      {/* Hotel Nổi Bật (topRatedHotels) */}
+      <section className="hotels_section py-5">
         <Container>
           <Row>
             <Col md="12">
@@ -192,28 +178,30 @@ const Home = () => {
             </Col>
           </Row>
           <Row>
-            <Col md="12">
-              {loading ? (
+            {loading ? (
+              <Col>
                 <p>Đang tải khách sạn nổi bật...</p>
-              ) : error ? (
+              </Col>
+            ) : error ? (
+              <Col>
                 <p>{error}</p>
-              ) : featuredHotels.length === 0 ? (
+              </Col>
+            ) : topRatedHotels.length === 0 ? (
+              <Col>
                 <p>Không có khách sạn nổi bật nào.</p>
-              ) : (
-                <Slider {...sliderSettings}>
-                  {featuredHotels.map((hotel, inx) => (
-                    <div key={inx} className="px-2">
-                      <HotelCard val={hotel} />
-                    </div>
-                  ))}
-                </Slider>
-              )}
-            </Col>
+              </Col>
+            ) : (
+              topRatedHotels.map((hotel, inx) => (
+                <Col md={3} sm={6} xs={12} className="mb-5" key={inx}>
+                  <HotelCard val={hotel} />
+                </Col>
+              ))
+            )}
           </Row>
         </Container>
       </section>
 
-      {/* Hotel Phổ Biến */}
+      {/* Hotel Phổ Biến (topHotelSallers) */}
       <section className="popular_hotels py-5">
         <Container>
           <Row>
@@ -232,12 +220,12 @@ const Home = () => {
               <Col>
                 <p>{error}</p>
               </Col>
-            ) : popularHotels.length === 0 ? (
+            ) : topHotelSallers.length === 0 ? (
               <Col>
                 <p>Không có khách sạn phổ biến nào.</p>
               </Col>
             ) : (
-              popularHotels.map((val, inx) => (
+              topHotelSallers.map((val, inx) => (
                 <Col md={3} sm={6} xs={12} className="mb-5" key={inx}>
                   <HotelCard val={val} />
                 </Col>
