@@ -324,12 +324,12 @@ const InvoicesControl = () => {
         break;
       case "customerName_asc":
         sortKey = "userInfor.fullName";
-        sortValue = "asc";
+        sortValue = "REGEXP";
         sortField = "customerName";
         break;
       case "customerName_desc":
         sortKey = "userInfor.fullName";
-        sortValue = "desc";
+        sortValue = "-REGEXP";
         sortField = "customerName";
         break;
       case "customerPhone_asc":
@@ -377,7 +377,7 @@ const InvoicesControl = () => {
     setSortModel(newSortModel);
     setCurrentPage(1);
     if (newSortModel.length > 0) {
-      const { field, sort } = newSortModel[0];
+      const { field, sort } = newSortModel;
       let sortKey = "";
       let sortOptionValue = "";
       switch (field) {
@@ -683,6 +683,10 @@ const InvoicesControl = () => {
     },
   ];
 
+  // Check if the order has voucherCode or any tour has discount to decide whether to show these columns
+  const hasVoucherOrDiscount = currentInvoice?.order?.voucherCode ||
+    currentInvoice?.order?.tours?.some((tour) => tour.discount);
+
   return (
     <Box m="20px">
       <ToastContainer
@@ -898,9 +902,9 @@ const InvoicesControl = () => {
       <Dialog
         open={openDetail}
         onClose={handleCloseDetail}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
-        sx={{ "& .MuiDialog-paper": { maxWidth: "600px", width: "100%" } }}
+        sx={{ "& .MuiDialog-paper": { maxWidth: "800px", width: "100%" } }}
       >
         <DialogTitle
           sx={{ fontWeight: "bold", fontSize: "1.3rem", textAlign: "center" }}
@@ -932,15 +936,21 @@ const InvoicesControl = () => {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell width="30%">Tiêu đề</TableCell>
-                          <TableCell width="15%" align="center">Số lượng</TableCell>
-                          <TableCell width="25%" align="center">Ngày xuất phát</TableCell>
-                          <TableCell width="30%" align="right">Giá (VNĐ)</TableCell>
+                          <TableCell width="25%">Tiêu đề</TableCell>
+                          <TableCell width="12%" align="center">Số lượng</TableCell>
+                          <TableCell width="15%" align="center">Ngày xuất phát</TableCell>
+                          {hasVoucherOrDiscount && (
+                            <>
+                              <TableCell width="15%" align="center">Mã Voucher</TableCell>
+                              <TableCell width="15%" align="center">Giảm giá (%)</TableCell>
+                            </>
+                          )}
+                          <TableCell width={hasVoucherOrDiscount ? "10%" : "35%"} align="right">Giá (VNĐ)</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {currentInvoice.tours.map((tour, index) => {
-                          // Tìm tour tương ứng trong currentInvoice.order.tours để lấy timeStarts
+                          // Tìm tour tương ứng trong currentInvoice.order.tours để lấy timeStarts và discount
                           const matchingTour = currentInvoice.order?.tours?.find(
                             (orderTour) => orderTour.tour_id === tour.tourInfo?._id
                           );
@@ -960,12 +970,24 @@ const InvoicesControl = () => {
                           const price = typeof tour.priceNew === 'number'
                             ? tour.priceNew
                             : (tour.tourInfo?.price || 0);
+                          const voucherCode = currentInvoice.order?.voucherCode || "Không có";
+                          const discount = typeof matchingTour?.discount === 'number'
+                            ? matchingTour.discount
+                            : 0;
 
                           return (
                             <TableRow key={index}>
                               <TableCell>{tour.tourInfo?.title || "N/A"}</TableCell>
                               <TableCell align="center">{quantity}</TableCell>
                               <TableCell align="center">{formattedDate}</TableCell>
+                              {hasVoucherOrDiscount && (
+                                <>
+                                  <TableCell align="center">{voucherCode}</TableCell>
+                                  <TableCell align="center">
+                                    {discount > 0 ? discount.toLocaleString("vi-VN") : "N/A"}
+                                  </TableCell>
+                                </>
+                              )}
                               <TableCell align="right">
                                 {price > 0 ? price.toLocaleString("vi-VN") : "N/A"}
                               </TableCell>
