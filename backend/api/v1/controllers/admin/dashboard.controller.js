@@ -61,6 +61,8 @@ module.exports.dashboard = async (req, res) => {
         },
     };
 
+    const orther = {}
+
     statistic.category.total = await Category.countDocuments({ deleted: false });
     statistic.category.active = await Category.countDocuments({ status: "active", deleted: false });
     statistic.category.inactive = await Category.countDocuments({ status: "inactive", deleted: false });
@@ -100,8 +102,128 @@ module.exports.dashboard = async (req, res) => {
     statistic.user.active = await User.countDocuments({ status: "active" });
     statistic.user.inactive = await User.countDocuments({ status: "inactive" });
 
+    const today = new Date();
+    const usersToday = await User.find({
+        createdAt: {
+            $gte: new Date(today.setHours(0, 0, 0, 0)),
+            $lte: new Date(today.setHours(23, 59, 59, 999))
+        },
+        deleted: false
+    });
+
+    const fiveOrder = await Order.find({ status: 'paid' }).sort({ updatedAt: 'desc' }).limit(5);
+
+    const revenue = await Order.find({
+        status: 'paid',
+        updatedAt: {
+            $gte: new Date(today.setHours(0, 0, 0, 0)),
+            $lte: new Date(today.setHours(23, 59, 59, 999))
+        }
+    });
+
+    let revenueToday = 0;
+    let quatityTourToday = 0;
+    let quatityRoomToday = 0;
+
+    for (const item of revenue) {
+        revenueToday += item.totalPrice;
+        if (item.tours.length > 0) {
+            for (const tour of item.tours) {
+                for (const time of tour.timeStarts) {
+                    quatityTourToday += time.stock || 0;
+                }
+            }
+        }
+        if (item.hotels.length > 0) {
+            for (const hotel of item.hotels) {
+                for (const room of hotel.rooms) {
+                    quatityRoomToday += room.quantity || 0;
+                }
+            }
+        }
+    }
+
+    const ordersThisMonth = await Order.find({
+        status: 'paid',
+        updatedAt: {
+            $gte: new Date(today.getFullYear(), today.getMonth(), 1),
+            $lte: new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
+        }
+    });
+
+    let totalRevenueThisMonth = 0;
+    let quatityTourMonth = 0;
+    let quatityRoomMonth = 0;
+    for (const order of ordersThisMonth) {
+        totalRevenueThisMonth += order.totalPrice;
+        if (order.tours.length > 0) {
+            for (const tour of order.tours) {
+                for (const time of tour.timeStarts) {
+                    quatityTourMonth += time.stock || 0;
+                }
+            }
+        }
+        if (order.hotels.length > 0) {
+            for (const hotel of order.hotels) {
+                for (const room of hotel.rooms) {
+                    quatityRoomMonth += room.quantity || 0;
+                }
+            }
+        }
+    }
+
+    const ordersThisYear = await Order.find({
+        status: 'paid',
+        updatedAt: {
+            $gte: new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0),
+            $lte: new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999)
+        }
+    });
+    let totalRevenueYear = 0;
+    let quatityTourYear = 0;
+    let quatityRoomYear = 0;
+    for (const order of ordersThisYear) {
+        totalRevenueYear += order.totalPrice;
+        if (order.tours.length > 0) {
+            for (const tour of order.tours) {
+                for (const time of tour.timeStarts) {
+                    quatityTourYear += time.stock || 0;
+                }
+            }
+        }
+        if (order.hotels.length > 0) {
+            for (const hotel of order.hotels) {
+                for (const room of hotel.rooms) {
+                    quatityRoomYear += room.quantity || 0;
+                }
+            }
+        }
+    }
+
+    // year
+    orther.ordersThisYear = ordersThisYear;
+    orther.totalRevenueYear = totalRevenueYear;
+    orther.quatityTourYear = quatityTourYear;
+    orther.quatityRoomYear = quatityRoomYear;
+
+    // month
+    orther.ordersThisMonth = ordersThisMonth;
+    orther.totalRevenueThisMonth = totalRevenueThisMonth;
+    orther.quatityTourMonth = quatityTourMonth;
+    orther.quatityRoomMonth = quatityRoomMonth;
+
+    // day
+    orther.quatityTourToday = quatityTourToday;
+    orther.quatityRoomToday = quatityRoomToday;
+    orther.revenueToday = revenueToday;
+
+    orther.usersToday = usersToday;
+    orther.fiveOrder = fiveOrder;
+
+
     res.json({
         code: 200,
-        statistic
+        statistic,
+        orther,
     })
 }
