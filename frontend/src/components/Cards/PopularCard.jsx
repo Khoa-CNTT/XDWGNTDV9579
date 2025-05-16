@@ -40,7 +40,7 @@ const PopularCard = ({ val }) => {
             : "https://via.placeholder.com/300x200?text=Tour+Image"
         }
         className="img-fluid"
-        alt={title}
+        alt={title || "Tour"}
       />
       <Card.Body>
         <Card.Text>

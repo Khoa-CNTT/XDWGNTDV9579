@@ -50,7 +50,7 @@ const Team = () => {
   const [allAccounts, setAllAccounts] = useState([]);
   const [roles, setRoles] = useState({});
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // Thêm state cho bộ lọc trạng thái
+  const [statusFilter, setStatusFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
@@ -75,17 +75,17 @@ const Team = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limitItems = 10;
+  const [sortOption, setSortOption] = useState("stt_asc");
+  const [sortModel, setSortModel] = useState([]);
 
   const fileInputRef = React.useRef(null);
 
-  const fetchAccounts = async (page = 1, search = "", status = "all") => {
+  const fetchAccounts = async (page = 1, search = "", status = "all", sortKey = "", sortValue = "") => {
     setLoading(true);
     try {
       const params = {
         page,
         limit: limitItems,
-        sortKey: "createdAt",
-        sortValue: "desc",
       };
       if (search) {
         params.search = search;
@@ -93,14 +93,30 @@ const Team = () => {
       if (status !== "all") {
         params.status = status;
       }
+      if (sortKey && sortValue) {
+        params.sortKey = sortKey;
+        params.sortValue = sortValue;
+      }
       const response = await getAccounts(params);
       console.log("fetchAccounts response:", response);
       if (response && Array.isArray(response.accounts)) {
-        const formattedData = response.accounts.map((item, index) => ({
-          ...item,
-          id: item._id,
-          stt: index + 1 + (page - 1) * limitItems,
-        }));
+        const formattedData = response.accounts.map((item, index) => {
+          let stt;
+          if (sortKey === "createdAt") {
+            if (sortValue === "asc") {
+              stt = index + 1 + (page - 1) * limitItems;
+            } else {
+              stt = response.accounts.length - index + (page - 1) * limitItems;
+            }
+          } else {
+            stt = index + 1 + (page - 1) * limitItems;
+          }
+          return {
+            ...item,
+            id: item._id,
+            stt: stt
+          };
+        });
         setAllAccounts(formattedData);
         setAccounts(formattedData);
         setTotalPages(response.totalPage || 1);
@@ -295,12 +311,16 @@ const Team = () => {
       setError("Mật khẩu xác nhận không khớp!");
       return;
     }
-    if (!newAccount.role_id) {
-      setError("Vui lòng chọn nhóm quyền!");
+    if (!newAccount.phone) {
+      setError("Vui lòng nhập số điện thoại!");
       return;
     }
-    if (newAccount.phone && !/^\d{10,11}$/.test(newAccount.phone)) {
+    if (!/^\d{10,11}$/.test(newAccount.phone)) {
       setError("Số điện thoại không hợp lệ!");
+      return;
+    }
+    if (!newAccount.role_id) {
+      setError("Vui lòng chọn nhóm quyền!");
       return;
     }
     if (newAccount.avatar && !(newAccount.avatar instanceof File)) {
@@ -315,7 +335,7 @@ const Team = () => {
       formData.append("email", newAccount.email);
       formData.append("password", newAccount.password);
       formData.append("confirmPassword", newAccount.confirmPassword);
-      formData.append("phone", newAccount.phone || "");
+      formData.append("phone", newAccount.phone);
       formData.append("role_id", newAccount.role_id);
       formData.append("status", newAccount.status || "active");
       if (newAccount.avatar) {
@@ -345,16 +365,28 @@ const Team = () => {
   };
 
   const handleUpdate = async () => {
-    if (!newAccount.fullName || !newAccount.email || !newAccount.role_id) {
-      setError("Vui lòng điền đầy đủ thông tin bắt buộc!");
+    if (!newAccount.fullName) {
+      setError("Vui lòng nhập họ tên!");
+      return;
+    }
+    if (!newAccount.email || !/^\S+@\S+\.\S+$/.test(newAccount.email)) {
+      setError("Vui lòng nhập email hợp lệ!");
+      return;
+    }
+    if (!newAccount.phone) {
+      setError("Vui lòng nhập số điện thoại!");
+      return;
+    }
+    if (!/^\d{10,11}$/.test(newAccount.phone)) {
+      setError("Số điện thoại không hợp lệ!");
+      return;
+    }
+    if (!newAccount.role_id) {
+      setError("Vui lòng chọn nhóm quyền!");
       return;
     }
     if (newAccount.password && newAccount.password !== newAccount.confirmPassword) {
       setError("Mật khẩu xác nhận không khớp!");
-      return;
-    }
-    if (newAccount.phone && !/^\d{10,11}$/.test(newAccount.phone)) {
-      setError("Số điện thoại không hợp lệ!");
       return;
     }
     if (newAccount.avatar && !(newAccount.avatar instanceof File)) {
@@ -371,7 +403,7 @@ const Team = () => {
         formData.append("password", newAccount.password);
         formData.append("confirmPassword", newAccount.confirmPassword);
       }
-      formData.append("phone", newAccount.phone || "");
+      formData.append("phone", newAccount.phone);
       formData.append("role_id", newAccount.role_id);
       formData.append("status", newAccount.status);
       if (newAccount.avatar) {
@@ -440,8 +472,109 @@ const Team = () => {
     }
   };
 
+  const handleSortChange = (event) => {
+    const value = event.target.value;
+    setSortOption(value);
+    setCurrentPage(1);
+    let sortKey = "";
+    let sortValue = "";
+    let sortField = "";
+    switch (value) {
+      case "stt_asc":
+        sortKey = "createdAt";
+        sortValue = "asc";
+        sortField = "stt";
+        break;
+      case "stt_desc":
+        sortKey = "createdAt";
+        sortValue = "desc";
+        sortField = "stt";
+        break;
+      case "name_asc":
+        sortKey = "fullName";
+        sortValue = "asc";
+        sortField = "fullName";
+        break;
+      case "name_desc":
+        sortKey = "fullName";
+        sortValue = "desc";
+        sortField = "fullName";
+        break;
+      case "email_asc":
+        sortKey = "email";
+        sortValue = "asc";
+        sortField = "email";
+        break;
+      case "email_desc":
+        sortKey = "email";
+        sortValue = "desc";
+        sortField = "email";
+        break;
+      case "phone_asc":
+        sortKey = "phone";
+        sortValue = "asc";
+        sortField = "phone";
+        break;
+      case "phone_desc":
+        sortKey = "phone";
+        sortValue = "desc";
+        sortField = "phone";
+        break;
+      default:
+        sortKey = "createdAt";
+        sortValue = "desc";
+        break;
+    }
+    fetchAccounts(1, searchText, statusFilter, sortKey, sortValue);
+    if (sortKey) {
+      setSortModel([{ field: sortField, sort: sortValue }]);
+    } else {
+      setSortModel([]);
+    }
+  };
+
+  const handleSortModelChange = (newSortModel) => {
+    setSortModel(newSortModel);
+    setCurrentPage(1);
+    if (newSortModel.length > 0) {
+      const { field, sort } = newSortModel[0];
+      let sortKey = "";
+      let sortOptionValue = "";
+      let sortValue = sort;
+      switch (field) {
+        case "stt":
+          sortKey = "createdAt";
+          sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+          break;
+        case "fullName":
+          sortKey = "fullName";
+          sortOptionValue = sort === "asc" ? "name_asc" : "name_desc";
+          break;
+        case "email":
+          sortKey = "email";
+          sortOptionValue = sort === "asc" ? "email_asc" : "email_desc";
+          break;
+        case "phone":
+          sortKey = "phone";
+          sortOptionValue = sort === "asc" ? "phone_asc" : "phone_desc";
+          break;
+        default:
+          sortKey = "createdAt";
+          sortValue = "desc";
+          break;
+      }
+      if (sortKey) {
+        setSortOption(sortOptionValue);
+        fetchAccounts(1, searchText, statusFilter, sortKey, sortValue);
+      }
+    } else {
+      setSortOption("none");
+      fetchAccounts(1, searchText, statusFilter);
+    }
+  };
+
   const columns = [
-    { field: "stt", headerName: "STT", flex: 0.3 },
+    { field: "stt", headerName: "STT", flex: 0.4 },
     {
       field: "fullName",
       headerName: "Tên",
@@ -561,6 +694,26 @@ const Team = () => {
             </Typography>
             <Box display="flex" gap={2}>
               <FormControl sx={{ width: 150 }}>
+                <InputLabel>Sắp xếp</InputLabel>
+                <Select
+                  value={sortOption}
+                  onChange={handleSortChange}
+                  label="Sắp xếp"
+                  sx={{
+                    backgroundColor: colors.primary[400],
+                  }}
+                >
+                  <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                  <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
+                  <MenuItem value="name_asc">Tên: Tăng dần</MenuItem>
+                  <MenuItem value="name_desc">Tên: Giảm dần</MenuItem>
+                  <MenuItem value="email_asc">Email: Tăng dần</MenuItem>
+                  <MenuItem value="email_desc">Email: Giảm dần</MenuItem>
+                  <MenuItem value="phone_asc">Số điện thoại: Tăng dần</MenuItem>
+                  <MenuItem value="phone_desc">Số điện thoại: Giảm dần</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl sx={{ width: 150 }}>
                 <InputLabel>Lọc trạng thái</InputLabel>
                 <Select
                   value={statusFilter}
@@ -674,6 +827,9 @@ const Team = () => {
                     width: "100%",
                   }}
                   hideFooter={true}
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={handleSortModelChange}
                 />
                 <Box display="flex" justifyContent="center" mt={2}>
                   <Pagination
@@ -820,6 +976,7 @@ const Team = () => {
             onChange={(e) =>
               setNewAccount({ ...newAccount, phone: e.target.value })
             }
+            required
           />
           <FormControl fullWidth margin="normal">
             <InputLabel>Nhóm quyền</InputLabel>

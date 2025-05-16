@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { useCart } from "../../context/CartContext";
-import "./cart.css";
+import { useEffect, useState, useContext } from "react";
+import { CartContext } from "../contexts/CartContext";
 
 const CartItem = ({ item, removeItem }) => {
-  const { updateQuantity, isLoading } = useCart();
+  const { updateQuantity, isLoading } = useContext(CartContext);
   const [quantity, setQuantity] = useState(item.quantity || 1);
 
   useEffect(() => {
-    setQuantity(item.quantity || 1);
+    setQuantity(item.quantity || 1); 
   }, [item.quantity]);
 
-  const handleQuantityChange = (newQuantity) => {
+  const handleQuantityChange = async (newQuantity) => {
     if (newQuantity < 1) {
       setQuantity(1);
       return;
     }
     setQuantity(newQuantity);
-    updateQuantity(
-      item.type,
-      item.type === "tour"
-        ? { id: item.tour_id, timeDepart: item.timeDepart }
-        : { hotel_id: item.hotel_id, room_id: item.room_id },
-      newQuantity
-    );
+    try {
+      await updateQuantity(
+        item.type,
+        item.type === "tour"
+          ? { id: item.tour_id, timeDepart: item.timeDepart }
+          : { hotel_id: item.hotel_id, room_id: item.room_id },
+        newQuantity
+      );
+    } catch (error) {
+      setQuantity(item.quantity || 1); // Reset nếu lỗi
+    }
   };
 
   const handleRemove = () => {
-    console.log("Removing item from CartItem:", item); // Log để gỡ lỗi
     removeItem(item);
   };
 
@@ -39,21 +41,23 @@ const CartItem = ({ item, removeItem }) => {
           <div className="cart-placeholder">No Image</div>
         )}
       </td>
-      <td>{item.title}</td>
+      <td>{item.title || "Không xác định"}</td>
       <td>
         {item.type === "tour"
-          ? new Date(item.timeDepart).toLocaleDateString("vi-VN")
+          ? item.timeDepart
+            ? new Date(item.timeDepart).toLocaleDateString("vi-VN")
+            : "Không xác định"
           : item.checkIn && item.checkOut
           ? `Check-in: ${new Date(item.checkIn).toLocaleDateString("vi-VN")}, Check-out: ${new Date(
               item.checkOut
             ).toLocaleDateString("vi-VN")}`
           : "Không áp dụng"}
       </td>
-      <td>{item.price.toLocaleString()} VNĐ</td>
+      <td>{item.price ? item.price.toLocaleString() : "0"} VNĐ</td>
       <td>
         <div className="quantity-control">
           <button
-            onClick={() => handleQuantityChange(quantity - 1)}
+            onClick={() => handleQuantityChange(Number(quantity) - 1)}
             disabled={isLoading || quantity <= 1}
           >
             -
@@ -61,22 +65,21 @@ const CartItem = ({ item, removeItem }) => {
           <input
             type="number"
             value={quantity}
-            onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+            onChange={(e) => handleQuantityChange(Number(e.target.value) || 1)}
             min="1"
             disabled={isLoading}
           />
-          <button onClick={() => handleQuantityChange(quantity + 1)} disabled={isLoading}>
+          <button
+            onClick={() => handleQuantityChange(Number(quantity) + 1)}
+            disabled={isLoading}
+          >
             +
           </button>
         </div>
       </td>
       <td>{(item.price * quantity).toLocaleString()} VNĐ</td>
       <td>
-        <button
-          className="remove-btn"
-          onClick={handleRemove}
-          disabled={isLoading}
-        >
+        <button className="remove-btn" onClick={handleRemove} disabled={isLoading}>
           {isLoading ? (
             <i className="bi bi-spinner bi-spin"></i>
           ) : (

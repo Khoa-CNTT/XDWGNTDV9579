@@ -85,13 +85,13 @@ const PieChart = ({ isDashboard = false, selectedYear }) => {
             {
               id: "Tour",
               label: "Tour",
-              value: tourRevenue / 1000, // Chia cho 1000 để hiển thị đơn vị K VNĐ
+              value: tourRevenue / 1000000, // Chia cho 1,000,000 để hiển thị đơn vị M VNĐ
               color: colors.blueAccent[700],
             },
             {
               id: "Hotel",
               label: "Hotel",
-              value: hotelRevenue / 1000,
+              value: hotelRevenue / 1000000,
               color: colors.greenAccent[500],
             },
           ];
@@ -171,7 +171,7 @@ const PieChart = ({ isDashboard = false, selectedYear }) => {
           arcLabelsRadiusOffset={0.4}
           arcLabelsSkipAngle={7}
           arcLabelsTextColor={{ from: "color", modifiers: [["darker", 2]] }}
-          valueFormat={(value) => `${Math.round(value)}K VNĐ`}
+          valueFormat={(value) => `${value.toFixed(3)}M VNĐ`}
           defs={[
             {
               id: "dots",

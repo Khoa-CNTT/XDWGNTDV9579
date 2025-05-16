@@ -1,9 +1,8 @@
-// src/pages/HotelService/HotelServices.jsx
 import React, { useState, useEffect } from "react";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
-import { Container, Row, Col, Offcanvas } from "react-bootstrap";
-import HotelCard from "../../pages/HotelService/HotelCard";
-import HotelFilters from "./HotelFilters"; // Import bộ lọc mới
+import { Container, Row, Col, Offcanvas, Spinner } from "react-bootstrap";
+import HotelCard from "./HotelCard";
+import HotelFilters from "./HotelFilters";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
 import "./hotel.css";
@@ -28,7 +27,7 @@ const HotelServices = () => {
     try {
       const response = await api.get("/hotels");
       setHotels(response.data);
-      setFilteredHotels(response.data); // Ban đầu hiển thị tất cả khách sạn
+      setFilteredHotels(response.data);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách khách sạn:", error);
       toast.error("Không thể tải danh sách khách sạn!");
@@ -42,7 +41,6 @@ const HotelServices = () => {
   const handleFilterChange = (filters) => {
     let filtered = [...hotels];
 
-    // Lọc theo vị trí
     if (filters.location) {
       const locationLower = filters.location.toLowerCase();
       filtered = filtered.filter(
@@ -52,7 +50,6 @@ const HotelServices = () => {
       );
     }
 
-    // Lọc theo giá
     filtered = filtered.filter((hotel) => {
       const minPrice = hotel.rooms.length
         ? Math.min(...hotel.rooms.map((room) => room.price))
@@ -62,14 +59,12 @@ const HotelServices = () => {
       );
     });
 
-    // Lọc theo số sao
     if (filters.starRating) {
       filtered = filtered.filter(
         (hotel) => hotel.starRating === Number(filters.starRating)
       );
     }
 
-    // Lọc theo tiện ích
     if (filters.amenities.length > 0) {
       filtered = filtered.filter((hotel) =>
         hotel.rooms.some((room) =>
@@ -80,7 +75,6 @@ const HotelServices = () => {
       );
     }
 
-    // Lọc theo loại phòng
     if (filters.roomType) {
       filtered = filtered.filter((hotel) =>
         hotel.rooms.some((room) => room.type === filters.roomType)
@@ -103,12 +97,15 @@ const HotelServices = () => {
                 </button>
               </div>
               <div className="hotel-filters d-lg-block d-none">
-                <HotelFilters onFilterChange={handleFilterChange} />
+                <HotelFilters onFilterChange={handleFilterChange} hotels={hotels} />
               </div>
             </Col>
             <Col xl="9" lg="8" md="12" sm="12" className="hotel-content">
               {loading ? (
-                <p>Đang tải danh sách khách sạn...</p>
+                <div className="text-center my-5">
+                  <Spinner animation="border" variant="primary" />
+                  <p className="mt-2">Đang tải danh sách khách sạn...</p>
+                </div>
               ) : filteredHotels.length === 0 ? (
                 <p>Không tìm thấy khách sạn nào.</p>
               ) : (
@@ -130,7 +127,7 @@ const HotelServices = () => {
           <Offcanvas.Title>Bộ lọc</Offcanvas.Title>
         </Offcanvas.Header>
         <Offcanvas.Body>
-          <HotelFilters onFilterChange={handleFilterChange} />
+          <HotelFilters onFilterChange={handleFilterChange} hotels={hotels} />
         </Offcanvas.Body>
       </Offcanvas>
     </>

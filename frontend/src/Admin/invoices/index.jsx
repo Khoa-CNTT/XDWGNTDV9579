@@ -50,7 +50,7 @@ const InvoicesControl = () => {
   const [searchText, setSearchText] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOption, setSortOption] = useState("none");
+  const [sortOption, setSortOption] = useState("stt_asc");
   const [sortModel, setSortModel] = useState([]);
   const [openDetail, setOpenDetail] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
@@ -59,6 +59,8 @@ const InvoicesControl = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const limitItems = 10;
   const [totalPages, setTotalPages] = useState(1);
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
 
   // Lấy danh sách hóa đơn
   const fetchInvoices = useCallback(
@@ -85,7 +87,6 @@ const InvoicesControl = () => {
         const data = await getInvoices(adminToken, params);
         console.log("Raw data from API:", data);
 
-        // Kiểm tra dữ liệu trả về
         if (!data || !Array.isArray(data.orders)) {
           console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
           setAllInvoices([]);
@@ -141,7 +142,6 @@ const InvoicesControl = () => {
     [adminToken, limitItems]
   );
 
-  // Debounced search function
   const debouncedSearch = useCallback(
     debounce((value) => {
       setCurrentPage(1);
@@ -204,19 +204,16 @@ const InvoicesControl = () => {
     [sortOption, startDate, endDate, fetchInvoices]
   );
 
-  // Khởi tạo dữ liệu
   useEffect(() => {
     fetchInvoices(currentPage);
   }, [currentPage, fetchInvoices]);
 
-  // Xử lý tìm kiếm theo mã hóa đơn
   const handleSearchTextChange = (e) => {
     const value = e.target.value;
     setSearchText(value);
     debouncedSearch(value);
   };
 
-  // Xử lý tìm kiếm theo ngày
   const handleDateSearch = (e) => {
     e.preventDefault();
     if (startDate && endDate) {
@@ -289,7 +286,6 @@ const InvoicesControl = () => {
     }
   };
 
-  // Reset tìm kiếm theo ngày
   const handleResetDateSearch = () => {
     setStartDate("");
     setEndDate("");
@@ -298,7 +294,6 @@ const InvoicesControl = () => {
     toast.success("Đã đặt lại tìm kiếm theo ngày!");
   };
 
-  // Xử lý thay đổi sắp xếp
   const handleSortChange = (event) => {
     const value = event.target.value;
     setSortOption(value);
@@ -378,7 +373,6 @@ const InvoicesControl = () => {
     }
   };
 
-  // Xử lý sắp xếp từ DataGrid
   const handleSortModelChange = (newSortModel) => {
     setSortModel(newSortModel);
     setCurrentPage(1);
@@ -424,7 +418,6 @@ const InvoicesControl = () => {
     }
   };
 
-  // Xử lý thay đổi trang
   const handlePageChange = (event, value) => {
     setCurrentPage(value);
     let sortKey = "";
@@ -484,12 +477,12 @@ const InvoicesControl = () => {
     fetchInvoices(value, searchText, startDate, endDate, sortKey, sortValue);
   };
 
-  // Mở modal chi tiết
   const handleOpenDetail = async (invoice) => {
     setLoading(true);
     try {
       const response = await getInvoiceDetail(adminToken, invoice._id);
       if (response.code === 200 && response.data) {
+        console.log("Invoice detail data:", response.data);
         setCurrentInvoice(response.data);
         setOpenDetail(true);
       } else {
@@ -509,29 +502,39 @@ const InvoicesControl = () => {
     setCurrentInvoice(null);
   };
 
-  // Xóa hóa đơn
   const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa hóa đơn này?")) {
-      setLoading(true);
-      try {
-        const response = await deleteInvoice(adminToken, id);
-        if (response.code === 200) {
-          fetchInvoices(currentPage);
-          toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
-        } else {
-          toast.error(response.message || "Xóa hóa đơn thất bại!", { position: "top-right" });
-        }
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
-        toast.error(errorMessage, { position: "top-right" });
-        console.error("Delete invoice error:", err.response?.data);
-      } finally {
-        setLoading(false);
+    setInvoiceToDelete(id);
+    setOpenDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!invoiceToDelete) return;
+
+    setLoading(true);
+    try {
+      const response = await deleteInvoice(adminToken, invoiceToDelete);
+      if (response.code === 200) {
+        fetchInvoices(currentPage);
+        toast.success("Xóa hóa đơn thành công!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Xóa hóa đơn thất bại!", { position: "top-right" });
       }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
+      toast.error(errorMessage, { position: "top-right" });
+      console.error("Delete invoice error:", err.response?.data);
+    } finally {
+      setLoading(false);
+      setOpenDeleteConfirm(false);
+      setInvoiceToDelete(null);
     }
   };
 
-  // Hàm xử lý in hóa đơn
+  const handleCancelDelete = () => {
+    setOpenDeleteConfirm(false);
+    setInvoiceToDelete(null);
+  };
+
   const handlePrint = () => {
     if (!currentInvoice) return;
     const printWindow = window.open("", "_blank");
@@ -646,7 +649,7 @@ const InvoicesControl = () => {
         const date = new Date(params.value);
         return (
           <Box display="flex" alignItems="center" height="100%">
-            {isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString("vi-VN")}
+            {isNaN(date.getTime()) ? "N/A" : date.toLocaleString("vi-VN")}
           </Box>
         );
       },
@@ -716,7 +719,6 @@ const InvoicesControl = () => {
                     backgroundColor: colors.primary[400],
                   }}
                 >
-                  <MenuItem value="none">Không sắp xếp</MenuItem>
                   <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                   <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                   <MenuItem value="orderCode_asc">Mã hóa đơn: Tăng dần</MenuItem>
@@ -762,6 +764,7 @@ const InvoicesControl = () => {
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     width: 150,
+                    borderRadius: "6px",
                     backgroundColor: colors.primary[400],
                     "& .MuiOutlinedInput-root": {
                       "& fieldset": { borderColor: "transparent" },
@@ -779,6 +782,7 @@ const InvoicesControl = () => {
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     width: 150,
+                    borderRadius: "6px",
                     backgroundColor: colors.primary[400],
                     "& .MuiOutlinedInput-root": {
                       "& fieldset": { borderColor: "transparent" },
@@ -917,36 +921,64 @@ const InvoicesControl = () => {
                 <Typography>Số điện thoại: {currentInvoice.order?.userInfor?.phone || "N/A"}</Typography>
                 <Typography>Ghi chú: {currentInvoice.order?.userInfor?.note || "Không có"}</Typography>
               </Box>
-              <Typography variant="h5" color={colors.grey[100]} mb={1}>
-                Danh sách tour
-              </Typography>
-              <TableContainer component={Paper} sx={{ mb: 2 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell width="40%">Tiêu đề</TableCell>
-                      <TableCell width="20%" align="center">Số lượng</TableCell>
-                      <TableCell width="40%" align="right">Giá (VNĐ)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Array.isArray(currentInvoice.tours) && currentInvoice.tours.length > 0 ? (
-                      currentInvoice.tours.map((tour, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{tour.tourInfo?.title || "N/A"}</TableCell>
-                          <TableCell align="center">{tour.quantity || 0}</TableCell>
-                          <TableCell align="right">{tour.priceNew?.toLocaleString("vi-VN") || "N/A"}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={3}>Không có tour</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
 
+              {/* Hiển thị bảng tour nếu có tour, hoặc bỏ qua nếu không có */}
+              {Array.isArray(currentInvoice.tours) && currentInvoice.tours.length > 0 && (
+                <>
+                  <Typography variant="h5" color={colors.grey[100]} mb={1}>
+                    Danh sách tour
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ mb: 2 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell width="30%">Tiêu đề</TableCell>
+                          <TableCell width="15%" align="center">Số lượng</TableCell>
+                          <TableCell width="25%" align="center">Ngày xuất phát</TableCell>
+                          <TableCell width="30%" align="right">Giá (VNĐ)</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {currentInvoice.tours.map((tour, index) => {
+                          // Tìm tour tương ứng trong currentInvoice.order.tours để lấy timeStarts
+                          const matchingTour = currentInvoice.order?.tours?.find(
+                            (orderTour) => orderTour.tour_id === tour.tourInfo?._id
+                          );
+                          const quantity = matchingTour?.timeStarts?.length > 0
+                            ? matchingTour.timeStarts[0].stock
+                            : 0;
+                          const departureDate = matchingTour?.timeStarts?.length > 0
+                            ? new Date(matchingTour.timeStarts[0].timeDepart)
+                            : null;
+                          const formattedDate = departureDate
+                            ? departureDate.toLocaleDateString("vi-VN", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                            : "N/A";
+                          const price = typeof tour.priceNew === 'number'
+                            ? tour.priceNew
+                            : (tour.tourInfo?.price || 0);
+
+                          return (
+                            <TableRow key={index}>
+                              <TableCell>{tour.tourInfo?.title || "N/A"}</TableCell>
+                              <TableCell align="center">{quantity}</TableCell>
+                              <TableCell align="center">{formattedDate}</TableCell>
+                              <TableCell align="right">
+                                {price > 0 ? price.toLocaleString("vi-VN") : "N/A"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {/* Hiển thị bảng khách sạn nếu có khách sạn, hoặc bỏ qua nếu không có */}
               {Array.isArray(currentInvoice.hotels) && currentInvoice.hotels.length > 0 && (
                 <>
                   <Typography variant="h5" color={colors.grey[100]} mb={1}>
@@ -956,28 +988,47 @@ const InvoicesControl = () => {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell width="35%">Tên khách sạn</TableCell>
-                          <TableCell width="25%">Phòng</TableCell>
-                          <TableCell width="20%" align="center">Số lượng</TableCell>
+                          <TableCell width="25%">Tên khách sạn</TableCell>
+                          <TableCell width="20%">Phòng</TableCell>
+                          <TableCell width="15%" align="center">Số đêm</TableCell>
                           <TableCell width="20%" align="right">Giá (VNĐ)</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {currentInvoice.hotels.map((hotel, index) =>
-                          hotel.rooms.map((room, roomIndex) => (
-                            <TableRow key={`${index}-${roomIndex}`}>
-                              <TableCell>{hotel.hotelInfo?.name || "N/A"}</TableCell>
-                              <TableCell>{room.roomInfo?.name || "N/A"}</TableCell>
-                              <TableCell align="center">{room.quantity || 0}</TableCell>
-                              <TableCell align="right">{room.price?.toLocaleString("vi-VN") || "N/A"}</TableCell>
-                            </TableRow>
-                          ))
+                          hotel.rooms.map((room, roomIndex) => {
+                            // Giả định có trường checkInDate trong tương lai, hiện tại để "N/A"
+                            const checkInDate = room.checkInDate
+                              ? new Date(room.checkInDate).toLocaleDateString("vi-VN", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })
+                              : "N/A";
+
+                            return (
+                              <TableRow key={`${index}-${roomIndex}`}>
+                                <TableCell>{hotel.hotelInfo?.name || "N/A"}</TableCell>
+                                <TableCell>{room.roomInfo?.name || "N/A"}</TableCell>
+                                <TableCell align="center">{room.quantity || 0}</TableCell>
+                                <TableCell align="right">{room.price?.toLocaleString("vi-VN") || "N/A"}</TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
                   </TableContainer>
                 </>
               )}
+
+              {/* Hiển thị thông báo nếu không có cả tour và khách sạn */}
+              {(!Array.isArray(currentInvoice.tours) || currentInvoice.tours.length === 0) &&
+                (!Array.isArray(currentInvoice.hotels) || currentInvoice.hotels.length === 0) && (
+                  <Typography variant="h6" color={colors.grey[100]} mt={2}>
+                    Không có tour hoặc khách sạn trong hóa đơn này.
+                  </Typography>
+                )}
 
               <Typography
                 variant="h5"
@@ -1012,6 +1063,39 @@ const InvoicesControl = () => {
             sx={{ fontWeight: "bold" }}
           >
             Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openDeleteConfirm}
+        onClose={handleCancelDelete}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.3rem", textAlign: "center" }}>
+          Xác nhận xóa
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn xóa hóa đơn này không?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCancelDelete}
+            color="primary"
+            variant="outlined"
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : "Xóa"}
           </Button>
         </DialogActions>
       </Dialog>

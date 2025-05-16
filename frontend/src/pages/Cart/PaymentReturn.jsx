@@ -1,56 +1,47 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Container, Card, Button, Spinner } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import api from "../../utils/api";
 import { toast } from "react-toastify";
 import Header from "../../components/Common/Header/Header";
 import { useCart } from "../../context/CartContext";
-import "./cart.css";
 
-const PaymentReturn = () => {
+const PaymentResult = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { fetchCart, clearCart, isLoading } = useCart();
+  const { fetchCart, isLoading: isCartLoading } = useCart();
   const [paymentStatus, setPaymentStatus] = useState(null);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(true);
+  const [orderCode, setOrderCode] = useState(null);
 
   useEffect(() => {
-    document.title = "Payment Return - GoTravel";
+    document.title = "Payment Result - GoTravel";
     window.scrollTo(0, 0);
     fetchPaymentStatus();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
-  const fetchPaymentStatus = async () => {
+  const fetchPaymentStatus = () => {
+    setIsCheckingPayment(true);
     const query = new URLSearchParams(location.search);
-    const vnp_TxnRef = query.get("vnp_TxnRef");
-    const vnp_ResponseCode = query.get("vnp_ResponseCode");
+    const orderCode = query.get("orderCode");
+    const message = query.get("message");
 
-    if (!vnp_TxnRef || !vnp_ResponseCode) {
-      setPaymentStatus({ success: false, message: "Thông tin thanh toán không hợp lệ!" });
-      return;
-    }
-
-    try {
-      const response = await api.get(`/api/v1/checkout/success${location.search}`);
-      if (response.data.code === 200) {
-        setPaymentStatus({
-          success: true,
-          message: "Thanh toán thành công!",
-          order: response.data.order,
-        });
-        await clearCart(); // Xóa giỏ hàng sau khi thanh toán thành công
-        await fetchCart(); // Đồng bộ giỏ hàng
-      } else {
-        setPaymentStatus({
-          success: false,
-          message: response.data.message || "Thanh toán thất bại!",
-        });
-      }
-    } catch (error) {
-      console.error("Lỗi khi kiểm tra trạng thái thanh toán:", error);
-      setPaymentStatus({
-        success: false,
-        message: "Có lỗi xảy ra khi kiểm tra trạng thái thanh toán!",
+    if (message) {
+      setPaymentStatus({ success: false, message: decodeURIComponent(message) });
+      toast.error(decodeURIComponent(message));
+      setIsCheckingPayment(false);
+    } else if (orderCode) {
+      setOrderCode(orderCode);
+      setPaymentStatus({ success: true, message: "Thanh toán thành công!" });
+      fetchCart().catch((err) => {
+        console.error("Lỗi khi làm mới giỏ hàng:", err);
+        toast.error("Không thể làm mới giỏ hàng, vui lòng thử lại!");
       });
+      setIsCheckingPayment(false);
+    } else {
+      setPaymentStatus({ success: false, message: "Thông tin thanh toán không hợp lệ!" });
+      toast.error("Thông tin thanh toán không hợp lệ!");
+      setIsCheckingPayment(false);
     }
   };
 
@@ -59,8 +50,10 @@ const PaymentReturn = () => {
   };
 
   const handleViewInvoice = () => {
-    if (paymentStatus?.order?._id) {
-      navigate(`/invoices/${paymentStatus.order._id}`);
+    if (orderCode) {
+      navigate(`/invoices?orderCode=${orderCode}`);
+    } else {
+      toast.error("Không tìm thấy thông tin hóa đơn!");
     }
   };
 
@@ -69,7 +62,7 @@ const PaymentReturn = () => {
       <Header />
       <section className="payment-return-section">
         <Container>
-          {isLoading ? (
+          {isCheckingPayment ? (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <Spinner animation="border" variant="primary" />
               <p className="mt-3">Đang kiểm tra trạng thái thanh toán...</p>
@@ -77,32 +70,26 @@ const PaymentReturn = () => {
           ) : (
             <Card className="payment-card">
               <Card.Body>
-                <h2 className={paymentStatus?.success ? "success" : "error"}>
-                  {paymentStatus?.success
-                    ? "Thanh toán thành công!"
-                    : "Thanh toán thất bại!"}
+                <h2 className={paymentStatus?.success ? "text-success" : "text-danger"}>
+                  {paymentStatus?.success ? "Thanh toán thành công!" : "Thanh toán thất bại!"}
                 </h2>
                 <p>{paymentStatus?.message}</p>
-                {paymentStatus?.success && paymentStatus.order && (
+
+                {paymentStatus?.success && orderCode && (
                   <div className="order-details">
                     <h4>Thông tin đơn hàng</h4>
                     <p>
-                      <strong>Mã đơn hàng:</strong> {paymentStatus.order.orderCode}
-                    </p>
-                    <p>
-                      <strong>Tổng tiền:</strong>{" "}
-                      {paymentStatus.order.totalPrice.toLocaleString()} VNĐ
-                    </p>
-                    <p>
-                      <strong>Trạng thái:</strong> {paymentStatus.order.status}
+                      <strong>Mã đơn hàng:</strong> {orderCode}
                     </p>
                   </div>
                 )}
-                <div className="d-flex justify-content-center gap-3">
+
+                <div className="d-flex justify-content-center gap-3 mt-3">
                   <Button
                     variant="primary"
                     onClick={handleContinueShopping}
-                    disabled={isLoading}
+                    disabled={isCartLoading}
+                    aria-label="Tiếp tục mua sắm"
                   >
                     Tiếp tục mua sắm
                   </Button>
@@ -110,7 +97,8 @@ const PaymentReturn = () => {
                     <Button
                       variant="success"
                       onClick={handleViewInvoice}
-                      disabled={isLoading}
+                      disabled={isCartLoading}
+                      aria-label="Xem hóa đơn"
                     >
                       Xem hóa đơn
                     </Button>
@@ -125,4 +113,4 @@ const PaymentReturn = () => {
   );
 };
 
-export default PaymentReturn;
+export default PaymentResult;

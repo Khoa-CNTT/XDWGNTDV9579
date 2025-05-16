@@ -721,7 +721,7 @@ const ContactsControl = () => {
           </Box>
         </Box>
       </Box>
-      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="sm" fullWidth>
+      <Dialog open={openDetail} onClose={handleCloseDetail} maxWidth="xs" fullWidth>
         <DialogTitle
           sx={{
             fontWeight: "bold",

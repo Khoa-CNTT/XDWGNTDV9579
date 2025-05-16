@@ -17,6 +17,7 @@ import {
     InputLabel,
     FormControl,
     Pagination,
+    Avatar,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useTheme } from "@mui/material";
@@ -28,6 +29,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CloseIcon from "@mui/icons-material/Close";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -49,7 +51,7 @@ const TourControl = () => {
     const [categories, setCategories] = useState([]);
     const [searchText, setSearchText] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [sortOption, setSortOption] = useState("none");
+    const [sortOption, setSortOption] = useState("stt_asc");
     const [sortModel, setSortModel] = useState([]);
     const [open, setOpen] = useState(false);
     const [openDetail, setOpenDetail] = useState(false);
@@ -75,6 +77,8 @@ const TourControl = () => {
         information: "",
         schedule: "",
     });
+    const [imagePreviews, setImagePreviews] = useState([]);
+    const [imageFiles, setImageFiles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState("");
@@ -117,7 +121,6 @@ const TourControl = () => {
     const fetchCategories = useCallback(async () => {
         try {
             const data = await getCategories();
-            console.log("Categories from API:", data);
             const categoryList = Array.isArray(data.categories) ? data.categories : [];
             setCategories(categoryList);
             return categoryList;
@@ -144,12 +147,9 @@ const TourControl = () => {
                     params.sortKey = sortKey;
                     params.sortValue = sortValue;
                 }
-                console.log("Fetch tours with params:", params);
                 const data = await getTours(params);
-                console.log("Tours from API:", data);
 
                 if (!data || !data.toursObject || !Array.isArray(data.toursObject)) {
-                    console.warn("Dữ liệu tour không hợp lệ hoặc rỗng:", data);
                     setTours([]);
                     setTotalPages(1);
                     toast.info(
@@ -161,17 +161,20 @@ const TourControl = () => {
                     return;
                 }
 
+                const totalRecords = data.totalRecords || data.toursObject.length;
                 const formattedData = data.toursObject.map((item, index) => {
                     const category = categoriesData.find((cat) => cat._id === item.category_id);
-                    console.log(`Tour ${item.title}: category_id=${item.category_id}, matched category=`, category);
-                    if (!category) {
-                        console.warn(`Tour ${item.title} has invalid category_id: ${item.category_id}`);
-                    }
                     const tourStatus = category && category.status === "inactive" ? "inactive" : item.status || "active";
+                    let stt;
+                    if (sortKey === "_id" && sortValue === "desc") {
+                        stt = totalRecords - ((page - 1) * limitItems + index);
+                    } else {
+                        stt = (page - 1) * limitItems + index + 1;
+                    }
                     return {
                         ...item,
                         id: item._id,
-                        stt: (page - 1) * limitItems + index + 1,
+                        stt: stt,
                         status: tourStatus,
                         price_special: item.price_special,
                         timeStarts: item.timeStarts || [],
@@ -214,7 +217,6 @@ const TourControl = () => {
     // Hàm làm mới dữ liệu tour
     const refreshTours = useCallback(
         async (page = 1, searchQuery = "", status = statusFilter, sortKey = "", sortValue = "") => {
-            console.log("Refreshing tours with searchQuery:", searchQuery);
             const normalizedQuery = normalizeSearchText(searchQuery);
             await fetchTours(categories, page, normalizedQuery, status, sortKey, sortValue);
         },
@@ -243,6 +245,14 @@ const TourControl = () => {
         let sortKey = "";
         let sortValue = "";
         switch (sortOption) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                break;
             case "price_asc":
                 sortKey = "price";
                 sortValue = "asc";
@@ -304,63 +314,132 @@ const TourControl = () => {
         setCurrentPage(1);
         let sortKey = "";
         let sortValue = "";
+        let sortField = "";
         switch (value) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                sortField = "stt";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                sortField = "stt";
+                break;
             case "price_asc":
                 sortKey = "price";
                 sortValue = "asc";
+                sortField = "price_special";
                 break;
             case "price_desc":
                 sortKey = "price";
                 sortValue = "desc";
+                sortField = "price_special";
                 break;
             case "code_asc":
                 sortKey = "code";
                 sortValue = "asc";
+                sortField = "code";
                 break;
             case "code_desc":
                 sortKey = "code";
                 sortValue = "desc";
+                sortField = "code";
                 break;
             case "title_asc":
                 sortKey = "title";
                 sortValue = "asc";
+                sortField = "title";
                 break;
             case "title_desc":
                 sortKey = "title";
                 sortValue = "desc";
+                sortField = "title";
                 break;
             case "discount_asc":
                 sortKey = "discount";
                 sortValue = "asc";
+                sortField = "discount";
                 break;
             case "discount_desc":
                 sortKey = "discount";
                 sortValue = "desc";
+                sortField = "discount";
                 break;
             case "stock_asc":
                 sortKey = "stock";
                 sortValue = "asc";
+                sortField = "selectedStock";
                 break;
             case "stock_desc":
                 sortKey = "stock";
                 sortValue = "desc";
+                sortField = "selectedStock";
                 break;
             case "timeDepart_asc":
                 sortKey = "timeDepart";
                 sortValue = "asc";
+                sortField = "timeStarts";
                 break;
             case "timeDepart_desc":
                 sortKey = "timeDepart";
                 sortValue = "desc";
+                sortField = "timeStarts";
                 break;
             default:
                 break;
         }
         refreshTours(1, searchText, statusFilter, sortKey, sortValue);
         if (sortKey) {
-            setSortModel([{ field: sortKey === "price" ? "price_special" : sortKey, sort: sortValue }]);
+            setSortModel([{ field: sortField, sort: sortValue }]);
         } else {
             setSortModel([]);
+        }
+    };
+
+    // Xử lý sắp xếp từ DataGrid
+    const handleSortModelChange = (newSortModel) => {
+        setSortModel(newSortModel);
+        setCurrentPage(1);
+        if (newSortModel.length > 0) {
+            const { field, sort } = newSortModel[0];
+            let sortKey = "";
+            let sortOptionValue = "";
+            switch (field) {
+                case "stt":
+                    sortKey = "_id";
+                    sortOptionValue = sort === "asc" ? "stt_asc" : "stt_desc";
+                    break;
+                case "code":
+                    sortKey = "code";
+                    sortOptionValue = sort === "asc" ? "code_asc" : "code_desc";
+                    break;
+                case "title":
+                    sortKey = "title";
+                    sortOptionValue = sort === "asc" ? "title_asc" : "title_desc";
+                    break;
+                case "price_special":
+                    sortKey = "price";
+                    sortOptionValue = sort === "asc" ? "price_asc" : "price_desc";
+                    break;
+                case "discount":
+                    sortKey = "discount";
+                    sortOptionValue = sort === "asc" ? "discount_asc" : "discount_desc";
+                    break;
+                case "selectedStock":
+                    sortKey = "stock";
+                    sortOptionValue = sort === "asc" ? "stock_asc" : "stock_desc";
+                    break;
+                default:
+                    break;
+            }
+            if (sortKey) {
+                setSortOption(sortOptionValue);
+                refreshTours(1, searchText, statusFilter, sortKey, sort);
+            }
+        } else {
+            setSortOption("none");
+            refreshTours(1, searchText, statusFilter);
         }
     };
 
@@ -373,6 +452,14 @@ const TourControl = () => {
             let sortKey = "";
             let sortValue = "";
             switch (sortOption) {
+                case "stt_asc":
+                    sortKey = "_id";
+                    sortValue = "asc";
+                    break;
+                case "stt_desc":
+                    sortKey = "_id";
+                    sortValue = "desc";
+                    break;
                 case "price_asc":
                     sortKey = "price";
                     sortValue = "asc";
@@ -442,6 +529,14 @@ const TourControl = () => {
         let sortKey = "";
         let sortValue = "";
         switch (sortOption) {
+            case "stt_asc":
+                sortKey = "_id";
+                sortValue = "asc";
+                break;
+            case "stt_desc":
+                sortKey = "_id";
+                sortValue = "desc";
+                break;
             case "price_asc":
                 sortKey = "price";
                 sortValue = "asc";
@@ -512,6 +607,8 @@ const TourControl = () => {
             information: "",
             schedule: "",
         });
+        setImagePreviews([]);
+        setImageFiles([]);
         setError("");
         setOpen(true);
     };
@@ -526,6 +623,7 @@ const TourControl = () => {
             if (isNaN(parsedDate.getTime())) return "";
             return parsedDate.toISOString().split("T")[0];
         };
+        const tourImages = tour.images || [];
         setNewTour({
             title: tour.title || "",
             code: tour.code || "",
@@ -538,10 +636,12 @@ const TourControl = () => {
                 stock: item.stock.toString(),
             })),
             status: tour.status || "active",
-            images: tour.images || [],
+            images: tourImages,
             information: tour.information || "",
             schedule: tour.schedule || "",
         });
+        setImagePreviews(tourImages);
+        setImageFiles(tourImages.map(url => ({ url })));
         setError("");
         setOpen(true);
     };
@@ -619,6 +719,36 @@ const TourControl = () => {
         setCurrentImageIndex(0);
     };
 
+    // Xử lý chọn ảnh
+    const handleImagesChange = (event) => {
+        const files = Array.from(event.target.files);
+        const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+        const validFiles = files.filter(file => validImageTypes.includes(file.type));
+
+        if (validFiles.length + imageFiles.length > 10) {
+            toast.error("Tối đa 10 ảnh!", { position: "top-right" });
+            return;
+        }
+
+        if (validFiles.length < files.length) {
+            toast.warn("Một số file không phải định dạng ảnh hợp lệ!", { position: "top-right" });
+        }
+
+        setImageFiles(prev => [...prev, ...validFiles]);
+        setNewTour(prev => ({ ...prev, images: [...imageFiles, ...validFiles] }));
+        const previews = validFiles.map(file => URL.createObjectURL(file));
+        setImagePreviews(prev => [...prev, ...previews]);
+    };
+
+    // Xử lý xóa ảnh
+    const handleRemoveImage = (index) => {
+        const newPreviews = imagePreviews.filter((_, i) => i !== index);
+        const newFiles = imageFiles.filter((_, i) => i !== index);
+        setImagePreviews(newPreviews);
+        setImageFiles(newFiles);
+        setNewTour(prev => ({ ...prev, images: newFiles }));
+    };
+
     // Thêm tour
     const handleAdd = async () => {
         if (
@@ -631,6 +761,10 @@ const TourControl = () => {
             !newTour.schedule
         ) {
             setError("Vui lòng điền đầy đủ thông tin!");
+            return;
+        }
+        if (imageFiles.length === 0) {
+            setError("Vui lòng chọn ít nhất một ảnh!");
             return;
         }
         const invalidTimeStarts = newTour.timeStarts.some(
@@ -654,29 +788,23 @@ const TourControl = () => {
             formData.append("schedule", newTour.schedule);
 
             const mergedTimeStarts = mergeDuplicateDates(newTour.timeStarts);
-            console.log("Merged timeStarts:", mergedTimeStarts);
-
             mergedTimeStarts.forEach((time, index) => {
                 formData.append(`timeStarts[${index}][timeDepart]`, time.timeDepart);
                 formData.append(`timeStarts[${index}][stock]`, time.stock);
-                console.log(`timeStarts[${index}]:`, { timeDepart: time.timeDepart, stock: time.stock });
             });
 
-            if (newTour.images.length > 0) {
-                newTour.images.forEach((image, index) => {
-                    if (image instanceof File) {
-                        formData.append("images", image);
-                        console.log(`Image ${index}:`, image.name, image.size);
-                    } else {
-                        console.warn(`Image ${index} is not a File object:`, image);
-                    }
-                });
-            } else {
-                console.log("No images provided.");
-            }
+            imageFiles.forEach((file, index) => {
+                if (file.url) {
+                    formData.append(`images[${index}]`, file.url);
+                } else {
+                    formData.append("images", file);
+                }
+            });
 
-            console.log("FormData to send:", Object.fromEntries(formData));
+            console.log("FormData gửi đi:", [...formData.entries()]);
             const response = await createTour(formData);
+            console.log("Phản hồi từ server:", response);
+
             if (response.code === 200) {
                 await refreshTours(currentPage);
                 handleClose();
@@ -710,6 +838,10 @@ const TourControl = () => {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
         }
+        if (imageFiles.length === 0) {
+            setError("Vui lòng chọn ít nhất một ảnh!");
+            return;
+        }
         const invalidTimeStarts = newTour.timeStarts.some(
             (time) => !time.timeDepart || !time.stock || isNaN(parseInt(time.stock)) || parseInt(time.stock) < 0
         );
@@ -733,16 +865,18 @@ const TourControl = () => {
                 formData.append(`timeStarts[${index}][timeDepart]`, time.timeDepart);
                 formData.append(`timeStarts[${index}][stock]`, parseInt(time.stock));
             });
-            newTour.images.forEach((image, index) => {
-                if (image instanceof File) {
-                    formData.append("images", image);
-                    console.log(`Image ${index}:`, image.name, image.size);
+            imageFiles.forEach((file, index) => {
+                if (file.url) {
+                    formData.append(`images[${index}]`, file.url);
                 } else {
-                    console.warn(`Image ${index} is not a File object:`, image);
+                    formData.append("images", file);
                 }
             });
-            console.log("FormData to send:", Object.fromEntries(formData));
+
+            console.log("FormData gửi đi:", [...formData.entries()]);
             const response = await updateTour(currentId, formData);
+            console.log("Phản hồi từ server:", response);
+
             if (response.code === 200) {
                 await refreshTours(currentPage);
                 handleClose();
@@ -799,7 +933,6 @@ const TourControl = () => {
                 }
             });
 
-            console.log("FormData for stock update:", Object.fromEntries(formData));
             const response = await updateTour(tourId, formData);
             if (response.code === 200) {
                 setTours((prev) =>
@@ -1178,7 +1311,9 @@ const TourControl = () => {
                                         },
                                     }}
                                 >
-                                    <MenuItem value="none">Không sắp xếp</MenuItem>
+                                    {/* <MenuItem value="none">Không sắp xếp</MenuItem> */}
+                                    <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
+                                    <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                     <MenuItem value="code_asc">Mã tour: Tăng dần</MenuItem>
                                     <MenuItem value="code_desc">Mã tour: Giảm dần</MenuItem>
                                     <MenuItem value="title_asc">Tiêu đề: Tăng dần</MenuItem>
@@ -1294,45 +1429,7 @@ const TourControl = () => {
                                     hideFooter={true}
                                     sortingMode="server"
                                     sortModel={sortModel}
-                                    onSortModelChange={(newSortModel) => {
-                                        setSortModel(newSortModel);
-                                        if (newSortModel.length > 0) {
-                                            const { field, sort } = newSortModel[0];
-                                            let sortKey = "";
-                                            let sortOptionValue = "";
-                                            switch (field) {
-                                                case "code":
-                                                    sortKey = "code";
-                                                    sortOptionValue = sort === "asc" ? "code_asc" : "code_desc";
-                                                    break;
-                                                case "title":
-                                                    sortKey = "title";
-                                                    sortOptionValue = sort === "asc" ? "title_asc" : "title_desc";
-                                                    break;
-                                                case "price_special":
-                                                    sortKey = "price";
-                                                    sortOptionValue = sort === "asc" ? "price_asc" : "price_desc";
-                                                    break;
-                                                case "discount":
-                                                    sortKey = "discount";
-                                                    sortOptionValue = sort === "asc" ? "discount_asc" : "discount_desc";
-                                                    break;
-                                                case "selectedStock":
-                                                    sortKey = "stock";
-                                                    sortOptionValue = sort === "asc" ? "stock_asc" : "stock_desc";
-                                                    break;
-                                                default:
-                                                    break;
-                                            }
-                                            if (sortKey) {
-                                                setSortOption(sortOptionValue);
-                                                refreshTours(1, searchText, statusFilter, sortKey, sort);
-                                            }
-                                        } else {
-                                            setSortOption("none");
-                                            refreshTours(1, searchText, statusFilter);
-                                        }
-                                    }}
+                                    onSortModelChange={handleSortModelChange}
                                 />
                                 <Box display="flex" justifyContent="center" mt={2}>
                                     <Pagination
@@ -1492,40 +1589,56 @@ const TourControl = () => {
                         required
                     />
                     <Box mt={2}>
+                        <Typography variant="body1" mb={1}>
+                            Ảnh tour
+                        </Typography>
+                        <Box display="flex" flexWrap="wrap" gap={1} mb={1}>
+                            {imagePreviews.length > 0 ? (
+                                imagePreviews.map((preview, index) => (
+                                    <Box key={index} sx={{ position: "relative" }}>
+                                        <Avatar
+                                            src={preview}
+                                            alt={`Preview ${index}`}
+                                            sx={{ width: 60, height: 60 }}
+                                            onError={(e) => {
+                                                e.target.src = "https://via.placeholder.com/60";
+                                            }}
+                                        />
+                                        <IconButton
+                                            size="small"
+                                            sx={{
+                                                position: "absolute",
+                                                top: -10,
+                                                right: -10,
+                                                backgroundColor: colors.redAccent[500],
+                                                color: "white",
+                                                "&:hover": {
+                                                    backgroundColor: colors.redAccent[700],
+                                                },
+                                            }}
+                                            onClick={() => handleRemoveImage(index)}
+                                        >
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    </Box>
+                                ))
+                            ) : (
+                                <Typography variant="caption">Chưa có ảnh</Typography>
+                            )}
+                        </Box>
                         <input
                             accept="image/*"
                             style={{ display: "none" }}
                             id="images-upload"
                             type="file"
                             multiple
-                            onChange={(e) => setNewTour({ ...newTour, images: Array.from(e.target.files) })}
+                            onChange={handleImagesChange}
                         />
                         <label htmlFor="images-upload">
                             <Button variant="contained" component="span" color="primary">
-                                Chọn ảnh
+                                Chọn ảnh (tối đa 10)
                             </Button>
                         </label>
-                        {newTour.images.length > 0 && (
-                            <Box mt={2} display="flex" gap={1} flexWrap="wrap">
-                                {newTour.images.map((image, index) => (
-                                    <Box
-                                        key={index}
-                                        component="img"
-                                        src={typeof image === "string" ? image : URL.createObjectURL(image)}
-                                        alt={`Tour Preview ${index}`}
-                                        sx={{
-                                            width: 100,
-                                            height: 60,
-                                            objectFit: "cover",
-                                            borderRadius: 1,
-                                        }}
-                                        onError={(e) => {
-                                            e.target.src = "https://via.placeholder.com/100";
-                                        }}
-                                    />
-                                ))}
-                            </Box>
-                        )}
                     </Box>
                 </DialogContent>
                 <DialogActions>

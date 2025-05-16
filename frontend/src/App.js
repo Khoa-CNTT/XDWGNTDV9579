@@ -5,7 +5,9 @@ import { ColorModeContext, useMode } from "./theme";
 import { AuthProvider } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminContext";
 import { CartProvider } from "./context/CartContext";
-import ChangePassword from "./pages/ChangePassword/ChangePassword"; // Import component mới
+import ChangePassword from "./pages/ChangePassword/ChangePassword";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Admin Components
 import Topbar from "./Admin/global/Topbar";
@@ -52,9 +54,10 @@ import PrivateRoute from "./components/Common/PrivateRoute";
 import HotelServices from "./pages/HotelService/HotelServices";
 import HotelDetails from "./pages/HotelService/HotelDetails";
 import Profile from "./pages/Profile/Profile";
-import Invoicess from "./pages/Invoices/Invoicess";
 import Categories from "./pages/Categories/Categories";
 import { getGeneralSettings } from "./Admin/Setting/SettingApi";
+import OrderList from "./pages/Invoices/OrderList";
+import NotFound from "./pages/NotFound/NotFound"; // Import component NotFound
 
 const AdminContent = ({ children, isSidebar, setIsSidebar }) => {
   const [theme, colorMode] = useMode();
@@ -186,15 +189,15 @@ const AppContent = () => {
         }
       />
       <Route
-        path="/invoices"
+        path="/orders"
         element={
           <PrivateRoute>
-            <Invoicess />
+            <OrderList />
           </PrivateRoute>
         }
       />
       <Route
-        path="/change-password" // Thêm route mới
+        path="/change-password"
         element={
           <PrivateRoute>
             <ChangePassword />
@@ -204,12 +207,24 @@ const AppContent = () => {
       <Route path="/hotel-services" element={<HotelServices />} />
       <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
       <Route path="/categories" element={<Categories />} />
-      <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
+      <Route path="*" element={<NotFound />} /> {/* Thay thế div 404 bằng component NotFound */}
     </Routes>
   );
 
   return (
     <>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       {isLoginAdmin ? (
         <Routes>
           <Route path="/loginadmin" element={<LoginAdmin />} />

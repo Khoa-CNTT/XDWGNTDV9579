@@ -43,7 +43,7 @@ const Reviews = () => {
     const [selectedHotel, setSelectedHotel] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [searchText, setSearchText] = useState("");
-    const [sortOption, setSortOption] = useState("none");
+    const [sortOption, setSortOption] = useState("stt_asc");
     const [sortModel, setSortModel] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
@@ -590,31 +590,27 @@ const Reviews = () => {
             flex: isMobile ? 0.8 : 1,
             sortable: false,
             renderCell: ({ row }) => (
-                <Box sx={{ display: "flex", gap: 1, mt: "25px" }}>
-                    <IconButton
+
+                <Box display="flex" gap={1} sx={{ alignItems: "center", height: "100%" }}>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
                         onClick={() => handleViewReview(row)}
-                        sx={{
-                            backgroundColor: colors.blueAccent[500],
-                            color: "white",
-                            "&:hover": {
-                                backgroundColor: colors.blueAccent[600],
-                            },
-                        }}
+
                     >
-                        <VisibilityIcon />
-                    </IconButton>
-                    <IconButton
+                        Xem
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        size="small"
+                        startIcon={<DeleteIcon />}
                         onClick={() => handleOpenDeleteModal(row._id)}
-                        sx={{
-                            backgroundColor: colors.redAccent[500],
-                            color: "white",
-                            "&:hover": {
-                                backgroundColor: colors.redAccent[600],
-                            },
-                        }}
                     >
-                        <DeleteIcon />
-                    </IconButton>
+                        Xóa
+                    </Button>
                 </Box>
             ),
         },
@@ -712,7 +708,7 @@ const Reviews = () => {
                                     },
                                 }}
                             >
-                                <MenuItem value="none">Không sắp xếp</MenuItem>
+                                {/* <MenuItem value="none">Không sắp xếp</MenuItem> */}
                                 <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                                 <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                 <MenuItem value="username_asc">Người dùng: Tăng dần</MenuItem>

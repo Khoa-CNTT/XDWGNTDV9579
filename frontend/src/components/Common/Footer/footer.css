@@ -93,7 +93,7 @@
   color: #ffffff;
   width: 50px;
   height: 50px;
-  border-radius: 50%;
+  border-radius: 0; /* Thay đổi từ 50% thành 0 để tạo hình vuông */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,6 +138,7 @@
     height: 40px;
     bottom: 20px;
     right: 20px;
+    border-radius: 0; /* Giữ hình vuông trên mobile */
   }
 
   .back-to-top i {
