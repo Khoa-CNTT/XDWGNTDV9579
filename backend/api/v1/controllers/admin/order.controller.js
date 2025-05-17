@@ -69,7 +69,6 @@ module.exports.index = async (req, res) => {
     }
 };
 
-
 // [PATCH]/api/v1/admin/orders/changeStatus/:status/:id
 module.exports.changeStatus = async (req, res) => {
     const permissions = req.roles.permissions;
