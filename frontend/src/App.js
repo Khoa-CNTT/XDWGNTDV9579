@@ -179,7 +179,7 @@ const AppContent = () => {
           </PrivateRoute>
         }
       />
-      <Route path="/payment/return" element={<PaymentReturn />} />
+      <Route path="/payment-result" element={<PaymentReturn />} />
       <Route
         path="/profile"
         element={

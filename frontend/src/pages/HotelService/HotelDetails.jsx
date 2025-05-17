@@ -59,7 +59,7 @@ const HotelDetails = () => {
         let hasError = false;
         for (const room of response.data.rooms) {
           try {
-            const reviewsResponse = await api.get(`/reviews/${hotelId}/${room._id}`);
+            const reviewsResponse = await api.get(`/reviews/get/${hotelId}/${room._id}`); // Cập nhật URL
             if (reviewsResponse.data.code === 200) {
               reviewsData[room._id] = reviewsResponse.data.reviews || [];
             } else {
@@ -151,7 +151,7 @@ const HotelDetails = () => {
 
     setSubmittingReview(true);
     try {
-      const response = await api.post(`/reviews/${hotelId}/${roomId}`, {
+      const response = await api.post(`/reviews/${hotelId}/${roomId}`, { 
         rating: newRating,
         comment: newComment,
       });
@@ -160,28 +160,42 @@ const HotelDetails = () => {
         setNewComment("");
         setNewRating(5);
         setFetchReviewError(false);
-        fetchHotelDetails();
-      } else {
+        fetchHotelDetails(); 
+      } else if (response.data.code === 400) {
         toast.error(response.data.message || "Đánh giá thất bại!");
+      } else {
+        toast.error("Có lỗi xảy ra khi gửi đánh giá!");
       }
     } catch (error) {
       console.error("Lỗi khi gửi đánh giá:", error);
-      toast.error(error.response?.data?.message || "Đánh giá thất bại!");
+      if (error.response?.data?.code === 400) {
+        toast.error(error.response.data.message || "Bạn đã đánh giá phòng này rồi!");
+      } else {
+        toast.error(error.response?.data?.message || "Đánh giá thất bại!");
+      }
     } finally {
       setSubmittingReview(false);
     }
   };
 
   const handleDeleteReview = async (reviewId) => {
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để xóa đánh giá!");
+      navigate("/login");
+      return;
+    }
+
     setDeletingReview(reviewId);
     try {
-      const response = await api.delete(`/reviews/delete/${reviewId}`);
+      const response = await api.delete(`/reviews/delete/${reviewId}`); // Cập nhật URL
       if (response.data.code === 200) {
         toast.success("Xóa đánh giá thành công!");
         setFetchReviewError(false);
-        fetchHotelDetails();
-      } else {
+        fetchHotelDetails(); // Cập nhật danh sách đánh giá
+      } else if (response.data.code === 404) {
         toast.error(response.data.message || "Xóa thất bại!");
+      } else {
+        toast.error("Có lỗi xảy ra khi xóa đánh giá!");
       }
     } catch (error) {
       console.error("Lỗi khi xóa đánh giá:", error);
@@ -376,6 +390,14 @@ const HotelDetails = () => {
                                         <Card.Body>
                                           <div className="d-flex justify-content-between align-items-center mb-2">
                                             <div className="d-flex align-items-center">
+                                              {review.user_id.avatar && (
+                                                <img
+                                                  src={review.user_id.avatar}
+                                                  alt={review.user_id.fullName}
+                                                  className="rounded-circle me-2"
+                                                  style={{ width: "30px", height: "30px" }}
+                                                />
+                                              )}
                                               <strong>{review.user_id.fullName}</strong>
                                               <span className="text-warning ms-2">
                                                 {"★".repeat(review.rating)}

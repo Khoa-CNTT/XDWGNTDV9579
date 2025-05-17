@@ -72,6 +72,7 @@ const TourControl = () => {
         stock: "",
         category_id: "",
         timeStarts: [{ timeDepart: "", stock: "" }],
+        gathering: "",
         status: "active",
         images: [],
         information: "",
@@ -602,6 +603,7 @@ const TourControl = () => {
             stock: "",
             category_id: "",
             timeStarts: [{ timeDepart: "", stock: "" }],
+            gathering: "",
             status: "active",
             images: [],
             information: "",
@@ -635,6 +637,7 @@ const TourControl = () => {
                 timeDepart: formatDate(item.timeDepart),
                 stock: item.stock.toString(),
             })),
+            gathering: tour.gathering || "",
             status: tour.status || "active",
             images: tourImages,
             information: tour.information || "",
@@ -758,7 +761,8 @@ const TourControl = () => {
             !newTour.category_id ||
             !newTour.timeStarts[0].timeDepart ||
             !newTour.timeStarts[0].stock ||
-            !newTour.schedule
+            !newTour.schedule ||
+            !newTour.gathering
         ) {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
@@ -782,6 +786,7 @@ const TourControl = () => {
             formData.append("discount", parseFloat(newTour.discount));
             formData.append("stock", parseInt(newTour.stock) || 0);
             formData.append("category_id", newTour.category_id);
+            formData.append("gathering", newTour.gathering);
             const category = categories.find((cat) => cat._id === newTour.category_id);
             formData.append("status", category && category.status === "inactive" ? "inactive" : newTour.status);
             formData.append("information", newTour.information || "");
@@ -833,7 +838,8 @@ const TourControl = () => {
             !newTour.price ||
             !newTour.discount ||
             !newTour.category_id ||
-            !newTour.schedule
+            !newTour.schedule ||
+            !newTour.gathering
         ) {
             setError("Vui lòng điền đầy đủ thông tin!");
             return;
@@ -857,6 +863,7 @@ const TourControl = () => {
             formData.append("discount", parseFloat(newTour.discount));
             formData.append("stock", parseInt(newTour.stock) || 0);
             formData.append("category_id", newTour.category_id);
+            formData.append("gathering", newTour.gathering);
             const category = categories.find((cat) => cat._id === newTour.category_id);
             formData.append("status", category && category.status === "inactive" ? "inactive" : newTour.status);
             formData.append("information", newTour.information || "");
@@ -919,6 +926,7 @@ const TourControl = () => {
             formData.append("discount", parseFloat(tour.discount));
             formData.append("stock", parseInt(tour.stock) || 0);
             formData.append("category_id", tour.category_id);
+            formData.append("gathering", tour.gathering);
             const category = categories.find((cat) => cat._id === tour.category_id);
             formData.append("status", category && category.status === "inactive" ? "inactive" : tour.status);
             formData.append("information", tour.information || "");
@@ -1141,7 +1149,12 @@ const TourControl = () => {
             ),
         },
         { field: "title", headerName: "Tiêu đề", flex: 1 },
-        { field: "categoryName", headerName: "Danh mục", flex: 1.3 },
+        { field: "categoryName", headerName: "Danh mục", flex: 0.8 },
+        {
+            field: "gathering",
+            headerName: "Địa điểm xuất phát",
+            flex: 1,
+        },
         { field: "price_special", headerName: "Giá (VNĐ)", flex: 0.7 },
         {
             field: "discount",
@@ -1311,7 +1324,6 @@ const TourControl = () => {
                                         },
                                     }}
                                 >
-                                    {/* <MenuItem value="none">Không sắp xếp</MenuItem> */}
                                     <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                                     <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                     <MenuItem value="code_asc">Mã tour: Tăng dần</MenuItem>
@@ -1485,6 +1497,14 @@ const TourControl = () => {
                         type="number"
                         value={newTour.discount}
                         onChange={(e) => setNewTour({ ...newTour, discount: e.target.value })}
+                        required
+                    />
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label="Địa điểm xuất phát"
+                        value={newTour.gathering}
+                        onChange={(e) => setNewTour({ ...newTour, gathering: e.target.value })}
                         required
                     />
                     <FormControl fullWidth margin="normal">
@@ -1696,6 +1716,10 @@ const TourControl = () => {
                             <Typography variant="h6">
                                 <strong>% Giảm giá:</strong>
                                 <span style={{ marginLeft: "8px" }}>{currentTour.discount || 0}</span>
+                            </Typography>
+                            <Typography variant="h6">
+                                <strong>Địa điểm xuất phát:</strong>
+                                <span style={{ marginLeft: "8px" }}>{currentTour.gathering || "Không xác định"}</span>
                             </Typography>
                             <Typography variant="h6">
                                 <strong>Danh mục:</strong>
