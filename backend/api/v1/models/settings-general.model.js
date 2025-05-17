@@ -6,6 +6,7 @@ const settingGeneralSchema = new mongoose.Schema({
     phone: String,
     email: String,
     address: String,
+    imageSliders: Array,
     slogan: String,
     copyright: String
 }, {
