@@ -12,5 +12,6 @@ router.patch('/general', upload.single('logo'),
     uploadCloud.uploadSingle,
     validate.settingValidate,
     controller.generalPatch);
+router.patch('/slider', upload.fields([{ name: 'imageSliders', maxCount: 10 }]), uploadCloud.uploadFields, controller.slider);
 
 module.exports = router;
