@@ -24,6 +24,7 @@ const TourSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    gathering: String,
     status: {
         type: String,
         default: "active"
