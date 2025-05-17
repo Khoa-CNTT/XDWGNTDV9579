@@ -14,7 +14,7 @@ export const getInvoices = async (adminToken, params = {}) => {
                 'Authorization': `Bearer ${adminToken}`
             }
         });
-        console.log("getInvoices response:", response.data);
+        // console.log("getInvoices response:", response.data);
 
         // Kiểm tra dữ liệu trả về
         if (!response.data || typeof response.data !== 'object') {
@@ -33,7 +33,7 @@ export const getInvoices = async (adminToken, params = {}) => {
 
         return response.data;
     } catch (error) {
-        console.error("getInvoices error:", error);
+        // console.error("getInvoices error:", error);
         const errorMessage = error.response?.data?.message || error.message || "Không thể tải danh sách hóa đơn!";
         throw new Error(errorMessage);
     }
@@ -50,10 +50,10 @@ export const getInvoiceDetail = async (adminToken, id) => {
                 'Authorization': `Bearer ${adminToken}`
             }
         });
-        console.log("getInvoiceDetail response:", response.data);
+        // console.log("getInvoiceDetail response:", response.data);
         return response.data;
     } catch (error) {
-        console.error("getInvoiceDetail error:", error);
+        // console.error("getInvoiceDetail error:", error);
         throw error;
     }
 };
@@ -69,10 +69,30 @@ export const deleteInvoice = async (adminToken, id) => {
                 'Authorization': `Bearer ${adminToken}`
             }
         });
-        console.log("deleteInvoice response:", response.data);
+        // console.log("deleteInvoice response:", response.data);
         return response.data;
     } catch (error) {
-        console.error("deleteInvoice error:", error);
+        // console.error("deleteInvoice error:", error);
         throw error;
+    }
+};
+
+// Cập nhật trạng thái hóa đơn
+export const changeOrderStatus = async (adminToken, status, id) => {
+    if (!adminToken) {
+        throw new Error("Token không hợp lệ hoặc thiếu!");
+    }
+    try {
+        const response = await api.patch(`${BASE_URL}/changeStatus/${status}/${id}`, {}, {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+        // console.log("changeOrderStatus response:", response.data);
+        return response.data;
+    } catch (error) {
+        // console.error("changeOrderStatus error:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Không thể cập nhật trạng thái hóa đơn!";
+        throw new Error(errorMessage);
     }
 };

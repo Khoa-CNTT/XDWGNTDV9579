@@ -806,9 +806,9 @@ const TourControl = () => {
                 }
             });
 
-            console.log("FormData gửi đi:", [...formData.entries()]);
+            // console.log("FormData gửi đi:", [...formData.entries()]);
             const response = await createTour(formData);
-            console.log("Phản hồi từ server:", response);
+            // console.log("Phản hồi từ server:", response);
 
             if (response.code === 200) {
                 await refreshTours(currentPage);
@@ -880,9 +880,9 @@ const TourControl = () => {
                 }
             });
 
-            console.log("FormData gửi đi:", [...formData.entries()]);
+            // console.log("FormData gửi đi:", [...formData.entries()]);
             const response = await updateTour(currentId, formData);
-            console.log("Phản hồi từ server:", response);
+            // console.log("Phản hồi từ server:", response);
 
             if (response.code === 200) {
                 await refreshTours(currentPage);

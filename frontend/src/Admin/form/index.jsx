@@ -42,7 +42,7 @@ const Form = () => {
   useEffect(() => {
     const fetchAdminInfo = async () => {
       const storedAdminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
-      console.log("Stored adminInfo:", JSON.stringify(storedAdminInfo, null, 2));
+      // console.log("Stored adminInfo:", JSON.stringify(storedAdminInfo, null, 2));
 
       const initialInfo = {
         _id: storedAdminInfo._id || "",
@@ -76,7 +76,7 @@ const Form = () => {
       setLoading(true);
       try {
         const response = await getAdminInfo(storedAdminInfo._id);
-        console.log("Fetch admin info response:", JSON.stringify(response, null, 2));
+        // console.log("Fetch admin info response:", JSON.stringify(response, null, 2));
         if (response.code === 200 && response.data) {
           const data = response.data;
           const updatedInfo = {
@@ -140,7 +140,7 @@ const Form = () => {
         });
         return;
       }
-      console.log("Selected file:", file);
+      // console.log("Selected file:", file);
       setNewAvatar(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -190,7 +190,7 @@ const Form = () => {
       if (password) {
         formData.append("password", password);
       }
-      console.log("FormData entries:", [...formData.entries()]);
+      // console.log("FormData entries:", [...formData.entries()]);
 
       const response = await updateAdminInfo(adminInfo._id, formData);
       if (response.code === 200) {

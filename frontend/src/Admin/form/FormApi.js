@@ -6,7 +6,7 @@ const BASE_URL = "http://localhost:3000/api/v1/admin/accounts";
 export const getAdminInfo = async (id) => {
     try {
         const response = await api.get(`${BASE_URL}/detail/${id}`);
-        console.log("getAdminInfo response:", JSON.stringify(response.data, null, 2));
+        // console.log("getAdminInfo response:", JSON.stringify(response.data, null, 2));
         if (!response.data) {
             throw new Error("Không tìm thấy tài khoản với ID: " + id);
         }
@@ -33,7 +33,7 @@ export const updateAdminInfo = async (id, formData) => {
                 "Content-Type": "multipart/form-data",
             },
         });
-        console.log("updateAdminInfo response:", JSON.stringify(response.data, null, 2));
+        // console.log("updateAdminInfo response:", JSON.stringify(response.data, null, 2));
         // Backend không trả data.avatar, trả về response gốc và xử lý ở Setting.js
         return response.data;
     } catch (error) {

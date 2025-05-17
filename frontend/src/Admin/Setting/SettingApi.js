@@ -6,7 +6,7 @@ const BASE_URL = "http://localhost:3000/api/v1/admin/settings";
 export const getAdminInfo = async (id) => {
     try {
         const response = await api.get(`${BASE_URL}`);
-        console.log("getAdminInfo response:", JSON.stringify(response.data, null, 2));
+        // console.log("getAdminInfo response:", JSON.stringify(response.data, null, 2));
         const account = response.data.find(acc => acc._id === id);
         if (!account) {
             throw new Error("Không tìm thấy website với ID: " + id);
@@ -34,7 +34,7 @@ export const updateAdminInfo = async (id, formData) => {
                 "Content-Type": "multipart/form-data",
             },
         });
-        console.log("updateAdminInfo response:", JSON.stringify(response.data, null, 2));
+        // console.log("updateAdminInfo response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (error) {
         console.error("updateAdminInfo error:", {
@@ -50,7 +50,7 @@ export const updateAdminInfo = async (id, formData) => {
 export const getGeneralSettings = async () => {
     try {
         const response = await api.get(`${BASE_URL}/general`);
-        console.log("getGeneralSettings response:", response.data);
+        // console.log("getGeneralSettings response:", response.data);
         return response.data;
     } catch (error) {
         console.error("getGeneralSettings error:", error);
@@ -75,7 +75,7 @@ export const updateGeneralSettings = async (data) => {
                 'Content-Type': 'multipart/form-data'
             }
         });
-        console.log("updateGeneralSettings response:", response.data);
+        // console.log("updateGeneralSettings response:", response.data);
         return response.data;
     } catch (error) {
         console.error("updateGeneralSettings error:", error);
@@ -113,14 +113,14 @@ export const updateSliderSettings = async (imageSliders) => {
         }
 
         // Log FormData for debugging
-        console.log("updateSliderSettings FormData:", [...formData.entries()]);
+        // console.log("updateSliderSettings FormData:", [...formData.entries()]);
 
         const response = await api.patch(`${BASE_URL}/slider`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
         });
-        console.log("updateSliderSettings response:", response.data);
+        // console.log("updateSliderSettings response:", response.data);
 
         // Fetch updated settings to get the new imageSliders list
         const updatedSettings = await getGeneralSettings();
@@ -137,13 +137,13 @@ export const updateSliderSettings = async (imageSliders) => {
                 finalFormData.append('imageSliders', url);
             });
 
-            console.log("Final updateSliderSettings FormData:", [...finalFormData.entries()]);
+            // console.log("Final updateSliderSettings FormData:", [...finalFormData.entries()]);
             const finalResponse = await api.patch(`${BASE_URL}/slider`, finalFormData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
             });
-            console.log("Final updateSliderSettings response:", finalResponse.data);
+            // console.log("Final updateSliderSettings response:", finalResponse.data);
             return finalResponse;
         }
 
