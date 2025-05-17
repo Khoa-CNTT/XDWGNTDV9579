@@ -99,7 +99,7 @@ module.exports.index = async (req, res) => {
 //[POST] api/v1/checkout/order
 module.exports.order = async (req, res) => {
     const cartId = req.cart.id;
-    const { fullName, phone, note, voucherCode } = req.body;
+    const { fullName, phone, email, note, voucherCode } = req.body.userInfor;
 
     const user_id = req.user.id;
 
@@ -278,7 +278,7 @@ module.exports.order = async (req, res) => {
     const newOrder = new Order({
         orderCode: code,
         user_id: user_id,
-        userInfor: { fullName, phone, note },
+        userInfor: { fullName, phone, email, note },
         status: "pending",
         tours,
         hotels,
@@ -336,7 +336,7 @@ module.exports.createPayment = async (req, res) => {
         const paymentUrl = vnpay.buildPaymentUrl({
             vnp_Amount: order.totalPrice,
             vnp_IpAddr: req.ip || "127.0.0.1",
-            vnp_TxnRef: order.orderCode,
+            vnp_TxnRef: order.orderCode + Date.now(),
             vnp_OrderInfo: 'Thanh toan don hang ' + order._id,
             vnp_OrderType: "other",
             vnp_ReturnUrl: "http://localhost:3000/api/v1/checkout/success",
@@ -361,35 +361,29 @@ module.exports.paymentCallback = async (req, res) => {
     try {
         verify = vnpay.verifyReturnUrl(req.query);
         if (!verify.isVerified) {
-            return res.json({
-                code: 400,
-                message: 'Xác thực tính toàn vẹn dữ liệu thất bại'
-            });
+            return res.redirect(`${process.env.FE_URL}/payment-result?status=invalid`);
         }
         if (!verify.isSuccess) {
-            return res.json({
-                code: 400,
-                message: 'Đơn hàng thanh toán thất bại'
-            });
+            return res.redirect(`${process.env.FE_URL}/payment-result?status=fail`);
         }
     } catch (error) {
-        return res.json({
-            code: 500,
-            message: 'Dữ liệu không hợp lệ'
-        });
+        return res.redirect(`${process.env.FE_URL}/payment-result?status=error`);
     }
 
     // Kiểm tra thông tin đơn hàng và xử lý tương ứng
-    const orderCode = verify.vnp_TxnRef;
+
+    const vnp_OrderInfo = verify.vnp_OrderInfo;
+    const parts = vnp_OrderInfo.split(' ');
+    const idOrder = parts[parts.length - 1];
     const order = await Order.findOneAndUpdate(
-        { orderCode: orderCode },
+        { _id: idOrder },
         { status: "paid", paymentInfo: verify },
         { new: true }
     );
     // gửi otp qua email user
-    const subject = `Cảm ơn ${req.user.fullName} đã tin tưởng dịch vụ của chúng tôi!`;
+    const subject = `Cảm ơn ${order.userInfor.fullName} đã tin tưởng dịch vụ của chúng tôi!`;
     const html = `
-        <p>Chào <strong>${req.user.fullName}</strong>,</p>
+        <p>Chào <strong>${order.userInfor.fullName}</strong>,</p>
         <p>
             Cảm ơn bạn đã đặt dịch vụ tại <strong>${req.settingGeneral.websiteName}</strong>!<br>
             Chúng tôi rất vui được bạn tin tưởng chọn dịch vụ của chúng tôi.
@@ -401,14 +395,10 @@ module.exports.paymentCallback = async (req, res) => {
         <p>Thân mến,<br>
         <strong>${req.settingGeneral.websiteName}</strong></p>`;
 
-    sendMailHelper.sendMail(req.user.email, subject, html);
+    sendMailHelper.sendMail(order.userInfor.email, subject, html);
 
 
-    return res.json({
-        code: 200,
-        message: 'Thanh toán thành công',
-        order: order
-    });
+    return res.redirect(`${process.env.FE_URL}/payment-result?status=success&orderCode=${order.orderCode}`);
 };
 
 // [PATCH] api/v1/checkout/cancel/:orderId
