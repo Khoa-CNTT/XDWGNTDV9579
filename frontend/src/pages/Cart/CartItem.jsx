@@ -41,8 +41,8 @@ const CartItem = ({ item, removeItem }) => {
           <div className="cart-placeholder">No Image</div>
         )}
       </td>
-      <td>{item.title || "Không xác định"}</td>
-      <td>
+      <td className="cart-item-title"><strong>{item.title || "Không xác định"}</strong></td>
+      <td className="cart-item-time">
         {item.type === "tour"
           ? item.timeDepart
             ? new Date(item.timeDepart).toLocaleDateString("vi-VN")
@@ -53,7 +53,7 @@ const CartItem = ({ item, removeItem }) => {
             ).toLocaleDateString("vi-VN")}`
           : "Không áp dụng"}
       </td>
-      <td>{item.price ? item.price.toLocaleString() : "0"} VNĐ</td>
+      <td className="cart-item-price">{item.price ? item.price.toLocaleString() : "0"} VNĐ</td>
       <td>
         <div className="quantity-control">
           <button
@@ -77,7 +77,7 @@ const CartItem = ({ item, removeItem }) => {
           </button>
         </div>
       </td>
-      <td>{(item.price * quantity).toLocaleString()} VNĐ</td>
+      <td className="cart-item-total">{(item.price * quantity).toLocaleString()} VNĐ</td>
       <td>
         <button className="remove-btn" onClick={handleRemove} disabled={isLoading}>
           {isLoading ? (

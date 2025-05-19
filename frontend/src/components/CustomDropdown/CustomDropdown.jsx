@@ -10,7 +10,7 @@ const CustomDropdown = ({ label, options, onSelect, placeholder }) => {
   const handleClick = (selectedVal) => {
     setSelectedValue(selectedVal);
     onSelect(selectedVal);
-    setValue(""); // Reset ô tìm kiếm sau khi chọn
+    setValue("");
   };
 
   return (

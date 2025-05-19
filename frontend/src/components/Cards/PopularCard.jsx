@@ -42,23 +42,12 @@ const PopularCard = ({ val }) => {
         className="img-fluid"
         alt={title || "Tour"}
       />
-      <Card.Body>
-        <Card.Text>
-          <i className="bi bi-geo-alt"></i>
-          <span className="text">Chưa có thông tin vị trí</span>
-        </Card.Text>
-
+      <Card.Body>       
         <Card.Title>
           <span className="body-text text-dark text-decoration-none">
             {title || "Không có tiêu đề"}
           </span>
         </Card.Title>
-        <p className="reviwe">
-          <span>
-            <i className="bi bi-star-fill me-1"></i>
-          </span>
-          <span>Chưa có đánh giá</span>
-        </p>
         {discount > 0 && (
           <Badge bg="success" className="me-1">
             Giảm {discount}%

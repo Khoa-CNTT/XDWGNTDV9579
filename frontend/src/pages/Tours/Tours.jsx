@@ -48,8 +48,17 @@ const Tours = () => {
       const response = await api.get(url);
       console.log("Dữ liệu tours từ API:", response.data);
       const toursData = response.data || [];
-      setTours(toursData);
-      applyFiltersAndSort(toursData);
+      // Định dạng dữ liệu để đảm bảo khớp với schema
+      const formattedTours = toursData.map((tour) => ({
+        ...tour,
+        title: tour.title || "Không có tiêu đề",
+        category_id: tour.category_id || "",
+        price: tour.price || 0,
+        discount: tour.discount || 0,
+        timeStarts: tour.timeStarts || [],
+      }));
+      setTours(formattedTours);
+      applyFiltersAndSort(formattedTours);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách tour:", error);
       const errorMessage = error.response?.data?.message || "Không thể tải danh sách tour!";
@@ -66,7 +75,7 @@ const Tours = () => {
     currentDate.setHours(0, 0, 0, 0);
 
     return toursData.filter((tour) => {
-      const firstTimeStart = tour.timeStarts && tour.timeStarts.length > 0 ? tour.timeStarts[0].timeDepart : null;
+      const firstTimeStart = tour.timeStarts?.length > 0 ? tour.timeStarts[0].timeDepart : null;
       return firstTimeStart && new Date(firstTimeStart) >= currentDate;
     });
   };
@@ -94,18 +103,18 @@ const Tours = () => {
 
     if (filters.category.length > 0) {
       filtered = filtered.filter((tour) =>
-        filters.category.includes(tour.category_id)
+        tour.category_id && filters.category.includes(tour.category_id)
       );
     }
 
     if (filters.price.length > 0) {
       filtered = filtered.filter((tour) => {
-        const tourPrice = (tour.price * (100 - (tour.discount || 0)) / 100).toFixed(0);
+        const tourPrice = tour.price * (1 - (tour.discount || 0) / 100); // Giá sau giảm
         return filters.price.some((priceRange) => {
-          const [min, max] = priceRange
-            .match(/\d+/g)
-            .map((num) => parseInt(num) * 1000);
-          return tourPrice >= min && (max ? tourPrice <= max : true);
+          const [minStr, maxStr] = priceRange.split(" - ");
+          const min = parseInt(minStr.replace(/[^0-9]/g, "")) || 0; // Loại bỏ ký tự không phải số
+          const max = maxStr ? parseInt(maxStr.replace(/[^0-9]/g, "")) : Infinity;
+          return tourPrice >= min && tourPrice <= max;
         });
       });
     }
@@ -116,14 +125,14 @@ const Tours = () => {
     // Áp dụng sắp xếp từ dropdown (nếu có)
     if (sortOption === "priceAsc") {
       filtered.sort((a, b) => {
-        const priceA = (a.price * (100 - (a.discount || 0)) / 100).toFixed(0);
-        const priceB = (b.price * (100 - (b.discount || 0)) / 100).toFixed(0);
+        const priceA = a.price * (1 - (a.discount || 0) / 100);
+        const priceB = b.price * (1 - (b.discount || 0) / 100);
         return priceA - priceB;
       });
     } else if (sortOption === "priceDesc") {
       filtered.sort((a, b) => {
-        const priceA = (a.price * (100 - (a.discount || 0)) / 100).toFixed(0);
-        const priceB = (b.price * (100 - (b.discount || 0)) / 100).toFixed(0);
+        const priceA = a.price * (1 - (a.discount || 0) / 100);
+        const priceB = b.price * (1 - (b.discount || 0) / 100);
         return priceB - priceA;
       });
     } else if (sortOption === "dateAsc") {
