@@ -37,6 +37,7 @@ import {
   getInvoices,
   getInvoiceDetail,
   deleteInvoice,
+  changeOrderStatus,
 } from "./InvoicesApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import { debounce } from "lodash";
@@ -85,10 +86,10 @@ const InvoicesControl = () => {
         }
 
         const data = await getInvoices(adminToken, params);
-        console.log("Raw data from API:", data);
+        // console.log("Raw data from API:", data);
 
         if (!data || !Array.isArray(data.orders)) {
-          console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
+          // console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
           setAllInvoices([]);
           setInvoices([]);
           setTotalPages(1);
@@ -120,13 +121,13 @@ const InvoicesControl = () => {
         setAllInvoices(formattedData);
         setInvoices(formattedData);
         setTotalPages(data.totalPage || 1);
-        console.log("Formatted invoices:", formattedData);
+        // console.log("Formatted invoices:", formattedData);
 
         if (formattedData.length === 0) {
           toast.info("Không có hóa đơn nào để hiển thị!", { position: "top-right" });
         }
       } catch (err) {
-        console.error("Error in fetchInvoices:", err);
+        // console.error("Error in fetchInvoices:", err);
         const errorMessage = err.message || "Không thể tải danh sách hóa đơn!";
         setError(errorMessage);
         toast.error(errorMessage, { position: "top-right" });
@@ -377,7 +378,7 @@ const InvoicesControl = () => {
     setSortModel(newSortModel);
     setCurrentPage(1);
     if (newSortModel.length > 0) {
-      const { field, sort } = newSortModel;
+      const { field, sort } = newSortModel[0];
       let sortKey = "";
       let sortOptionValue = "";
       switch (field) {
@@ -482,7 +483,7 @@ const InvoicesControl = () => {
     try {
       const response = await getInvoiceDetail(adminToken, invoice._id);
       if (response.code === 200 && response.data) {
-        console.log("Invoice detail data:", response.data);
+        // console.log("Invoice detail data:", response.data);
         setCurrentInvoice(response.data);
         setOpenDetail(true);
       } else {
@@ -491,7 +492,7 @@ const InvoicesControl = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Không thể tải chi tiết hóa đơn!";
       toast.error(errorMessage, { position: "top-right" });
-      console.error("Get invoice detail error:", err.response?.data);
+      // console.error("Get invoice detail error:", err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -522,7 +523,7 @@ const InvoicesControl = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
       toast.error(errorMessage, { position: "top-right" });
-      console.error("Delete invoice error:", err.response?.data);
+      // console.error("Delete invoice error:", err.response?.data);
     } finally {
       setLoading(false);
       setOpenDeleteConfirm(false);
@@ -583,6 +584,34 @@ const InvoicesControl = () => {
     printWindow.print();
   };
 
+  const handleRefund = async () => {
+    if (!currentInvoice?.order?._id) return;
+    setLoading(true);
+    try {
+      const response = await changeOrderStatus(adminToken, "refund", currentInvoice.order._id);
+      if (response.code === 200) {
+        // Cập nhật currentInvoice để phản ánh trạng thái mới
+        setCurrentInvoice({
+          ...currentInvoice,
+          order: {
+            ...currentInvoice.order,
+            status: "refund",
+          },
+        });
+        // Làm mới danh sách hóa đơn để cập nhật cột trạng thái
+        await fetchInvoices(currentPage);
+        toast.success("Đã cập nhật trạng thái hoàn tiền!", { position: "top-right" });
+      } else {
+        toast.error(response.message || "Cập nhật trạng thái hoàn tiền thất bại!", { position: "top-right" });
+      }
+    } catch (err) {
+      const errorMessage = err.message || "Cập nhật trạng thái hoàn tiền thất bại!";
+      toast.error(errorMessage, { position: "top-right" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
     {
       field: "stt",
@@ -631,11 +660,41 @@ const InvoicesControl = () => {
           pending: "Chờ xác nhận",
           confirmed: "Đang xử lý",
           paid: "Đã thanh toán",
+          refund: "Đã hoàn tiền",
         };
         const displayStatus = statusMap[params.value] || "Không xác định";
+        const backgroundColor = {
+          cancelled: "#EE0000", // Tomato red
+          pending: "#FFA500", // Gold
+          paid: "#009900", // Lime green
+          confirmed: "transparent",
+          refund: "transparent",
+        }[params.value] || "transparent";
+        const textColor = {
+          cancelled: "#FFFFFF", // White text on red
+          pending: "#000000", // Black text on yellow (yellow is light, white text would be hard to read)
+          paid: "#FFFFFF", // White text on green
+          confirmed: "#000000",
+          refund: "#000000",
+        }[params.value] || "#000000";
         return (
-          <Box display="flex" alignItems="center" height="100%">
-            <Typography sx={{ color: "#000000" }}>{displayStatus}</Typography>
+          <Box
+            display="flex"
+            mt="10px"
+            ml="25px"
+            alignItems="center"
+            justifyContent="center"
+            height="70%"
+            width="70%"
+            sx={{
+              backgroundColor: backgroundColor,
+              borderRadius: "10px",
+              padding: "0px 0px",
+            }}
+          >
+            <Typography sx={{ color: textColor, fontSize: "15px", }}>
+              {displayStatus}
+            </Typography>
           </Box>
         );
       },
@@ -926,6 +985,19 @@ const InvoicesControl = () => {
                 <Typography>Ghi chú: {currentInvoice.order?.userInfor?.note || "Không có"}</Typography>
               </Box>
 
+              {/* Hiển thị thông tin thẻ ngân hàng nếu trạng thái là "cancelled" hoặc "refund" */}
+              {(currentInvoice.order?.status === "cancelled" || currentInvoice.order?.status === "refund") && (
+                <>
+                  <Typography variant="h5" color={colors.grey[100]} mb={1}>
+                    Thông tin hoàn tiền
+                  </Typography>
+                  <Box mb={2}>
+                    <Typography>Ngân hàng: {currentInvoice.order?.inforCancel?.bankName || "N/A"}</Typography>
+                    <Typography>Số tài khoản: {currentInvoice.order?.inforCancel?.numberAccount || "N/A"}</Typography>
+                  </Box>
+                </>
+              )}
+
               {/* Hiển thị bảng tour nếu có tour, hoặc bỏ qua nếu không có */}
               {Array.isArray(currentInvoice.tours) && currentInvoice.tours.length > 0 && (
                 <>
@@ -942,7 +1014,7 @@ const InvoicesControl = () => {
                           {hasVoucherOrDiscount && (
                             <>
                               <TableCell width="15%" align="center">Mã Voucher</TableCell>
-                              <TableCell width="15%" align="center">Giảm giá (%)</TableCell>
+                              <TableCell width="15%" align="center">Giảm giá tour</TableCell>
                             </>
                           )}
                           <TableCell width={hasVoucherOrDiscount ? "10%" : "35%"} align="right">Giá (VNĐ)</TableCell>
@@ -1069,23 +1141,36 @@ const InvoicesControl = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button
-            startIcon={<PrintIcon />}
-            onClick={handlePrint}
-            variant="contained"
-            color="primary"
-            disabled={!currentInvoice}
-          >
-            In hóa đơn
-          </Button>
-          <Button
-            onClick={handleCloseDetail}
-            color="error"
-            variant="contained"
-            sx={{ fontWeight: "bold" }}
-          >
-            Đóng
-          </Button>
+          <Box display="flex" alignItems="center" gap={2}>
+            {currentInvoice?.order?.status === "cancelled" ? (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleRefund}
+                disabled={loading}
+              >
+                Xác nhận hoàn tiền
+              </Button>
+            ) : currentInvoice?.order?.status !== "refund" ? (
+              <Button
+                startIcon={<PrintIcon />}
+                onClick={handlePrint}
+                variant="contained"
+                color="primary"
+                disabled={!currentInvoice}
+              >
+                In hóa đơn
+              </Button>
+            ) : null}
+            <Button
+              onClick={handleCloseDetail}
+              color="error"
+              variant="contained"
+              sx={{ fontWeight: "bold" }}
+            >
+              Đóng
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 

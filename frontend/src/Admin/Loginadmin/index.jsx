@@ -36,7 +36,7 @@ const LoginAdmin = () => {
                     avatar: response.data.avatar || "",
                     _id: response.data.accountId || "", // Use if backend provides account ID
                 };
-                console.log("Saving adminData to localStorage:", JSON.stringify(adminData, null, 2));
+               console.log ("Saving adminData to localStorage:", JSON.stringify(adminData, null, 2));
 
                 // Call loginAdmin to update context and localStorage
                 loginAdmin(adminData, token);

@@ -65,7 +65,7 @@ const DelegationControl = () => {
                 sortKey: "createdAt",
                 sortValue: "desc",
             });
-            console.log("fetchRoles response:", response);
+            // console.log("fetchRoles response:", response);
             if (response && Array.isArray(response.roles)) {
                 const formattedRoles = response.roles.map((role) => ({
                     id: role._id,
@@ -100,8 +100,8 @@ const DelegationControl = () => {
                 });
                 setPermissions(newPermissions);
                 setPreviousPermissions(newPreviousPermissions);
-                console.log("Roles loaded:", formattedRoles);
-                console.log("Permissions structured:", newPermissions);
+                // console.log("Roles loaded:", formattedRoles);
+                // console.log("Permissions structured:", newPermissions);
                 if (formattedRoles.length === 0) {
                     toast.info("Không có nhóm quyền nào để hiển thị!", { position: "top-right" });
                 }
@@ -224,7 +224,7 @@ const DelegationControl = () => {
                     };
                 }),
             };
-            console.log("Permissions data to send:", permissionsData);
+            // console.log("Permissions data to send:", permissionsData);
             const response = await updatePermissions(permissionsData);
             if (response.code === 200) {
                 toast.success("Cập nhật phân quyền thành công!", { position: "top-right" });

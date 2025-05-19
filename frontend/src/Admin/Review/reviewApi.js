@@ -17,7 +17,7 @@ export const getHotels = async (adminToken) => {
     try {
         const api = createApiInstance(adminToken);
         const response = await api.get("/api/v1/admin/hotels");
-        console.log("getHotels response:", JSON.stringify(response.data, null, 2));
+        // console.log("getHotels response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (err) {
         console.error("getHotels error:", err.response?.data || err);
@@ -30,7 +30,7 @@ export const getHotelReviews = async (hotelId, params, adminToken) => {
     try {
         const api = createApiInstance(adminToken);
         const response = await api.get(`${BASE_URL}/hotels/${hotelId}`, { params });
-        console.log("getHotelReviews response:", JSON.stringify(response.data, null, 2));
+        // console.log("getHotelReviews response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (err) {
         console.error("getHotelReviews error:", JSON.stringify(err.response?.data, null, 2));
@@ -43,7 +43,7 @@ export const getRoomReviews = async (hotelId, roomId, params, adminToken) => {
     try {
         const api = createApiInstance(adminToken);
         const response = await api.get(`${BASE_URL}/rooms/${hotelId}/${roomId}`, { params });
-        console.log("getRoomReviews response:", JSON.stringify(response.data, null, 2));
+        // console.log("getRoomReviews response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (err) {
         console.error("getRoomReviews error:", JSON.stringify(err.response?.data, null, 2));
@@ -56,7 +56,7 @@ export const deleteReview = async (reviewId, adminToken) => {
     try {
         const api = createApiInstance(adminToken);
         const response = await api.delete(`${BASE_URL}/delete/${reviewId}`);
-        console.log("deleteReview response:", JSON.stringify(response.data, null, 2));
+        // console.log("deleteReview response:", JSON.stringify(response.data, null, 2));
         return response.data;
     } catch (err) {
         console.error("deleteReview error:", JSON.stringify(err.response?.data, null, 2));

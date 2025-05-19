@@ -68,9 +68,9 @@ const ContactsControl = () => {
         if (status !== "all") params.status = status;
         if (sortKey) params.sortKey = sortKey;
         if (sortValue) params.sortValue = sortValue;
-        console.log("Fetching contacts with params:", params);
+        // console.log("Fetching contacts with params:", params);
         const response = await getContacts(params);
-        console.log("fetchContacts response:", response);
+        // console.log("fetchContacts response:", response);
         if (response && Array.isArray(response.users)) {
           const totalRecords = response.totalRecords || response.users.length;
           const formattedData = response.users.map((item, index) => {

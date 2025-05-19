@@ -85,9 +85,9 @@ const BarChart = ({ isDashboard = false }) => {
           }
         }
 
-        console.log("Sending request with params:", params);
+        // console.log("Sending request with params:", params);
         const response = await getRevenueStatistics(params);
-        console.log("API Response:", response);
+        // console.log("API Response:", response);
 
         if (response.code === 200 && Array.isArray(response.data)) {
           if (response.data.length === 0) {
@@ -114,7 +114,7 @@ const BarChart = ({ isDashboard = false }) => {
               })
               .filter((item) => item !== null);
 
-            console.log("Formatted Data:", formattedData);
+            // console.log("Formatted Data:", formattedData);
             setData(formattedData);
             setRowCount(response.totalItems || formattedData.length);
             if (formattedData.length === 0) {
@@ -129,7 +129,7 @@ const BarChart = ({ isDashboard = false }) => {
           toast.error(`Lỗi API: ${response.message || "Không xác định"}`, { position: "top-right" });
         }
       } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu thống kê:", error);
+        // console.error("Lỗi khi lấy dữ liệu thống kê:", error);
         const errorMsg = error.response?.data?.message || `Lỗi kết nối API: ${error.message}`;
         setErrorMessage(errorMsg);
         setData([]);

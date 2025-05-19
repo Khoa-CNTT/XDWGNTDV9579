@@ -70,7 +70,7 @@ export const getRevenueStatistics = async (params) => {
             return new Date(yearA, monthA - 1) - new Date(yearB, monthB - 1);
         });
 
-        console.log("Dữ liệu thống kê:", result);
+        // console.log("Dữ liệu thống kê:", result);
 
         return {
             code: 200,
@@ -79,7 +79,7 @@ export const getRevenueStatistics = async (params) => {
             totalItems: totalItems,
         };
     } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu thống kê:", error);
+        // console.error("Lỗi khi lấy dữ liệu thống kê:", error);
         throw error;
     }
 };

@@ -88,7 +88,7 @@ const Dashboard = () => {
       return;
     }
 
-    console.log("Fetching monthly revenue for month:", selectedMonth, "year:", selectedYear);
+    // console.log("Fetching monthly revenue for month:", selectedMonth, "year:", selectedYear);
     try {
       const monthlyInvoicesResponse = await getInvoices(adminToken, {
         page: 1,
@@ -97,7 +97,7 @@ const Dashboard = () => {
         year: selectedYear,
         month: selectedMonth,
       });
-      console.log("Monthly Invoices Response for month", selectedMonth, ":", JSON.stringify(monthlyInvoicesResponse, null, 2));
+      // console.log("Monthly Invoices Response for month", selectedMonth, ":", JSON.stringify(monthlyInvoicesResponse, null, 2));
       let monthlyInvoices = monthlyInvoicesResponse.orders || [];
 
       // Lọc hóa đơn theo tháng và năm được chọn
@@ -113,7 +113,7 @@ const Dashboard = () => {
         return sum + (invoice.totalPrice || 0);
       }, 0);
 
-      console.log("Calculated revenue for month", selectedMonth, ":", calculatedRevenue);
+      // console.log("Calculated revenue for month", selectedMonth, ":", calculatedRevenue);
       setRevenueThisMonth(calculatedRevenue);
       if (calculatedRevenue === 0) {
         setErrorMessage(`Không có doanh thu trong tháng ${selectedMonth}/${selectedYear}.`);
@@ -415,7 +415,7 @@ const Dashboard = () => {
         allInvoices.map(async (invoice) => {
           try {
             const detailResponse = await getInvoiceDetail(adminToken, invoice._id);
-            console.log("getInvoiceDetail response for invoice", invoice._id, ":", JSON.stringify(detailResponse.data, null, 2));
+            // console.log("getInvoiceDetail response for invoice", invoice._id, ":", JSON.stringify(detailResponse.data, null, 2));
             return {
               ...invoice,
               tours: detailResponse.data.tours || invoice.tours,
