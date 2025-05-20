@@ -6,6 +6,12 @@
   z-index: 1000;
 }
 
+/* Chatbox icon wrapper */
+.chat-icon-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
 /* Chatbox icon */
 .chatbox-icon {
   background: #28a745;
@@ -20,13 +26,88 @@
   align-items: center;
   justify-content: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  animation: pulse 2s infinite ease-in-out; /* Thêm hiệu ứng rung */
+  animation: pulse 2s infinite ease-in-out;
 }
 
 .chatbox-icon:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  animation-play-state: paused; /* Tạm dừng hiệu ứng rung khi hover */
+  animation-play-state: paused;
+}
+
+/* Chat label */
+.chat-label {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  background-color: #28a745;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  white-space: nowrap;
+}
+
+.chat-icon-wrapper:hover .chat-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Icon group */
+.icon-group {
+  display: flex;
+  flex-direction: column; /* Xếp dọc */
+  gap: 10px;
+  align-items: flex-end; /* Căn phải */
+}
+
+/* Messenger icon */
+.messenger-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: linear-gradient(135deg, #0088ff, #d81b60); /* Gradient giống Meta */
+  color: white;
+  animation: pulse 2s infinite ease-in-out; /* Hiệu ứng giống chatbox */
+}
+
+.messenger-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 136, 255, 0.3);
+  animation-play-state: paused;
+}
+
+/* Phone icon */
+.phone-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: transparent; /* Trong suốt */
+  color: #ff0000; /* Màu đỏ */
+  animation: pulse 2s infinite ease-in-out; /* Hiệu ứng giống chatbox */
+}
+
+.phone-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+  animation-play-state: paused;
 }
 
 /* Chatbox */
@@ -108,7 +189,7 @@
 
 .chat-header div {
   display: flex;
-  gap: 12px; /* Khoảng cách giữa các nút */
+  gap: 12px;
 }
 
 /* Clear button */
@@ -120,7 +201,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 5px; /* Khoảng cách giữa icon và chữ */
+  gap: 5px;
   padding: 5px 8px;
   border-radius: 5px;
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
@@ -215,7 +296,7 @@
   margin-bottom: 0;
   display: flex;
   align-items: center;
-  animation: pulse 1.5s infinite ease-in-out; /* Hiệu ứng nhấp nháy */
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
 .loading::after {

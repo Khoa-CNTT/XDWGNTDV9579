@@ -74,7 +74,6 @@ const Footer = () => {
                 <ListGroup.Item><NavLink to="/">Trang Chủ</NavLink></ListGroup.Item>
                 <ListGroup.Item><NavLink to="/about-us">Giới Thiệu</NavLink></ListGroup.Item>
                 <ListGroup.Item><NavLink to="/contact-us">Liên Hệ</NavLink></ListGroup.Item>
-                {user && <ListGroup.Item><NavLink to="/dashboard">Dashboard</NavLink></ListGroup.Item>}
               </ListGroup>
             </Col>
 
@@ -91,7 +90,7 @@ const Footer = () => {
               <p><i className="bi bi-envelope"></i> <a href="mailto:ngocthangthcs@gmail.com">gotravel@gmail.com</a></p>
               <p><i className="bi bi-telephone"></i> <a href="tel:0779407905">0779 407 905</a></p>
               <div className="social-links mt-3">
-                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-facebook"></i></a>
+                <a href="https://www.facebook.com/profile.php?id=61575213824007" target="_blank" rel="noopener noreferrer"><i className="bi bi-facebook"></i></a>
                 <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-instagram"></i></a>
                 <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-tiktok"></i></a>
                 <a href="https://youtube.com" target="_blank" rel="noopener noreferrer"><i className="bi bi-youtube"></i></a>

@@ -30,6 +30,8 @@ const TourDetails = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeDepart, setSelectedTimeDepart] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [voucherCode, setVoucherCode] = useState(""); // Thêm trạng thái cho mã voucher
+  const [voucher, setVoucher] = useState(null); // Trạng thái cho voucher
 
   useEffect(() => {
     if (!tourId || tourId === "undefined") {
@@ -77,6 +79,19 @@ const TourDetails = () => {
     }
   };
 
+  const fetchVoucher = async () => {
+    if (!voucherCode) return;
+    try {
+      const response = await api.get(`/vouchers/code/${voucherCode}`);
+      setVoucher(response.data);
+      toast.success("Áp dụng mã giảm giá thành công!");
+    } catch (error) {
+      console.error("Lỗi khi lấy voucher:", error);
+      toast.error(error.response?.data?.message || "Mã giảm giá không hợp lệ!");
+      setVoucher(null);
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!user) {
       toast.error("Vui lòng đăng nhập để đặt tour!");
@@ -116,6 +131,7 @@ const TourDetails = () => {
       _id: tour._id,
       timeDepart: new Date(selectedTimeDepart).toISOString(),
       quantity: parseInt(quantity),
+      voucherCode: voucher ? voucher.code : null, // Thêm mã voucher vào giỏ hàng
     };
 
     try {
@@ -136,7 +152,17 @@ const TourDetails = () => {
     return <p>Không tìm thấy tour.</p>;
   }
 
-  const priceAfterDiscount = (tour.price * (100 - (tour.discount || 0)) / 100).toFixed(0);
+  // Sử dụng price_special từ backend thay vì tính lại
+  const priceAfterDiscount = tour.price_special || (tour.price * (100 - (tour.discount || 0)) / 100).toFixed(0);
+
+  // Tính tổng giá với số lượng và áp dụng voucher
+  const totalPriceBeforeDiscount = priceAfterDiscount * quantity;
+  const { discountAmount, finalPrice } = voucher
+    ? {
+        discountAmount: totalPriceBeforeDiscount * (voucher.discount / 100),
+        finalPrice: totalPriceBeforeDiscount * (1 - voucher.discount / 100)
+      }
+    : { discountAmount: 0, finalPrice: totalPriceBeforeDiscount };
 
   return (
     <>
@@ -201,6 +227,16 @@ const TourDetails = () => {
                               <strong>Mã tour:</strong> {tour.code}
                             </ListGroup.Item>
                             <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Điểm tập trung:</strong> {tour.gathering || "Chưa có thông tin"}
+                            </ListGroup.Item>
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Số lượng đã bán:</strong> {tour.sold || 0}
+                            </ListGroup.Item>
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
+                              <strong>Ngày tạo:</strong>{" "}
+                              {new Date(tour.createdAt).toLocaleDateString("vi-VN")}
+                            </ListGroup.Item>               
+                            <ListGroup.Item className="tour-info-item border-0 pt-0 body-text">
                               <strong>Thời gian khởi hành:</strong>{" "}
                               <Form.Select
                                 value={selectedTimeDepart || ""}
@@ -214,7 +250,7 @@ const TourDetails = () => {
                                     </option>
                                   ))
                                 ) : (
-                                  <option value="">Chưa có ngày</option>
+                                  <option value="">Chưa có ngày khởi hành</option>
                                 )}
                               </Form.Select>
                             </ListGroup.Item>
@@ -223,7 +259,7 @@ const TourDetails = () => {
                               <Form.Control
                                 type="number"
                                 value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
+                                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                                 min="1"
                                 className="d-inline-block w-auto"
                               />
@@ -237,33 +273,37 @@ const TourDetails = () => {
                       <div className="tour_details-section schedule-section">
                         <h1 className="section-title">Lịch trình</h1>
                         <Accordion defaultActiveKey="0" className="mt-4">
-                          {tour.schedule.split("\n").map((item, index) => (
-                            <Accordion.Item eventKey={index.toString()} key={index} className="mb-4">
-                              <Accordion.Header>
-                                <h1>Ngày {index + 1}</h1>
-                              </Accordion.Header>
-                              <Accordion.Body className="body-text">{item}</Accordion.Body>
-                            </Accordion.Item>
-                          ))}
+                          {tour.schedule && tour.schedule.split("\n").length > 0 ? (
+                            tour.schedule.split("\n").map((item, index) => (
+                              <Accordion.Item eventKey={index.toString()} key={index} className="mb-4">
+                                <Accordion.Header>
+                                  <h1>Ngày {index + 1}</h1>
+                                </Accordion.Header>
+                                <Accordion.Body className="body-text">{item}</Accordion.Body>
+                              </Accordion.Item>
+                            ))
+                          ) : (
+                            <p>Chưa có lịch trình</p>
+                          )}
                         </Accordion>
                       </div>
                     </Tab.Pane>
 
                     <Tab.Pane eventKey="3">
                       <div className="tour_details-section inclusion-section">
-                        <h1 className="section-title">
-                          Bao gồm và loại trừ
-                        </h1>
+                        <h1 className="section-title">Bao gồm và loại trừ</h1>
                         <h5 className="section-subtitle mt-3">Bao gồm</h5>
                         <ListGroup className="inclusion-list">
                           <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
-                            <i className="bi bi-check-lg me-2 text-success h4 m-0"></i> Chưa có thông tin
+                            <i className="bi bi-check-lg me-2 text-success h4 m-0"></i> 
+                            {tour.inclusions ? tour.inclusions : "Chưa có thông tin"}
                           </ListGroup.Item>
                         </ListGroup>
                         <h5 className="section-subtitle mt-3">Loại trừ</h5>
                         <ListGroup className="inclusion-list">
                           <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
-                            <i className="bi bi-x-lg me-2 text-danger h5 m-0"></i> Chưa có thông tin
+                            <i className="bi bi-x-lg me-2 text-danger h5 m-0"></i> 
+                            {tour.exclusions ? tour.exclusions : "Chưa có thông tin"}
                           </ListGroup.Item>
                         </ListGroup>
                       </div>
@@ -272,14 +312,18 @@ const TourDetails = () => {
                     <Tab.Pane eventKey="4">
                       <div className="tour_details-section location-section">
                         <h1 className="section-title">Vị trí</h1>
-                        <iframe
-                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1010296.398675619!2d114.41207770371561!3d-8.453560368052777!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dd141d3e8100fa1%3A0x24910fb14b24e690!2sBali%2C%20Indonesia!5e0!3m2!1sen!2sin!4v1724581274620!5m2!1sen!2sin"
-                          width="100%"
-                          height="400px"
-                          allowFullScreen=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                        />
+                        {tour.location ? (
+                          <iframe
+                            src={tour.location}
+                            width="100%"
+                            height="400px"
+                            allowFullScreen=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                          />
+                        ) : (
+                          <p>Chưa có thông tin vị trí</p>
+                        )}
                       </div>
                     </Tab.Pane>
                   </Tab.Content>
@@ -290,7 +334,7 @@ const TourDetails = () => {
                     <Card className="rounded-3 p-2 shadow-sm mb-4 price-info">
                       <Card.Body>
                         <Stack gap={2} direction="horizontal">
-                          <h1 className="font-bold mb-0 h2">{Number(priceAfterDiscount).toLocaleString()} VNĐ</h1>
+                          <h1 className="font-bold mb-0 h2">{Number(finalPrice).toLocaleString()} VNĐ</h1>
                           <span className="fs-4"> /người</span>
                         </Stack>
                         {tour.discount > 0 && (
@@ -298,7 +342,11 @@ const TourDetails = () => {
                             <del>{tour.price.toLocaleString()} VNĐ</del> (Giảm {tour.discount}%)
                           </p>
                         )}
-
+                        {voucher && (
+                          <p className="text-success">
+                            Giảm thêm {voucher.discount}%: -{Number(discountAmount).toLocaleString()} VNĐ
+                          </p>
+                        )}
                         <button
                           className="btn btn-primary w-100 mt-3"
                           onClick={handleAddToCart}
