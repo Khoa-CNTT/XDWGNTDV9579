@@ -156,11 +156,11 @@ const BarChart = ({ isDashboard = false }) => {
       if (statType === "quantity") {
         keys = ["tours", "hotels"];
         barColors = [colors.blueAccent[400], colors.greenAccent[400]];
-        legendLabels = ["Tours", "Hotels"];
+        legendLabels = ["SL Tours", "SL Hotels"];
       } else {
-        keys = ["totalPrice"];
-        barColors = [colors.redAccent[400]];
-        legendLabels = ["Tổng doanh thu"];
+        keys = ["tourRevenue", "hotelRevenue"];
+        barColors = [colors.blueAccent[400], colors.greenAccent[400]];
+        legendLabels = ["DT Tours", "DT Hotels"];
       }
     } else if (viewType === "tours") {
       keys = [statType === "quantity" ? "tours" : "tourRevenue"];
@@ -197,7 +197,7 @@ const BarChart = ({ isDashboard = false }) => {
     { field: "hotels", headerName: "Số lượng Hotels", flex: 0.7 },
     {
       field: "totalPrice",
-      headerName: "Tổng doanh thu (K VNĐ)",
+      headerName: "",
       flex: 1,
       renderCell: (params) => (
         <Box display="flex" alignItems="center" height="100%">
@@ -451,12 +451,7 @@ const BarChart = ({ isDashboard = false }) => {
                       fill: colors.grey[100],
                     },
                   },
-                  tooltip: {
-                    container: {
-                      background: colors.primary[400],
-                      color: colors.grey[100],
-                    },
-                  },
+
                 }}
                 layout="vertical"
                 valueFormat={(value) => {
@@ -498,7 +493,6 @@ const BarChart = ({ isDashboard = false }) => {
                     }
                     return Math.round(value / 1000);
                   },
-                  legend: isDashboard ? undefined : statType === "quantity" ? "Số lượng" : "Doanh thu (K VNĐ)",
                   legendPosition: "middle",
                   legendOffset: isMobile ? -45 : -50,
                 }}
@@ -510,13 +504,7 @@ const BarChart = ({ isDashboard = false }) => {
                   from: "color",
                   modifiers: [["darker", 1.6]],
                 }}
-                tooltip={({ id, value, indexValue }) => (
-                  <div style={{ padding: 12, background: colors.primary[500], color: colors.grey[100] }}>
-                    <strong>{indexValue}</strong>
-                    <br />
-                    {id}: {id === "tours" || id === "hotels" ? value : `${Math.round(value / 1000)}K VNĐ`}
-                  </div>
-                )}
+
                 legends={
                   isMobile || isDashboard
                     ? []
@@ -613,6 +601,7 @@ const BarChart = ({ isDashboard = false }) => {
                 }}
               >
                 <DataGrid
+                  hideFooter={true}
                   rows={data}
                   columns={columns}
                   getRowId={(row) => row.id}

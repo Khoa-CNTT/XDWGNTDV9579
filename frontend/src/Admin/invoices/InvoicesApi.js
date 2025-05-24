@@ -96,3 +96,23 @@ export const changeOrderStatus = async (adminToken, status, id) => {
         throw new Error(errorMessage);
     }
 };
+
+// Cập nhật trạng thái hoàn tiền
+export const refundOrder = async (adminToken, id) => {
+    if (!adminToken) {
+        throw new Error("Token không hợp lệ hoặc thiếu!");
+    }
+    try {
+        const response = await api.patch(`${BASE_URL}/reFundStatus/${id}`, {}, {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+        // console.log("refundOrder response:", response.data);
+        return response.data;
+    } catch (error) {
+        // console.error("refundOrder error:", error);
+        const errorMessage = error.response?.data?.message || error.message || "Không thể cập nhật trạng thái hoàn tiền!";
+        throw new Error(errorMessage);
+    }
+};
