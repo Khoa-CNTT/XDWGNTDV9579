@@ -139,6 +139,8 @@ module.exports.detail = async (req, res) => {
                 rooms.push({
                     roomInfo: roomInfo,
                     quantity: room.quantity,
+                    checkIn: room.checkIn,
+                    checkOut: room.checkOut,
                     price: room.price
                 });
             }
