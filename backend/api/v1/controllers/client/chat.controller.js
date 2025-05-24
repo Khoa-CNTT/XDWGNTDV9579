@@ -16,6 +16,23 @@ const invalidTopics = [
     "bạn là ai", "tên bạn là gì", "ai tạo ra bạn", "openai", "chatgpt", "nguồn dữ liệu", "tự học"
 ];
 
+function extractMonthFromMessage(message) {
+    const lower = message.toLowerCase();
+    const monthMatch = lower.match(/tháng (\d{1,2})/);
+    if (monthMatch) {
+        const parsed = parseInt(monthMatch[1]);
+        if (parsed >= 1 && parsed <= 12) return parsed;
+    }
+
+    if (lower.includes("tháng sau")) {
+        const now = new Date();
+        return ((now.getMonth() + 1) % 12) + 1;
+    }
+
+    return null;
+}
+
+
 function normalizeText(text) {
     return text
         .toLowerCase()
@@ -63,9 +80,12 @@ module.exports.getChatResponse = async (req, res) => {
                 tours.map(tour => `- ${tour.title} (${tour.price} VND)`).join("\n");
         }
 
+        const extractedMonth = extractMonthFromMessage(message);
+        const targetMonth = extractedMonth || (new Date().getMonth() + 1);
+
         const systemPrompt = {
             role: "system",
-            content: `Bạn là trợ lý du lịch.Hãy dựa vào tháng ${month}/${year} để trả lời nhé!.
+            content: `Bạn là trợ lý du lịch.Hãy dựa vào tháng ${targetMonth}/${year} để trả lời nhé!.
             Chỉ sử dụng thông tin tôi cung cấp để gợi ý điểm đến, lịch trình và mẹo du lịch. Trả lời thật ngắn gọn và súc tích.
             Không lấy thông tin bên ngoài, không nhắc đến thương hiệu hay website.\n${suggestedTours}`
         };
