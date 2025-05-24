@@ -203,14 +203,16 @@ const Reviews = () => {
 
     useEffect(() => {
         if (selectedHotel?._id) {
+            setReviews([]); // Reset reviews before fetching new ones
             refreshReviews(currentPage, searchText);
         }
-    }, [selectedHotel, currentPage, refreshReviews]);
+    }, [selectedHotel, currentPage, refreshReviews, searchText]);
 
     const handleHotelChange = (event) => {
         const hotelId = event.target.value;
         const hotel = hotels.find((h) => h._id === hotelId) || null;
         setSelectedHotel(hotel);
+        setReviews([]); // Reset reviews when changing hotel
         setCurrentPage(1);
         setSearchText("");
         refreshReviews(1, "");
@@ -590,7 +592,6 @@ const Reviews = () => {
             flex: isMobile ? 0.8 : 1,
             sortable: false,
             renderCell: ({ row }) => (
-
                 <Box display="flex" gap={1} sx={{ alignItems: "center", height: "100%" }}>
                     <Button
                         variant="contained"
@@ -598,7 +599,6 @@ const Reviews = () => {
                         size="small"
                         startIcon={<VisibilityIcon />}
                         onClick={() => handleViewReview(row)}
-
                     >
                         Xem
                     </Button>
@@ -708,7 +708,6 @@ const Reviews = () => {
                                     },
                                 }}
                             >
-                                {/* <MenuItem value="none">Không sắp xếp</MenuItem> */}
                                 <MenuItem value="stt_asc">STT: Tăng dần</MenuItem>
                                 <MenuItem value="stt_desc">STT: Giảm dần</MenuItem>
                                 <MenuItem value="username_asc">Người dùng: Tăng dần</MenuItem>
@@ -848,7 +847,7 @@ const Reviews = () => {
                     </Box>
                 )}
             </Box>
-            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
+            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.5rem", textAlign: "center" }}>
                     Chi tiết đánh giá
                 </DialogTitle>

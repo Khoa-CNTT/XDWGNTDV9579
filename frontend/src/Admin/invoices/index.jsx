@@ -38,6 +38,7 @@ import {
   getInvoiceDetail,
   deleteInvoice,
   changeOrderStatus,
+  refundOrder,
 } from "./InvoicesApi";
 import { useAdminAuth } from "../../context/AdminContext";
 import { debounce } from "lodash";
@@ -588,7 +589,7 @@ const InvoicesControl = () => {
     if (!currentInvoice?.order?._id) return;
     setLoading(true);
     try {
-      const response = await changeOrderStatus(adminToken, "refund", currentInvoice.order._id);
+      const response = await refundOrder(adminToken, currentInvoice.order._id);
       if (response.code === 200) {
         // Cập nhật currentInvoice để phản ánh trạng thái mới
         setCurrentInvoice({
@@ -672,7 +673,7 @@ const InvoicesControl = () => {
         }[params.value] || "transparent";
         const textColor = {
           cancelled: "#FFFFFF", // White text on red
-          pending: "#000000", // Black text on yellow (yellow is light, white text would be hard to read)
+          pending: "#000000", // Black text on yellow
           paid: "#FFFFFF", // White text on green
           confirmed: "#000000",
           refund: "#000000",
@@ -680,21 +681,36 @@ const InvoicesControl = () => {
         return (
           <Box
             display="flex"
-            mt="10px"
-            ml="25px"
             alignItems="center"
             justifyContent="center"
-            height="70%"
-            width="70%"
-            sx={{
-              backgroundColor: backgroundColor,
-              borderRadius: "10px",
-              padding: "0px 0px",
-            }}
+            height="100%" // Đặt lại height để ô cha chiếm toàn bộ chiều cao của ô bảng
+            width="100%" // Đặt lại width để ô cha chiếm toàn bộ chiều rộng của ô bảng
           >
-            <Typography sx={{ color: textColor, fontSize: "15px", }}>
-              {displayStatus}
-            </Typography>
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              height="60%" // Giữ chiều cao của ô màu
+              width="80%" // Giữ chiều rộng của ô màu
+              sx={{
+                backgroundColor: backgroundColor,
+                borderRadius: "8px",
+                padding: "2px 6px",
+                boxSizing: "border-box",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: textColor,
+                  fontSize: { xs: "0.75rem", sm: "0.85rem", md: "1rem" },
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {displayStatus}
+              </Typography>
+            </Box>
           </Box>
         );
       },
@@ -1056,7 +1072,7 @@ const InvoicesControl = () => {
                                 <>
                                   <TableCell align="center">{voucherCode}</TableCell>
                                   <TableCell align="center">
-                                    {discount > 0 ? discount.toLocaleString("vi-VN") : "N/A"}
+                                    {discount > 0 ? discount.toLocaleString("vi-VN") : "N/A"}%
                                   </TableCell>
                                 </>
                               )}
