@@ -33,7 +33,9 @@ const orderSchema = new mongoose.Schema({
                 {
                     room_id: String,
                     price: Number,
-                    quantity: Number
+                    quantity: Number,
+                    checkIn: Date,
+                    checkOut: Date
                 }
             ],
 

@@ -118,22 +118,32 @@ module.exports.addPostHotel = async (req, res) => {
     const hotelId = req.params.hotel_id;
     const roomId = req.params.room_id;
     const quantity = parseInt(req.body.quantity);
+    const checkIn = new Date(req.body.checkIn);
+    const checkOut = new Date(req.body.checkOut);
     const cartId = req.cart.id;
 
     if (!quantity || quantity <= 0) {
         return res.status(400).json({
             code: 400,
-            message: "Số lượng không hợp lệ"
+            message: "Số lượng phòng không hợp lệ"
         });
     }
 
-    const cart = await Cart.findOne({
-        _id: cartId
-    });
+    if (!checkIn || !checkOut || checkIn >= checkOut) {
+        return res.status(400).json({
+            code: 400,
+            message: "Ngày check-in/check-out không hợp lệ"
+        });
+    }
+
+    const cart = await Cart.findById(cartId);
+    if (!cart) {
+        return res.status(404).json({ code: 404, message: "Không tìm thấy giỏ hàng" });
+    }
 
     const room = await Room.findById(roomId);
     if (!room) {
-        return res.json({
+        return res.status(400).json({
             code: 400,
             message: "Phòng không tồn tại"
         });
@@ -142,54 +152,25 @@ module.exports.addPostHotel = async (req, res) => {
     const hotelInCart = cart.hotels.find(hotel => hotel.hotel_id === hotelId);
 
     if (hotelInCart) {
-        const roomInHotel = hotelInCart.rooms.find(room => room.room_id === roomId);
+        const roomInHotel = hotelInCart.rooms.find(room =>
+            room.room_id === roomId &&
+            new Date(room.checkIn).getTime() === checkIn.getTime() &&
+            new Date(room.checkOut).getTime() === checkOut.getTime()
+        );
 
-        if (!roomInHotel) {
-            if (quantity > room.availableRooms) {
-                return res.json({
-                    code: 400,
-                    message: "Số lượng phòng trong giỏ hàng vượt quá số lượng phòng đang trống"
-                });
-            }
-
-            const data = await Cart.findOneAndUpdate(
-                {
-                    _id: cartId,
-                    "hotels.hotel_id": hotelId,
-                    "hotels.rooms.room_id": roomId
-                },
-                {
-                    $set: {
-                        "hotels.$[hotel].rooms.$[room].quantity": quantityNew
-                    }
-                },
-                {
-                    arrayFilters: [
-                        { "hotel.hotel_id": hotelId },
-                        { "room.room_id": roomId }
-                    ],
-                    new: true
-                }
-            );
-            res.json({
-                code: 200,
-                message: "Thêm giỏ hàng thành công",
-                data: data
-            });
-        } else {
+        if (roomInHotel) {
             const quantityNew = quantity + roomInHotel.quantity;
             if (quantityNew > room.availableRooms) {
-                return res.json({
+                return res.status(400).json({
                     code: 400,
-                    message: "Số lượng phòng trong giỏ hàng vượt quá số lượng phòng đang trống"
+                    message: "Tổng số lượng vượt quá số phòng trống"
                 });
             }
 
             const data = await Cart.findOneAndUpdate(
                 {
                     _id: cartId,
-                    "hotels.hotel_id": hotelId,
-                    "hotels.rooms.room_id": roomId
+                    "hotels.hotel_id": hotelId
                 },
                 {
                     $set: {
@@ -199,28 +180,60 @@ module.exports.addPostHotel = async (req, res) => {
                 {
                     arrayFilters: [
                         { "hotel.hotel_id": hotelId },
-                        { "room.room_id": roomId }
+                        {
+                            "room.room_id": roomId,
+                            "room.checkIn": checkIn,
+                            "room.checkOut": checkOut
+                        }
                     ],
                     new: true
                 }
             );
-            res.json({
+
+            return res.json({
                 code: 200,
-                message: "Thêm giỏ hàng thành công",
-                data: data
+                message: "Cập nhật số lượng phòng trong giỏ hàng thành công",
+                data
+            });
+        } else {
+            if (quantity > room.availableRooms) {
+                return res.status(400).json({
+                    code: 400,
+                    message: "Số lượng phòng vượt quá phòng trống"
+                });
+            }
+
+            const data = await Cart.findOneAndUpdate(
+                { _id: cartId, "hotels.hotel_id": hotelId },
+                {
+                    $push: {
+                        "hotels.$.rooms": {
+                            room_id: roomId,
+                            quantity,
+                            checkIn,
+                            checkOut
+                        }
+                    }
+                },
+                { new: true }
+            );
+
+            return res.json({
+                code: 200,
+                message: "Thêm phòng vào khách sạn trong giỏ hàng thành công",
+                data
+            });
+        }
+    } else {
+        if (quantity > room.availableRooms) {
+            return res.status(400).json({
+                code: 400,
+                message: "Số lượng phòng vượt quá phòng trống"
             });
         }
 
-    } else {
-        const room = await Room.findById(roomId);
-        if (quantity > room.availableRooms) {
-            return res.json({
-                code: 400,
-                message: "Số lượng phòng trong giỏ hàng vượt quá số lượng phòng đang trống"
-            });
-        }
-        const data = await Cart.findOneAndUpdate(
-            { _id: cartId },
+        const data = await Cart.findByIdAndUpdate(
+            cartId,
             {
                 $push: {
                     hotels: {
@@ -228,7 +241,9 @@ module.exports.addPostHotel = async (req, res) => {
                         rooms: [
                             {
                                 room_id: roomId,
-                                quantity: quantity
+                                quantity,
+                                checkIn,
+                                checkOut
                             }
                         ]
                     }
@@ -236,13 +251,14 @@ module.exports.addPostHotel = async (req, res) => {
             },
             { new: true }
         );
-        res.json({
+
+        return res.json({
             code: 200,
-            message: "Thêm giỏ hàng thành công",
-            data: data
+            message: "Thêm khách sạn và phòng mới vào giỏ hàng thành công",
+            data
         });
     }
-}
+};
 
 // [GET] /api/v1/carts/
 module.exports.index = async (req, res) => {
@@ -265,7 +281,7 @@ module.exports.index = async (req, res) => {
         totalPrice: 0
     };
 
-    // Xử lý tour
+    // Xử lý tours
     for (const item of cart.tours) {
         const tourInfo = await Tour.findById(item.tour_id).select("-timeStarts");
         if (!tourInfo) continue;
@@ -277,14 +293,16 @@ module.exports.index = async (req, res) => {
             priceNew,
             timeStarts: []
         };
+
         for (const timeStart of item.timeStarts) {
             const totalPrice = timeStart.stock * parseInt(priceNew);
 
             tourProcessed.timeStarts.push({
                 timeDepart: timeStart.timeDepart,
-                quantity: timeStart.quantity,
-                totalPrice: totalPrice
-            })
+                quantity: timeStart.stock,
+                totalPrice
+            });
+
             processedCart.totalPrice += totalPrice;
         }
 
@@ -293,7 +311,7 @@ module.exports.index = async (req, res) => {
         }
     }
 
-    // Xử lý hotels & rooms
+    // Xử lý hotels
     for (const hotelItem of cart.hotels) {
         const hotelInfo = await Hotel.findById(hotelItem.hotel_id);
         if (!hotelInfo) continue;
@@ -308,12 +326,22 @@ module.exports.index = async (req, res) => {
             const roomInfo = await Room.findById(roomItem.room_id);
             if (!roomInfo) continue;
 
-            const total = roomItem.quantity * roomInfo.price;
+            const checkIn = new Date(roomItem.checkIn);
+            const checkOut = new Date(roomItem.checkOut);
+
+            // Tính số đêm
+            const timeDiff = checkOut.getTime() - checkIn.getTime();
+            const nights = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+            const total = roomItem.quantity * roomInfo.price * nights;
 
             hotelProcessed.rooms.push({
                 room_id: roomItem.room_id,
                 roomInfo,
                 quantity: roomItem.quantity,
+                checkIn: roomItem.checkIn,
+                checkOut: roomItem.checkOut,
+                nights,
                 price: roomInfo.price,
                 totalPrice: total
             });
@@ -432,12 +460,12 @@ module.exports.deleteHotel = async (req, res) => {
     });
 }
 
-// [PATCH] /api/v1/carts/update/:tour_id?timeDepart=?quantity=
+// [PATCH] /api/v1/carts/update/:tour_id/:timeDepart?quantity=
 module.exports.update = async (req, res) => {
     const tourId = req.params.tour_id;
     const quantity = req.query.quantity;
     const cartId = req.cart.id;
-    const timeDepart = new Date(req.query.timeDepart);
+    const timeDepart = new Date(req.params.timeDepart);
 
 
     if (!quantity || quantity <= 0 || new Date(timeDepart) < Date.now()) {
@@ -524,8 +552,7 @@ module.exports.updateRoom = async (req, res) => {
 
     const cart = await Cart.findOne({
         _id: cartId,
-        "hotels.hotel_id": hotelId,
-        "hotels.rooms.room_id": roomId
+        "hotels.hotel_id": hotelId
     });
 
     if (!cart) {
@@ -535,35 +562,108 @@ module.exports.updateRoom = async (req, res) => {
         });
     }
 
-    const room = await Room.findOne({
-        _id: roomId
-    });
-    if (quantity < 1 || quantity > room.availableRooms) {
-        return res.json({
-            code: 400,
-            message: "Số lượng tour không hợp lệ"
+    const room = await Room.findById(roomId);
+    if (!room) {
+        return res.status(404).json({
+            code: 404,
+            message: "Phòng không tồn tại"
         });
     }
 
-    const data = await Cart.findOneAndUpdate({
-        _id: cartId,
-        "hotels.hotel_id": hotelId,
-        "hotels.rooms.room_id": roomId
-    }, {
-        $set: {
-            "hotels.$[hotel].rooms.$[room].quantity": quantity
+    if (quantity < 1 || quantity > room.availableRooms) {
+        return res.json({
+            code: 400,
+            message: "Số lượng phòng không hợp lệ"
+        });
+    }
+
+    // Update chính xác theo checkIn, checkOut
+    const data = await Cart.findOneAndUpdate(
+        {
+            _id: cartId
+        },
+        {
+            $set: {
+                "hotels.$[hotel].rooms.$[room].quantity": quantity
+            }
+        },
+        {
+            arrayFilters: [
+                { "hotel.hotel_id": hotelId },
+                {
+                    "room.room_id": roomId
+                }
+            ],
+            new: true
         }
-    }, {
-        arrayFilters: [
-            { "hotel.hotel_id": hotelId },
-            { "room.room_id": roomId }
-        ],
-        new: true
-    });
+    );
+
+    if (!data) {
+        return res.status(400).json({
+            code: 400,
+            message: "Không tìm thấy phòng cần cập nhật trong giỏ hàng"
+        });
+    }
 
     res.json({
         code: 200,
         message: "Cập nhật số lượng giỏ hàng thành công",
-        data: data
+        data
     });
-}
+};
+
+// [PATCH] /api/v1/carts/updateRoomDate/:hotel_id/:room_id?newCheckIn=&newCheckOut=
+module.exports.updateRoomDate = async (req, res) => {
+    const cartId = req.cart.id;
+    const hotelId = req.params.hotel_id;
+    const roomId = req.params.room_id;
+
+    const newCheckIn = new Date(req.query.newCheckIn);
+    const newCheckOut = new Date(req.query.newCheckOut);
+
+    // Kiểm tra giỏ hàng và phòng có tồn tại không
+    const cart = await Cart.findOne({
+        _id: cartId,
+        "hotels.hotel_id": hotelId
+    });
+
+    if (!cart) {
+        return res.status(404).json({
+            code: 404,
+            message: "Không tìm thấy giỏ hàng hoặc khách sạn"
+        });
+    }
+
+    // Tiến hành cập nhật ngày checkIn/checkOut cho đúng phòng
+    const data = await Cart.findOneAndUpdate(
+        { _id: cartId },
+        {
+            $set: {
+                "hotels.$[hotel].rooms.$[room].checkIn": newCheckIn,
+                "hotels.$[hotel].rooms.$[room].checkOut": newCheckOut
+            }
+        },
+        {
+            arrayFilters: [
+                { "hotel.hotel_id": hotelId },
+                {
+                    "room.room_id": roomId
+                }
+            ],
+            new: true
+        }
+    );
+
+    if (!data) {
+        return res.status(400).json({
+            code: 400,
+            message: "Không tìm thấy phòng cần cập nhật ngày"
+        });
+    }
+
+    res.json({
+        code: 200,
+        message: "Cập nhật ngày checkIn/checkOut thành công",
+        data
+    });
+};

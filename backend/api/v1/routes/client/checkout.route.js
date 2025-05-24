@@ -8,7 +8,7 @@ const validate = require("../../validates/client/cancelOrder.validate");
 router.get('/', authMiddleware.requireAuth, controller.index);
 router.post('/order', authMiddleware.requireAuth, controller.order);
 router.post("/payment/:orderId", authMiddleware.requireAuth, controller.createPayment);
-router.get('/success', authMiddleware.requireAuth, controller.paymentCallback);
+router.get('/success', controller.paymentCallback);
 router.patch('/cancel/:orderId', authMiddleware.requireAuth, validate.cancelOrder, controller.cancel);
 
 module.exports = router;

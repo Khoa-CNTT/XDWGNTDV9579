@@ -10,7 +10,7 @@ const vnpay = require('../../../../config/vnpay');
 const sendMailHelper = require("../../helper/sendMail");
 const moment = require("moment");
 
-//[GET] api/v1/checkout
+// [GET] api/v1/checkout
 module.exports.index = async (req, res) => {
     const userId = req.user._id;
 
@@ -43,6 +43,7 @@ module.exports.index = async (req, res) => {
             priceNew,
             timeStarts: []
         };
+
         for (const timeStart of item.timeStarts) {
             const totalPrice = timeStart.stock * parseInt(priceNew);
 
@@ -50,7 +51,8 @@ module.exports.index = async (req, res) => {
                 timeDepart: timeStart.timeDepart,
                 quantity: timeStart.quantity,
                 totalPrice: totalPrice
-            })
+            });
+
             processedCart.totalPrice += totalPrice;
         }
 
@@ -74,14 +76,21 @@ module.exports.index = async (req, res) => {
             const roomInfo = await Room.findById(roomItem.room_id);
             if (!roomInfo) continue;
 
-            const total = roomItem.quantity * roomInfo.price;
+            const numNights = Math.ceil(
+                (new Date(roomItem.checkOut) - new Date(roomItem.checkIn)) / (1000 * 60 * 60 * 24)
+            );
+
+            const total = roomItem.quantity * roomInfo.price * numNights;
 
             hotelProcessed.rooms.push({
                 room_id: roomItem.room_id,
                 roomInfo,
                 quantity: roomItem.quantity,
                 price: roomInfo.price,
-                totalPrice: total
+                checkIn: roomItem.checkIn,
+                checkOut: roomItem.checkOut,
+                totalPrice: total,
+                numNights: numNights
             });
 
             processedCart.totalPrice += total;
@@ -95,119 +104,107 @@ module.exports.index = async (req, res) => {
     res.json(processedCart);
 };
 
-
-//[POST] api/v1/checkout/order
+// [POST] api/v1/checkout/order
 module.exports.order = async (req, res) => {
     const cartId = req.cart.id;
     const { fullName, phone, email, note, voucherCode } = req.body.userInfor;
-
     const user_id = req.user.id;
 
-    const cart = await Cart.findOne({
-        _id: cartId
-    });
+    const cart = await Cart.findOne({ _id: cartId });
     if (!cart || (cart.tours.length === 0 && cart.hotels.length === 0)) {
         return res.json({
             code: "400",
             message: "Giỏ hàng trống!"
         });
     }
+
     let totalPrice = 0;
     let discountAmount = 0;
     let tours = [];
     let hotels = [];
 
-    // xử lý tour
+    // Xử lý tour
     for (const tour of cart.tours) {
-        const tourInfo = await Tour.findOne({
-            _id: tour.tour_id
-        });
-
+        const tourInfo = await Tour.findById(tour.tour_id);
         if (!tourInfo) {
-            return res.json({
-                code: "400",
-                message: "Tour không tồn tại!"
-            });
+            return res.json({ code: "400", message: "Tour không tồn tại!" });
         }
+
         const priceNew = tourHelper.priceNewTour(tourInfo);
-
         const timeStarts = [];
-        for (const timeStart of tour.timeStarts) {
-            const tourTime = tour.timeStarts.find(item =>
-                new Date(item.timeDepart).getTime() === new Date(timeStart.timeDepart).getTime() &&
-                new Date(timeStart.timeDepart) >= Date.now()
-            );
 
-            if (!tourTime) {
+        for (const timeStart of tour.timeStarts) {
+            const isValidTime = new Date(timeStart.timeDepart) >= new Date();
+            if (!isValidTime) {
                 return res.json({
                     code: "400",
-                    message: "Thời gian khởi hành tour không hợp lệ! hoặc đã quá ngày!"
+                    message: "Thời gian khởi hành tour không hợp lệ hoặc đã quá ngày!"
                 });
             }
 
             const itemTotal = timeStart.stock * priceNew;
-
             timeStarts.push({
                 timeDepart: new Date(timeStart.timeDepart),
                 stock: timeStart.stock
             });
-
             totalPrice += itemTotal;
 
             await Tour.updateOne(
-                {
-                    _id: tour.tour_id,
-                    "timeStarts.timeDepart": new Date(timeStart.timeDepart)
-                },
+                { _id: tour.tour_id, "timeStarts.timeDepart": new Date(timeStart.timeDepart) },
                 {
                     $inc: {
                         sold: timeStart.stock,
                         "timeStarts.$[time].stock": -timeStart.stock
                     }
-                }, {
-                arrayFilters: [{ "time.timeDepart": new Date(timeStart.timeDepart) }]
-            });
+                },
+                {
+                    arrayFilters: [{ "time.timeDepart": new Date(timeStart.timeDepart) }]
+                }
+            );
         }
 
         tours.push({
             tour_id: tour.tour_id,
             price: tourInfo.price,
             discount: tourInfo.discount,
-            timeStarts: timeStarts,
+            timeStarts
         });
     }
 
-    // xử lý hotel
+    // Xử lý hotel
     for (const hotel of cart.hotels) {
         const hotelInfo = await Hotel.findById(hotel.hotel_id);
-
         if (!hotelInfo) {
-            return res.json({
-                code: "400",
-                message: "Hotel không tồn tại!"
-            });
+            return res.json({ code: "400", message: "Khách sạn không tồn tại!" });
         }
+
         const rooms = [];
         for (const room of hotel.rooms) {
             const roomInfo = await Room.findById(room.room_id);
-
             if (!roomInfo || roomInfo.availableRooms < room.quantity) {
                 return res.json({
                     code: "400",
-                    message: "Room không tồn tại! hoặc số lượng phòng hiện tại không đủ!"
+                    message: "Phòng không tồn tại hoặc không đủ số lượng!"
                 });
             }
 
-            const price = roomInfo.price;
-            const total = room.quantity * price;
+            const checkIn = new Date(room.checkIn);
+            const checkOut = new Date(room.checkOut);
+            const numNights = Math.max(
+                1,
+                Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24))
+            );
+
+            const total = room.quantity * roomInfo.price * numNights;
             totalPrice += total;
 
             rooms.push({
                 room_id: room.room_id,
                 quantity: room.quantity,
-                price,
+                price: roomInfo.price,
+                checkIn,
+                checkOut
             });
-
 
             await Room.updateOne(
                 { _id: room.room_id },
@@ -216,22 +213,16 @@ module.exports.order = async (req, res) => {
                         sold: room.quantity,
                         availableRooms: -room.quantity
                     }
-                });
-        }
-        const totalRoomQuantity = rooms.reduce((acc, r) => acc + r.quantity, 0);
-
-        await Hotel.updateOne(
-            { _id: hotel.hotel_id },
-            {
-                $inc: {
-                    sold: totalRoomQuantity,
                 }
-            });
+            );
+        }
+
+        const totalRoomQuantity = rooms.reduce((acc, r) => acc + r.quantity, 0);
+        await Hotel.updateOne({ _id: hotel.hotel_id }, { $inc: { sold: totalRoomQuantity } });
 
         hotels.push({
             hotel_id: hotel.hotel_id,
-            hotelInfo,
-            rooms: rooms
+            rooms
         });
     }
 
@@ -244,64 +235,52 @@ module.exports.order = async (req, res) => {
 
         if (voucher) {
             if (new Date() > new Date(voucher.endDate)) {
-                return res.json({
-                    error: "400",
-                    message: "Voucher đã hết hạn!"
-                });
+                return res.json({ error: "400", message: "Voucher đã hết hạn!" });
             }
-
             if (voucher.quantity <= 0) {
-                return res.json({
-                    error: "400",
-                    message: "Voucher đã hết số lượng!"
-                });
+                return res.json({ error: "400", message: "Voucher đã hết số lượng!" });
             }
 
             const discountData = tourHelper.calculateDiscount(totalPrice, voucher);
             discountAmount = discountData.discountAmount;
             totalPrice = discountData.finalPrice;
 
-
-            await Voucher.updateOne({
-                _id: voucher._id
-            }, {
-                $inc:
-                {
-                    quantity: -1
-                }
-            });
+            await Voucher.updateOne({ _id: voucher._id }, { $inc: { quantity: -1 } });
         }
     }
 
     const countOrder = await Order.countDocuments();
     const code = generate.generateOrderCode(countOrder + 1);
+
     const newOrder = new Order({
         orderCode: code,
-        user_id: user_id,
+        user_id,
         userInfor: { fullName, phone, email, note },
         status: "pending",
         tours,
         hotels,
-        voucherCode: voucherCode,
+        voucherCode,
         totalPrice,
         updateBy: []
     });
 
     const savedOrder = await newOrder.save();
 
-    await Cart.updateOne({
-        _id: cart._id
-    }, {
-        tours: [],
-        hotels: []
-    });
+    // Clear giỏ hàng sau khi đặt
+    await Cart.updateOne(
+        { _id: cart._id },
+        {
+            tours: [],
+            hotels: []
+        }
+    );
 
     res.json({
         status: "200",
         message: "Đặt hàng thành công!",
         order: savedOrder
     });
-}
+};
 
 //[POST] api/v1/checkout/payment/:orderId
 module.exports.createPayment = async (req, res) => {
