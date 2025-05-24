@@ -5,6 +5,11 @@ const ForgotPassword = require("../../models/forgot-password.model");
 const generateHelper = require("../../helper/generate");
 const sendMailHelper = require("../../helper/sendMail");
 const Cart = require('../../models/cart.model');
+const Order = require('../../models/order.model');
+const Hotel = require('../../models/hotel.model');
+const Room = require('../../models/room.model');
+const Tour = require('../../models/tour.model');
+const tourHelper = require("../../helper/tours");
 
 // [POST]/api/v1/users/register
 module.exports.register = async (req, res) => {
@@ -293,16 +298,55 @@ module.exports.orderUser = async (req, res) => {
 // [GET]/api/v1/user/ordersDetail/:id
 module.exports.orderDetail = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
         const orderId = req.params.id;
-        const data = await Order.findOne({
+        const order = await Order.findOne({
             _id: orderId,
             user_id: userId
-        })
+        });
+
+        const tours = [];
+        for (const item of order.tours) {
+            const tourInfo = await Tour.findOne({
+                _id: item.tour_id
+            });
+            tours.push({
+                tourInfo: tourInfo,
+                quantity: item.quantity,
+                priceNew: tourHelper.priceNewTour(tourInfo)
+            });
+        }
+
+        const hotels = [];
+        for (const item of order.hotels) {
+            const hotelInfo = await Hotel.findOne({
+                _id: item.hotel_id
+            });
+            const rooms = [];
+            for (const room of item.rooms) {
+                const roomInfo = await Room.findOne({
+                    _id: room.room_id
+                });
+                rooms.push({
+                    roomInfo: roomInfo,
+                    quantity: room.quantity,
+                    price: room.price
+                });
+            }
+            hotels.push({
+                hotelInfo: hotelInfo,
+                rooms: rooms
+            });
+        }
+
         res.json({
             code: 200,
-            message: "Order chi tiết!",
-            data: data
+            message: "Lấy thông tin đơn hàng thành công!",
+            data: {
+                order: order,
+                tours: tours,
+                hotels: hotels
+            }
         });
     } catch (error) {
         res.json({

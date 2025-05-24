@@ -185,3 +185,35 @@ module.exports.delete = async (req, res) => {
         }
     }
 };
+
+// [PATCH]/api/v1/admin/orders/reFundStatus/:id
+module.exports.reFundStatus = async (req, res) => {
+    const permissions = req.roles.permissions;
+    if (!permissions.includes("order_edit")) {
+        return res.json({
+            code: 400,
+            message: "Bạn không có quyền cập nhật trạng thái đơn hàng"
+        });
+    } else {
+        try {
+            const id = req.params.id;
+
+            await Order.updateOne({
+                _id: id,
+                status: "cancelled"
+            }, {
+                status: "refund"
+            });
+
+            res.json({
+                code: 200,
+                message: "Cập nhật trạng thái thành công!"
+            });
+        } catch (error) {
+            res.json({
+                code: 500,
+                message: "Có lỗi " + error
+            });
+        }
+    }
+};

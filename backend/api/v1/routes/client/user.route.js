@@ -16,6 +16,6 @@ router.get('/logout', controller.logout);
 router.patch('/edit', authMiddleware.requireAuth, validate.edit, controller.edit);
 router.patch('/password/change', authMiddleware.requireAuth, validate.changePassword, controller.changePass);
 router.get('/orders', authMiddleware.requireAuth, controller.orderUser);
-router.get('ordersDetail/:id', authMiddleware.requireAuth, controller.orderDetail);
+router.get('/ordersDetail/:id', authMiddleware.requireAuth, controller.orderDetail);
 
 module.exports = router;
