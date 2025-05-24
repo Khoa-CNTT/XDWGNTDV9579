@@ -18,15 +18,30 @@ const invalidTopics = [
 
 function extractMonthFromMessage(message) {
     const lower = message.toLowerCase();
+    const now = new Date();
+
     const monthMatch = lower.match(/tháng (\d{1,2})/);
     if (monthMatch) {
         const parsed = parseInt(monthMatch[1]);
         if (parsed >= 1 && parsed <= 12) return parsed;
     }
 
+    // "tháng sau"
     if (lower.includes("tháng sau")) {
-        const now = new Date();
         return ((now.getMonth() + 1) % 12) + 1;
+    }
+
+    // "tháng này"
+    if (lower.includes("tháng này")) {
+        const day = now.getDate();
+        const bufferDays = 2;
+
+        if (day <= bufferDays) {
+            const adjustedDate = new Date(now.getFullYear(), now.getMonth() - 1);
+            return adjustedDate.getMonth() + 1;
+        }
+
+        return now.getMonth() + 1;
     }
 
     return null;
@@ -57,7 +72,7 @@ module.exports.getChatResponse = async (req, res) => {
         }
         // Check cache trước
         const allCached = await CachedResponse.find({
-            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // 30 ngày
+            createdAt: { $gte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) }
         });
 
         const match = allCached.find(item =>
