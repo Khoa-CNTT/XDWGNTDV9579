@@ -59,12 +59,10 @@ const InvoicesControl = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const limitItems = 10;
   const [totalPages, setTotalPages] = useState(1);
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
 
-  // Lấy danh sách hóa đơn
   const fetchInvoices = useCallback(
     async (page = 1, search = "", start = "", end = "", sortKey = "", sortValue = "") => {
       if (!adminToken) {
@@ -77,7 +75,7 @@ const InvoicesControl = () => {
 
       setLoading(true);
       try {
-        const params = { page, limit: limitItems };
+        const params = { page, limit: 10 };
         if (search) params.search = search;
         if (start) params.startDate = start;
         if (end) params.endDate = end;
@@ -87,10 +85,7 @@ const InvoicesControl = () => {
         }
 
         const data = await getInvoices(adminToken, params);
-        // console.log("Raw data from API:", data);
-
         if (!data || !Array.isArray(data.orders)) {
-          // console.warn("Dữ liệu hóa đơn không hợp lệ hoặc rỗng:", data);
           setAllInvoices([]);
           setInvoices([]);
           setTotalPages(1);
@@ -102,9 +97,9 @@ const InvoicesControl = () => {
         const formattedData = data.orders.map((item, index) => {
           let stt;
           if (sortKey === "_id" && sortValue === "desc") {
-            stt = totalRecords - ((page - 1) * limitItems + index);
+            stt = totalRecords - ((page - 1) * 10 + index);
           } else {
-            stt = (page - 1) * limitItems + index + 1;
+            stt = (page - 1) * 10 + index + 1;
           }
           return {
             ...item,
@@ -122,13 +117,11 @@ const InvoicesControl = () => {
         setAllInvoices(formattedData);
         setInvoices(formattedData);
         setTotalPages(data.totalPage || 1);
-        // console.log("Formatted invoices:", formattedData);
 
         if (formattedData.length === 0) {
           toast.info("Không có hóa đơn nào để hiển thị!", { position: "top-right" });
         }
       } catch (err) {
-        // console.error("Error in fetchInvoices:", err);
         const errorMessage = err.message || "Không thể tải danh sách hóa đơn!";
         setError(errorMessage);
         toast.error(errorMessage, { position: "top-right" });
@@ -141,7 +134,7 @@ const InvoicesControl = () => {
         setLoading(false);
       }
     },
-    [adminToken, limitItems]
+    [adminToken]
   );
 
   const debouncedSearch = useCallback(
@@ -484,16 +477,16 @@ const InvoicesControl = () => {
     try {
       const response = await getInvoiceDetail(adminToken, invoice._id);
       if (response.code === 200 && response.data) {
-        // console.log("Invoice detail data:", response.data);
         setCurrentInvoice(response.data);
         setOpenDetail(true);
       } else {
-        toast.error(response.message || "Không thể tải chi tiết hóa đơn!", { position: "top-right" });
+        toast.error(response.message || "Không thể tải chi tiết hóa đơn!", {
+          position: "top-right",
+        });
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Không thể tải chi tiết hóa đơn!";
       toast.error(errorMessage, { position: "top-right" });
-      // console.error("Get invoice detail error:", err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -524,7 +517,6 @@ const InvoicesControl = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Xóa hóa đơn thất bại!";
       toast.error(errorMessage, { position: "top-right" });
-      // console.error("Delete invoice error:", err.response?.data);
     } finally {
       setLoading(false);
       setOpenDeleteConfirm(false);
@@ -589,9 +581,17 @@ const InvoicesControl = () => {
     if (!currentInvoice?.order?._id) return;
     setLoading(true);
     try {
-      const response = await refundOrder(adminToken, currentInvoice.order._id);
+      const refundData = {
+        orderId: currentInvoice.order._id,
+        amount: Math.floor(currentInvoice.order.totalPrice * 0.7),
+        bankName: currentInvoice.order.inforCancel.bankName,
+        accountNumber: currentInvoice.order.inforCancel.numberAccount,
+        transactionNo: currentInvoice.order.paymentInfo.vnp_TransactionNo,
+        txnRef: currentInvoice.order.paymentInfo.vnp_TxnRef,
+      };
+
+      const response = await refundOrder(adminToken, refundData);
       if (response.code === 200) {
-        // Cập nhật currentInvoice để phản ánh trạng thái mới
         setCurrentInvoice({
           ...currentInvoice,
           order: {
@@ -599,14 +599,13 @@ const InvoicesControl = () => {
             status: "refund",
           },
         });
-        // Làm mới danh sách hóa đơn để cập nhật cột trạng thái
         await fetchInvoices(currentPage);
-        toast.success("Đã cập nhật trạng thái hoàn tiền!", { position: "top-right" });
+        toast.success("Hoàn tiền thành công!", { position: "top-right" });
       } else {
-        toast.error(response.message || "Cập nhật trạng thái hoàn tiền thất bại!", { position: "top-right" });
+        toast.error(response.message || "Hoàn tiền thất bại!", { position: "top-right" });
       }
     } catch (err) {
-      const errorMessage = err.message || "Cập nhật trạng thái hoàn tiền thất bại!";
+      const errorMessage = err.message || "Hoàn tiền thất bại!";
       toast.error(errorMessage, { position: "top-right" });
     } finally {
       setLoading(false);
@@ -665,16 +664,16 @@ const InvoicesControl = () => {
         };
         const displayStatus = statusMap[params.value] || "Không xác định";
         const backgroundColor = {
-          cancelled: "#EE0000", // Tomato red
-          pending: "#FFA500", // Gold
-          paid: "#009900", // Lime green
+          cancelled: "#EE0000",
+          pending: "#FFA500",
+          paid: "#009900",
           confirmed: "transparent",
           refund: "transparent",
         }[params.value] || "transparent";
         const textColor = {
-          cancelled: "#FFFFFF", // White text on red
-          pending: "#000000", // Black text on yellow
-          paid: "#FFFFFF", // White text on green
+          cancelled: "#FFFFFF",
+          pending: "#000000",
+          paid: "#FFFFFF",
           confirmed: "#000000",
           refund: "#000000",
         }[params.value] || "#000000";
@@ -683,15 +682,15 @@ const InvoicesControl = () => {
             display="flex"
             alignItems="center"
             justifyContent="center"
-            height="100%" // Đặt lại height để ô cha chiếm toàn bộ chiều cao của ô bảng
-            width="100%" // Đặt lại width để ô cha chiếm toàn bộ chiều rộng của ô bảng
+            height="100%"
+            width="100%"
           >
             <Box
               display="flex"
               alignItems="center"
               justifyContent="center"
-              height="60%" // Giữ chiều cao của ô màu
-              width="80%" // Giữ chiều rộng của ô màu
+              height="60%"
+              width="80%"
               sx={{
                 backgroundColor: backgroundColor,
                 borderRadius: "8px",
@@ -758,7 +757,6 @@ const InvoicesControl = () => {
     },
   ];
 
-  // Check if the order has voucherCode or any tour has discount to decide whether to show these columns
   const hasVoucherOrDiscount = currentInvoice?.order?.voucherCode ||
     currentInvoice?.order?.tours?.some((tour) => tour.discount);
 
@@ -989,10 +987,12 @@ const InvoicesControl = () => {
         <DialogContent>
           {currentInvoice ? (
             <Box id="invoice-detail">
-              <Typography variant="h4" color={colors.grey[100]} mb={2}>
-                Mã hóa đơn: {currentInvoice.order?.orderCode || "N/A"}
-              </Typography>
-              <Typography variant="h5" color={colors.grey[100]} mb={1}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                <Typography variant="h4" color={colors.grey[100]}>
+                  Mã hóa đơn: {currentInvoice.order?.orderCode || "N/A"}
+                </Typography>
+              </Box>
+              <Typography variant="h4" color={colors.grey[100]} mb={1}>
                 Thông tin khách hàng
               </Typography>
               <Box mb={2}>
@@ -1001,7 +1001,6 @@ const InvoicesControl = () => {
                 <Typography>Ghi chú: {currentInvoice.order?.userInfor?.note || "Không có"}</Typography>
               </Box>
 
-              {/* Hiển thị thông tin thẻ ngân hàng nếu trạng thái là "cancelled" hoặc "refund" */}
               {(currentInvoice.order?.status === "cancelled" || currentInvoice.order?.status === "refund") && (
                 <>
                   <Typography variant="h5" color={colors.grey[100]} mb={1}>
@@ -1010,11 +1009,11 @@ const InvoicesControl = () => {
                   <Box mb={2}>
                     <Typography>Ngân hàng: {currentInvoice.order?.inforCancel?.bankName || "N/A"}</Typography>
                     <Typography>Số tài khoản: {currentInvoice.order?.inforCancel?.numberAccount || "N/A"}</Typography>
+                    <Typography>Số tiền hoàn: {Math.floor((currentInvoice.order?.totalPrice || 0) * 0.7).toLocaleString("vi-VN")} VNĐ</Typography>
                   </Box>
                 </>
               )}
 
-              {/* Hiển thị bảng tour nếu có tour, hoặc bỏ qua nếu không có */}
               {Array.isArray(currentInvoice.tours) && currentInvoice.tours.length > 0 && (
                 <>
                   <Typography variant="h5" color={colors.grey[100]} mb={1}>
@@ -1038,7 +1037,6 @@ const InvoicesControl = () => {
                       </TableHead>
                       <TableBody>
                         {currentInvoice.tours.map((tour, index) => {
-                          // Tìm tour tương ứng trong currentInvoice.order.tours để lấy timeStarts và discount
                           const matchingTour = currentInvoice.order?.tours?.find(
                             (orderTour) => orderTour.tour_id === tour.tourInfo?._id
                           );
@@ -1088,7 +1086,6 @@ const InvoicesControl = () => {
                 </>
               )}
 
-              {/* Hiển thị bảng khách sạn nếu có khách sạn, hoặc bỏ qua nếu không có */}
               {Array.isArray(currentInvoice.hotels) && currentInvoice.hotels.length > 0 && (
                 <>
                   <Typography variant="h5" color={colors.grey[100]} mb={1}>
@@ -1098,18 +1095,26 @@ const InvoicesControl = () => {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell width="25%">Tên khách sạn</TableCell>
-                          <TableCell width="20%">Phòng</TableCell>
-                          <TableCell width="15%" align="center">Số đêm</TableCell>
-                          <TableCell width="20%" align="right">Giá (VNĐ)</TableCell>
+                          <TableCell width="20%">Tên khách sạn</TableCell>
+                          <TableCell width="15%">Phòng</TableCell>
+                          <TableCell width="10%" align="center">Số đêm</TableCell>
+                          <TableCell width="15%" align="center">Ngày vào</TableCell>
+                          <TableCell width="15%" align="center">Ngày ra</TableCell>
+                          <TableCell width="15%" align="right">Giá (VNĐ)</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {currentInvoice.hotels.map((hotel, index) =>
+                        {currentInvoice.hotels.flatMap((hotel, index) =>
                           hotel.rooms.map((room, roomIndex) => {
-                            // Giả định có trường checkInDate trong tương lai, hiện tại để "N/A"
-                            const checkInDate = room.checkInDate
-                              ? new Date(room.checkInDate).toLocaleDateString("vi-VN", {
+                            const checkInDate = room.checkIn
+                              ? new Date(room.checkIn).toLocaleDateString("vi-VN", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })
+                              : "N/A";
+                            const checkOutDate = room.checkOut
+                              ? new Date(room.checkOut).toLocaleDateString("vi-VN", {
                                 day: "2-digit",
                                 month: "2-digit",
                                 year: "numeric",
@@ -1121,6 +1126,8 @@ const InvoicesControl = () => {
                                 <TableCell>{hotel.hotelInfo?.name || "N/A"}</TableCell>
                                 <TableCell>{room.roomInfo?.name || "N/A"}</TableCell>
                                 <TableCell align="center">{room.quantity || 0}</TableCell>
+                                <TableCell align="center">{checkInDate}</TableCell>
+                                <TableCell align="center">{checkOutDate}</TableCell>
                                 <TableCell align="right">{room.price?.toLocaleString("vi-VN") || "N/A"}</TableCell>
                               </TableRow>
                             );
@@ -1132,7 +1139,6 @@ const InvoicesControl = () => {
                 </>
               )}
 
-              {/* Hiển thị thông báo nếu không có cả tour và khách sạn */}
               {(!Array.isArray(currentInvoice.tours) || currentInvoice.tours.length === 0) &&
                 (!Array.isArray(currentInvoice.hotels) || currentInvoice.hotels.length === 0) && (
                   <Typography variant="h6" color={colors.grey[100]} mt={2}>
@@ -1151,6 +1157,20 @@ const InvoicesControl = () => {
               >
                 Tổng giá: {currentInvoice.order?.totalPrice?.toLocaleString("vi-VN") || "N/A"} VNĐ
               </Typography>
+
+              {currentInvoice.order?.status === "cancelled" && (
+                <Typography
+                  variant="h5"
+                  sx={{
+                    mt: 1,
+                    textAlign: "right",
+                    fontWeight: "bold",
+                    color: colors.redAccent[500],
+                  }}
+                >
+                  Số tiền phải hoàn (70%): {Math.floor((currentInvoice.order?.totalPrice || 0) * 0.7).toLocaleString("vi-VN")} VNĐ
+                </Typography>
+              )}
             </Box>
           ) : (
             <Typography>Không có dữ liệu</Typography>
@@ -1158,7 +1178,9 @@ const InvoicesControl = () => {
         </DialogContent>
         <DialogActions>
           <Box display="flex" alignItems="center" gap={2}>
-            {currentInvoice?.order?.status === "cancelled" ? (
+            {currentInvoice?.order?.status === "cancelled" &&
+              currentInvoice.order?.inforCancel?.bankName &&
+              currentInvoice.order?.inforCancel?.numberAccount ? (
               <Button
                 variant="contained"
                 color="success"
