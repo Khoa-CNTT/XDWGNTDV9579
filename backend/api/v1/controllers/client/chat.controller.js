@@ -1,4 +1,5 @@
 const axios = require("axios");
+const stringSimilarity = require("string-similarity");
 const Chat = require("../../models/chat.model");
 const Tour = require("../../models/tour.model");
 const CachedResponse = require("../../models/CachedResponse");
@@ -70,6 +71,30 @@ module.exports.getChatResponse = async (req, res) => {
         if (invalidTopics.some(topic => normalizedMsg.includes(normalizeText(topic)))) {
             return res.json({ reply: "Mình chỉ hỗ trợ về du lịch thôi nhé! 🚀" });
         }
+
+
+        const suggestWebsiteKeywords = [
+            "giới thiệu website du lịch",
+            "trang web du lịch",
+            "website du lịch nào",
+            "web du lịch",
+            "cho tôi một trang du lịch",
+            "tư vấn website du lịch",
+            "giới thiệu trang web về du lịch",
+            "có trang web du lịch nào không",
+            "Giới thiệu cho tôi về 1 web du lịch"
+        ];
+
+        const isSuggestingWebsite = suggestWebsiteKeywords.some(keyword =>
+            normalizedMsg.includes(normalizeText(keyword))
+        );
+
+        if (isSuggestingWebsite) {
+            return res.json({
+                reply: "Bạn có thể truy cập website chính thức của chúng tôi  để khám phá các tour du lịch hấp dẫn nhé! 🌍✨"
+            });
+        }
+
         // Check cache trước
         const allCached = await CachedResponse.find({
             createdAt: { $gte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) }
@@ -89,7 +114,7 @@ module.exports.getChatResponse = async (req, res) => {
         const year = currentDate.getFullYear();
 
         let suggestedTours = "";
-        const tours = await Tour.find().limit(5).select("title price");
+        const tours = await Tour.find().select("title price");
         if (tours.length > 0) {
             suggestedTours = "Dưới đây là một số tour bạn có thể tham khảo:\n" +
                 tours.map(tour => `- ${tour.title} (${tour.price} VND)`).join("\n");
@@ -102,7 +127,7 @@ module.exports.getChatResponse = async (req, res) => {
             role: "system",
             content: `Bạn là trợ lý du lịch.Hãy dựa vào tháng ${targetMonth}/${year} để trả lời nhé!.
             Chỉ sử dụng thông tin tôi cung cấp để gợi ý điểm đến, lịch trình và mẹo du lịch. Trả lời thật ngắn gọn và súc tích.
-            Không lấy thông tin bên ngoài, không nhắc đến thương hiệu hay website.\n${suggestedTours}`
+            Không lấy thông tin bên ngoài.Chỉ lấy thông tin website GoTravel của chúng tôi.\n${suggestedTours}`
         };
 
         let messages = [systemPrompt, { role: "user", content: message }];

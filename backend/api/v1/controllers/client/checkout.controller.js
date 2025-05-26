@@ -360,19 +360,39 @@ module.exports.paymentCallback = async (req, res) => {
         { new: true }
     );
     // gửi otp qua email user
-    const subject = `Cảm ơn ${order.userInfor.fullName} đã tin tưởng dịch vụ của chúng tôi!`;
+    const subject = `Xác nhận đơn hàng - Cảm ơn ${order.userInfor.fullName} đã sử dụng dịch vụ của chúng tôi!`;
+
     const html = `
-        <p>Chào <strong>${order.userInfor.fullName}</strong>,</p>
-        <p>
-            Cảm ơn bạn đã đặt dịch vụ tại <strong>${req.settingGeneral.websiteName}</strong>!<br>
-            Chúng tôi rất vui được bạn tin tưởng chọn dịch vụ của chúng tôi.
-        </p>
-        <p>
-            Mọi thắc mắc, bạn cứ liên hệ tụi mình qua <strong>${req.settingGeneral.phone}</strong> hoặc <strong>${req.settingGeneral.email}</strong>.
-        </p>
-        <p>Hy vọng sớm được gặp bạn!</p>
-        <p>Thân mến,<br>
-        <strong>${req.settingGeneral.websiteName}</strong></p>`;
+  <p>Chào <strong>${order.userInfor.fullName}</strong>,</p>
+
+  <p>
+    Cảm ơn bạn đã đặt dịch vụ tại <strong>${req.settingGeneral.websiteName}</strong>!<br>
+    Đơn hàng của bạn đã được xác nhận và đang được xử lý.
+  </p>
+
+  <p>
+    Dưới đây là thông tin đơn hàng của bạn:
+    <ul>
+      <li><strong>Mã đơn hàng:</strong> ${order.orderCode}</li>
+      <li><strong>Ngày đặt:</strong> ${new Date(order.createdAt).toLocaleDateString('vi-VN')}</li>
+      <li><strong>Tổng thanh toán:</strong> ${order.totalPrice.toLocaleString('vi-VN')} VNĐ</li>
+    </ul>
+  </p>
+
+  <p>
+    Hóa đơn điện tử sẽ được gửi kèm trong email này hoặc có thể được xem trong tài khoản của bạn trên website.
+  </p>
+
+  <p>
+    Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua số <strong>${req.settingGeneral.phone}</strong> hoặc email <strong>${req.settingGeneral.email}</strong>.
+  </p>
+
+  <p>Rất mong được phục vụ bạn trong thời gian tới!</p>
+
+  <p>Thân mến,<br>
+  <strong>${req.settingGeneral.websiteName}</strong></p>
+`;
+
 
     sendMailHelper.sendMail(order.userInfor.email, subject, html);
 

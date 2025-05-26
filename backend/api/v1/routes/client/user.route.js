@@ -10,7 +10,7 @@ router.post('/register', validate.registerPost, controller.register);
 router.post('/login', validate.loginPost, controller.login);
 router.post('/password/forgot', validate.forgotPassword, controller.forgotPassword);
 router.post('/password/otp', controller.otpPassword);
-router.post('/password/reset', validate.resetPasswordPost, controller.resetPassword);
+router.post('/password/reset', controller.resetPassword);
 router.get('/detail', authMiddleware.requireAuth, controller.detail);
 router.get('/logout', controller.logout);
 router.patch('/edit', authMiddleware.requireAuth, validate.edit, controller.edit);
