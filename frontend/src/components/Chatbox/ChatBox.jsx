@@ -29,7 +29,7 @@ const ChatBox = () => {
       if (response.data.code === 200) {
         const history = response.data.history || [];
         const formattedMessages = history
-          .filter((msg) => msg.role !== "system") // Bỏ qua system prompt
+          .filter((msg) => msg.role !== "system")
           .map((msg) => ({
             text: msg.content,
             sender: msg.role === "user" ? "user" : "bot",
@@ -43,7 +43,6 @@ const ChatBox = () => {
         toast.error(response.data.message || "Không thể tải lịch sử!");
       }
     } catch (error) {
-      toast.error("Không thể tải lịch sử trò chuyện!");
       setMessages([{ text: "Xin chào! Tôi có thể giúp gì cho bạn?", sender: "bot" }]);
     }
   };

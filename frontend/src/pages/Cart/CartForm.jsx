@@ -66,12 +66,15 @@ const CartForm = ({ totalPrice }) => {
           newErrors.note = `Số lượng phòng ${room.roomInfo.name} vượt quá số lượng còn lại (${room.roomInfo.availableRooms})!`;
           isValid = false;
         }
-        if (new Date(room.checkIn) < new Date() || new Date(room.checkOut) < new Date()) {
-          newErrors.note = `Ngày check-in/check-out của phòng ${room.roomInfo.name} không hợp lệ (ngày trong quá khứ)!`;
+        const checkInDate = new Date(room.checkIn);
+        const checkOutDate = new Date(room.checkOut);
+        if (checkInDate >= checkOutDate) {
+          newErrors.note = `Ngày check-out của phòng ${room.roomInfo.name} không hợp lệ!`;
           isValid = false;
         }
-        if (new Date(room.checkOut) <= new Date(room.checkIn)) {
-          newErrors.note = `Ngày check-out phải sau ngày check-in cho phòng ${room.roomInfo.name}!`;
+        const numNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+        if (numNights < 1) {
+          newErrors.note = `Số đêm của phòng ${room.roomInfo.name} phải ít nhất 1 đêm!`;
           isValid = false;
         }
       }
@@ -120,14 +123,14 @@ const CartForm = ({ totalPrice }) => {
           discount: tour.discount || 0,
           timeStarts: tour.timeStarts.map((time) => ({
             timeDepart: time.timeDepart,
-            stock: time.quantity,
+            quantity: time.quantity,
           })),
         })),
         hotels: cart.hotels.map((hotel) => ({
           hotel_id: hotel.hotel_id,
           rooms: hotel.rooms.map((room) => ({
             room_id: room.room_id,
-            price: room.roomInfo?.price || room.price || 0,
+            price: room.price || room.roomInfo?.price || 0,
             quantity: room.quantity,
             checkIn: room.checkIn,
             checkOut: room.checkOut,
@@ -146,7 +149,7 @@ const CartForm = ({ totalPrice }) => {
       const paymentResponse = await api.post(`/api/v1/checkout/payment/${orderId}`);
       const paymentUrl = paymentResponse.data.paymentUrl;
       if (paymentUrl) {
-        window.location.href = paymentUrl; // Redirect trực tiếp đến VNPay
+        window.location.href = paymentUrl;
       } else {
         throw new Error("Không nhận được URL thanh toán từ VNPay!");
       }

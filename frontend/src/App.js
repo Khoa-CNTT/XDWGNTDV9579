@@ -57,7 +57,8 @@ import Profile from "./pages/Profile/Profile";
 import Categories from "./pages/Categories/Categories";
 import { getGeneralSettings } from "./Admin/Setting/SettingApi";
 import OrderList from "./pages/Invoices/OrderList";
-import NotFound from "./pages/NotFound/NotFound"; // Import component NotFound
+import OrderDetail from "./pages/Invoices/OrderDetail"; 
+import NotFound from "./pages/NotFound/NotFound";
 
 const AdminContent = ({ children, isSidebar, setIsSidebar }) => {
   const [theme, colorMode] = useMode();
@@ -197,6 +198,14 @@ const AppContent = () => {
         }
       />
       <Route
+        path="/orders/detail/:orderId"
+        element={
+          <PrivateRoute>
+            <OrderDetail />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/change-password"
         element={
           <PrivateRoute>
@@ -207,7 +216,7 @@ const AppContent = () => {
       <Route path="/hotel-services" element={<HotelServices />} />
       <Route path="/hotel-details/:hotelId" element={<HotelDetails />} />
       <Route path="/categories" element={<Categories />} />
-      <Route path="*" element={<NotFound />} /> {/* Thay thế div 404 bằng component NotFound */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 

@@ -19,7 +19,7 @@ export const CartProvider = ({ children }) => {
   const debouncedFetchCart = debounce(async () => {
     try {
       setIsLoading(true);
-      const response = await api.get("/carts/");
+      const response = await api.get("/api/v1/carts/");
       if (response.data) {
         const cartData = {
           tours: response.data.tours || [],
@@ -28,17 +28,15 @@ export const CartProvider = ({ children }) => {
         };
         setCart(cartData);
 
-        const totalCount =
-          cartData.tours.reduce(
-            (sum, tour) =>
-              sum +
-              tour.timeStarts.reduce((tSum, time) => tSum + (time.quantity || 0), 0),
-            0
-          ) +
+        const totalCount = cartData.tours.reduce(
+          (sum, tour) =>
+            sum +
+            tour.timeStarts.reduce((tSum, time) => tSum + (time.quantity || 0), 0),
+          0
+        ) +
           cartData.hotels.reduce(
             (sum, hotel) =>
-              sum +
-              hotel.rooms.reduce((rSum, room) => rSum + (room.quantity || 0), 0),
+              sum + hotel.rooms.reduce((rSum, room) => rSum + (room.quantity || 0), 0),
             0
           );
         setCartCount(totalCount);
@@ -63,14 +61,19 @@ export const CartProvider = ({ children }) => {
           timeDepart: item.timeDepart,
           quantity: item.quantity,
         };
-        await api.post(`/carts/add/${item._id}`, payload);
+        await api.post(`/api/v1/carts/add/${item._id}`, payload);
       } else if (type === "room") {
+        const checkInDate = new Date(item.checkIn);
+        const checkOutDate = new Date(item.checkOut);
+        checkInDate.setHours(7, 0, 0, 0); // Múi giờ +07
+        checkOutDate.setHours(7, 0, 0, 0);
+
         const payload = {
           quantity: item.quantity,
-          checkIn: item.checkIn,
-          checkOut: item.checkOut,
+          checkIn: checkInDate.toISOString().split("T")[0],
+          checkOut: checkOutDate.toISOString().split("T")[0],
         };
-        await api.post(`/carts/add/${item.hotelId}/${item.roomId}`, payload);
+        await api.post(`/api/v1/carts/add/${item.hotelId}/${item.roomId}`, payload);
       }
       await fetchCart();
       toast.success("Đã thêm vào giỏ hàng!");
@@ -85,17 +88,15 @@ export const CartProvider = ({ children }) => {
 
   const updateQuantity = async (type, item, newQuantity) => {
     try {
-      if (newQuantity < 1) {
-        toast.warn("Số lượng phải lớn hơn 0!");
-        return;
-      }
       setIsLoading(true);
       if (type === "tour") {
-        const payload = { timeDepart: item.timeDepart, quantity: newQuantity };
-        await api.patch(`/carts/update/${item.id}`, payload);
+        await api.patch(`/api/v1/carts/update/${item.id}/${item.timeDepart}`, null, {
+          params: { quantity: newQuantity },
+        });
       } else if (type === "room") {
-        const payload = { quantity: newQuantity };
-        await api.patch(`/carts/updateRoom/${item.hotel_id}/${item.room_id}`, payload);
+        await api.patch(`/api/v1/carts/updateRoom/${item.hotel_id}/${item.room_id}`, null, {
+          params: { quantity: newQuantity },
+        });
       }
       await fetchCart();
       toast.success("Cập nhật số lượng thành công!");
@@ -112,11 +113,11 @@ export const CartProvider = ({ children }) => {
     try {
       setIsLoading(true);
       if (type === "tour") {
-        await api.patch(`/carts/delete/${id}`);
+        await api.patch(`/api/v1/carts/delete/${id}`);
       } else if (type === "room" && roomId) {
-        await api.patch(`/carts/deleteHotel/${id}/${roomId}`);
+        await api.patch(`/api/v1/carts/deleteHotel/${id}/${roomId}`);
       } else if (type === "room") {
-        await api.patch(`/carts/deleteHotel/${id}`);
+        await api.patch(`/api/v1/carts/deleteHotel/${id}`);
       }
       await fetchCart();
       toast.success("Đã xóa khỏi giỏ hàng!");
@@ -132,7 +133,7 @@ export const CartProvider = ({ children }) => {
   const checkout = async (data) => {
     try {
       setIsLoading(true);
-      const response = await api.post("/checkout/order", data);
+      const response = await api.post("/api/v1/checkout/order", data);
       return response.data;
     } catch (error) {
       console.error("Lỗi khi thanh toán:", error.response?.data || error);
@@ -145,13 +146,13 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = async () => {
     try {
-      const response = await api.delete("/api/v1/carts"); // Thay PATCH bằng DELETE, điều chỉnh endpoint nếu cần
+      const response = await api.delete("/api/v1/carts");
       console.log("Clear cart response:", response.data);
       setCart({ tours: [], hotels: [] });
       setCartCount(0);
     } catch (error) {
       console.error("Failed to clear cart:", error);
-      throw error; // Để xử lý lỗi ở cấp cao hơn
+      throw error;
     }
   };
 

@@ -21,9 +21,10 @@ const CartPage = () => {
         quantity: time.quantity || 1,
         title: tour.tourInfo?.title || "Tên tour không xác định",
         price: tour.priceNew || tour.tourInfo?.price || 0,
-        image: tour.tourInfo?.images?.[0]?.original || "/path/to/fallback-image.jpg",
-      }))
+        image: tour.tourInfo.images[0] || "/path/to/fallback-image.jpg",
+      })),
     ),
+    
     ...cart.hotels.flatMap((hotel) =>
       hotel.rooms.map((room) => ({
         type: "room",
@@ -31,28 +32,21 @@ const CartPage = () => {
         hotel_id: hotel.hotel_id,
         room_id: room.room_id,
         quantity: room.quantity || 1,
-        checkIn: room.checkIn,
-        checkOut: room.checkOut,
         title: `${hotel.hotelInfo?.name || "Khách sạn không xác định"} - ${
           room.roomInfo?.name || "Phòng không xác định"
         }`,
-        price: room.roomInfo?.price || room.price || 0,
+        price: room.price || room.roomInfo?.price || 0,
         image:
           room.roomInfo?.images?.[0] ||
           hotel.hotelInfo?.images?.[0] ||
           "/path/to/fallback-image.jpg",
+        checkIn: room.checkIn,
+        checkOut: room.checkOut,
       }))
     ),
   ];
 
-  const calculatedTotalPrice = cartItems.reduce(
-    (total, item) => total + (item.price * item.quantity || 0),
-    0
-  );
-  const totalPrice =
-    cart.totalPrice !== undefined && cart.totalPrice !== null
-      ? cart.totalPrice
-      : calculatedTotalPrice;
+  const totalPrice = cart.totalPrice || 0;
 
   const handleQuantityChange = async (item, newQuantity) => {
     if (newQuantity < 1) return;
@@ -111,50 +105,50 @@ const CartPage = () => {
                         <tr key={item.id}>
                           <td>
                             <div className="cart-item-info">
-                                <img
-                                  src={item.image}
-                                  alt={item.title}
-                                  className="cart-item-image"
-                                />
-                                <div>
-                                  <h5>{item.title}</h5>
-                                  <p>
-                                    Thời gian khởi hành:{" "}
-                                    {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>{item.price.toLocaleString()} VNĐ</td>
-                            <td>
-                              <Form.Control
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  handleQuantityChange(item, parseInt(e.target.value))
-                                }
-                                min="1"
-                                style={{ width: "80px" }}
-                                disabled={isLoading}
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="cart-item-image"
                               />
-                            </td>
-                            <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
-                            <td>
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => handleRemoveItem(item)}
-                                disabled={isLoading}
-                              >
-                                {isLoading ? (
-                                  <i className="bi bi-spinner bi-spin"></i>
-                                ) : (
-                                  "Xóa"
-                                )}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                              <div>
+                                <h5>{item.title}</h5>
+                                <p>
+                                  Thời gian khởi hành:{" "}
+                                  {new Date(item.timeDepart).toLocaleDateString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{item.price.toLocaleString()} VNĐ</td>
+                          <td>
+                            <Form.Control
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleQuantityChange(item, parseInt(e.target.value))
+                              }
+                              min="1"
+                              style={{ width: "80px" }}
+                              disabled={isLoading}
+                            />
+                          </td>
+                          <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
+                          <td>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <i className="bi bi-spinner bi-spin"></i>
+                              ) : (
+                                "Xóa"
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </Table>
 
@@ -165,6 +159,7 @@ const CartPage = () => {
                       <th>Sản phẩm</th>
                       <th>Giá</th>
                       <th>Số lượng</th>
+                      <th>Ngày ở</th>
                       <th>Tổng</th>
                       <th></th>
                     </tr>
@@ -183,13 +178,6 @@ const CartPage = () => {
                               />
                               <div>
                                 <h5>{item.title}</h5>
-                                <p>
-                                  Check-in: {new Date(item.checkIn).toLocaleDateString("vi-VN")}
-                                </p>
-                                <p>
-                                  Check-out:{" "}
-                                  {new Date(item.checkOut).toLocaleDateString("vi-VN")}
-                                </p>
                               </div>
                             </div>
                           </td>
@@ -205,6 +193,16 @@ const CartPage = () => {
                               style={{ width: "80px" }}
                               disabled={isLoading}
                             />
+                          </td>
+                          <td>
+                            {item.checkIn && item.checkOut ? (
+                              <>
+                                Check-in: {new Date(item.checkIn).toLocaleDateString("vi-VN")}<br />
+                                Check-out: {new Date(item.checkOut).toLocaleDateString("vi-VN")}
+                              </>
+                            ) : (
+                              "Không xác định"
+                            )}
                           </td>
                           <td>{(item.price * item.quantity).toLocaleString()} VNĐ</td>
                           <td>

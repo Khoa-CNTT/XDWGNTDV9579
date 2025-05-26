@@ -1,8 +1,7 @@
-// src/pages/Auth/ResetPassword/ResetPasswordForm.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { verifyOtp, resetPassword, forgotPassword } from "../../../services/authService";
+import { forgotPassword, verifyOtp, resetPassword } from "../../../services/authService";
 import "./resetPassword.css";
 
 const ResetPasswordForm = () => {
@@ -10,7 +9,7 @@ const ResetPasswordForm = () => {
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [token, setToken] = useState(localStorage.getItem("resetToken") || null); // Lưu token vào localStorage
+  const [token, setToken] = useState(null); // Lưu token trong state thay vì localStorage
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
@@ -25,7 +24,7 @@ const ResetPasswordForm = () => {
     const emailFromQuery = params.get("email");
     if (emailFromQuery) {
       setEmail(decodeURIComponent(emailFromQuery));
-      // Đồng bộ thời gian hết hạn OTP với backend (180 giây)
+      // Thiết lập thời gian hết hạn OTP (180 giây) để đồng bộ với frontend
       const expiryTime = new Date().getTime() + 180000; // 180 giây = 3 phút
       setOtpExpiry(expiryTime);
     } else {
@@ -95,50 +94,45 @@ const ResetPasswordForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.error("Vui lòng kiểm tra lại thông tin!");
-      return;
-    }
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) {
+    toast.error("Vui lòng kiểm tra lại thông tin!");
+    return;
+  }
 
-    // Kiểm tra nếu OTP đã hết hạn
-    if (otpExpiry && new Date().getTime() >= otpExpiry) {
-      toast.error("Mã OTP đã hết hạn. Vui lòng gửi lại mã mới!");
-      return;
-    }
+  // Kiểm tra nếu OTP đã hết hạn
+  if (otpExpiry && new Date().getTime() >= otpExpiry) {
+    toast.error("Mã OTP đã hết hạn. Vui lòng gửi lại mã mới!");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      if (!token) {
-        // Bước 1: Xác thực OTP
-        const otpResult = await verifyOtp(email, otp);
-        toast.success(otpResult.message || "Xác thực OTP thành công!");
-        setToken(otpResult.token);
-        localStorage.setItem("resetToken", otpResult.token); // Lưu token vào localStorage
-      } else {
-        // Bước 2: Đặt lại mật khẩu
-        const resetResult = await resetPassword(token, password);
-        toast.success(resetResult.message || "Đặt lại mật khẩu thành công!");
-        localStorage.removeItem("resetToken"); // Xóa token sau khi reset thành công
-        setTimeout(() => navigate("/login"), 2000);
-      }
-    } catch (error) {
-      const errorMessage = error.message || "Có lỗi xảy ra. Vui lòng thử lại.";
-      toast.error(errorMessage);
-      if (error.message === "Mã OTP không đúng" && !otpExpiry) {
-        toast.warn("Mã OTP có thể đã hết hạn. Vui lòng gửi lại mã mới!");
-      }
-      if (error.message.includes("Token không hợp lệ")) {
-        localStorage.removeItem("resetToken");
-        setToken(null);
-        navigate("/forgot-password");
-      }
-    } finally {
-      setLoading(false);
+  try {
+    if (!token) {
+      const otpResult = await verifyOtp(email, otp);
+      toast.success(otpResult.message || "Xác thực OTP thành công!");
+      setToken(otpResult.token);
+    } else {
+      const resetResult = await resetPassword(token, password);
+      toast.success(resetResult.message || "Đặt lại mật khẩu thành công!");
+      setTimeout(() => navigate("/login"), 2000);
     }
-  };
+  } catch (error) {
+    const errorMessage = typeof error.message === "string" ? error.message : error.response?.data?.message || "Có lỗi xảy ra. Vui lòng thử lại.";
+    toast.error(errorMessage);
+    if (typeof error.message === "string" && error.message.includes("Mã OTP không đúng")) {
+      toast.warn("Mã OTP không đúng. Vui lòng kiểm tra lại hoặc gửi lại mã mới!");
+    }
+    if (typeof error.message === "string" && error.message.includes("Token không hợp lệ")) {
+      setToken(null);
+      navigate("/forgot-password");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleResendOtp = async () => {
     if (otpExpiry && new Date().getTime() < otpExpiry) {

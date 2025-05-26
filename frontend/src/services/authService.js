@@ -108,7 +108,7 @@ export const verifyOtp = async (email, otp) => {
     }
   } catch (error) {
     console.error("Verify OTP error:", error.response?.data || error);
-    throw error.response?.data || error;
+    throw new Error(error.response?.data?.message || "Xác thực OTP thất bại!");
   }
 };
 
@@ -126,7 +126,7 @@ export const resetPassword = async (token, password) => {
     }
   } catch (error) {
     console.error("Reset password error:", error.response?.data || error);
-    throw error.response?.data || error;
+    throw new Error(error.response?.data?.message || "Đặt lại mật khẩu thất bại!");
   }
 };
 

@@ -14,6 +14,8 @@ import {
   Card,
   Stack,
   Form,
+  Button,
+  Modal,
 } from "react-bootstrap";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
@@ -30,8 +32,10 @@ const TourDetails = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeDepart, setSelectedTimeDepart] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [voucherCode, setVoucherCode] = useState(""); // Thêm trạng thái cho mã voucher
-  const [voucher, setVoucher] = useState(null); // Trạng thái cho voucher
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucher, setVoucher] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false); // Trạng thái cho modal xác nhận
+  const [isConfirmed, setIsConfirmed] = useState(false); // Trạng thái checkbox
 
   useEffect(() => {
     if (!tourId || tourId === "undefined") {
@@ -131,7 +135,7 @@ const TourDetails = () => {
       _id: tour._id,
       timeDepart: new Date(selectedTimeDepart).toISOString(),
       quantity: parseInt(quantity),
-      voucherCode: voucher ? voucher.code : null, // Thêm mã voucher vào giỏ hàng
+      voucherCode: voucher ? voucher.code : null,
     };
 
     try {
@@ -144,6 +148,15 @@ const TourDetails = () => {
     }
   };
 
+  const handleConfirm = () => {
+    if (!isConfirmed) {
+      toast.error("Vui lòng xác nhận địa điểm khởi hành!");
+      return;
+    }
+    setShowConfirmation(false);
+    handleAddToCart();
+  };
+
   if (loading) {
     return <p>Đang tải chi tiết tour...</p>;
   }
@@ -152,10 +165,8 @@ const TourDetails = () => {
     return <p>Không tìm thấy tour.</p>;
   }
 
-  // Sử dụng price_special từ backend thay vì tính lại
   const priceAfterDiscount = tour.price_special || (tour.price * (100 - (tour.discount || 0)) / 100).toFixed(0);
 
-  // Tính tổng giá với số lượng và áp dụng voucher
   const totalPriceBeforeDiscount = priceAfterDiscount * quantity;
   const { discountAmount, finalPrice } = voucher
     ? {
@@ -193,9 +204,6 @@ const TourDetails = () => {
                       </Nav.Item>
                       <Nav.Item>
                         <Nav.Link eventKey="2">Lịch trình</Nav.Link>
-                      </Nav.Item>
-                      <Nav.Item>
-                        <Nav.Link eventKey="3">Bao gồm & loại trừ</Nav.Link>
                       </Nav.Item>
                       <Nav.Item>
                         <Nav.Link eventKey="4">Vị trí</Nav.Link>
@@ -288,28 +296,7 @@ const TourDetails = () => {
                         </Accordion>
                       </div>
                     </Tab.Pane>
-
                     <Tab.Pane eventKey="3">
-                      <div className="tour_details-section inclusion-section">
-                        <h1 className="section-title">Bao gồm và loại trừ</h1>
-                        <h5 className="section-subtitle mt-3">Bao gồm</h5>
-                        <ListGroup className="inclusion-list">
-                          <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
-                            <i className="bi bi-check-lg me-2 text-success h4 m-0"></i> 
-                            {tour.inclusions ? tour.inclusions : "Chưa có thông tin"}
-                          </ListGroup.Item>
-                        </ListGroup>
-                        <h5 className="section-subtitle mt-3">Loại trừ</h5>
-                        <ListGroup className="inclusion-list">
-                          <ListGroup.Item className="inclusion-item border-0 pt-0 body-text d-flex align-items-center">
-                            <i className="bi bi-x-lg me-2 text-danger h5 m-0"></i> 
-                            {tour.exclusions ? tour.exclusions : "Chưa có thông tin"}
-                          </ListGroup.Item>
-                        </ListGroup>
-                      </div>
-                    </Tab.Pane>
-
-                    <Tab.Pane eventKey="4">
                       <div className="tour_details-section location-section">
                         <h1 className="section-title">Vị trí</h1>
                         {tour.location ? (
@@ -347,12 +334,12 @@ const TourDetails = () => {
                             Giảm thêm {voucher.discount}%: -{Number(discountAmount).toLocaleString()} VNĐ
                           </p>
                         )}
-                        <button
+                        <Button
                           className="btn btn-primary w-100 mt-3"
-                          onClick={handleAddToCart}
+                          onClick={() => setShowConfirmation(true)}
                         >
                           Đặt Tour
-                        </button>
+                        </Button>
                       </Card.Body>
                     </Card>
                   </aside>
@@ -362,6 +349,30 @@ const TourDetails = () => {
           </Row>
         </Container>
       </section>
+
+      {/* Modal xác nhận */}
+      <Modal show={showConfirmation} onHide={() => setShowConfirmation(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận đặt tour</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Địa điểm khởi hành hiện tại chỉ đang ở <strong>Đà Nẵng, Quảng Nam</strong>.</p>
+          <Form.Check
+            type="checkbox"
+            label="Tôi xác nhận đã đọc và đồng ý với thông tin trên."
+            checked={isConfirmed}
+            onChange={(e) => setIsConfirmed(e.target.checked)}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowConfirmation(false)}>
+            Hủy
+          </Button>
+          <Button variant="primary" onClick={handleConfirm} disabled={!isConfirmed}>
+            Xác nhận
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

@@ -52,6 +52,7 @@ header .navbar .offcanvas-body a {
 
 header .navbar .offcanvas-body .dropdown-menu a {
   color: black !important;
+  padding-left: 4px;
 }
 
 header .navbar .offcanvas-body a:hover {

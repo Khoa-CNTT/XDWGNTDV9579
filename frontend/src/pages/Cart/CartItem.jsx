@@ -1,4 +1,5 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState } from "react";
+import { useContext } from "react";
 import { CartContext } from "../contexts/CartContext";
 
 const CartItem = ({ item, removeItem }) => {
@@ -6,7 +7,7 @@ const CartItem = ({ item, removeItem }) => {
   const [quantity, setQuantity] = useState(item.quantity || 1);
 
   useEffect(() => {
-    setQuantity(item.quantity || 1); 
+    setQuantity(item.quantity || 1); // Đồng bộ với backend
   }, [item.quantity]);
 
   const handleQuantityChange = async (newQuantity) => {
@@ -14,8 +15,8 @@ const CartItem = ({ item, removeItem }) => {
       setQuantity(1);
       return;
     }
-    setQuantity(newQuantity);
     try {
+      setQuantity(newQuantity);
       await updateQuantity(
         item.type,
         item.type === "tour"
@@ -24,7 +25,8 @@ const CartItem = ({ item, removeItem }) => {
         newQuantity
       );
     } catch (error) {
-      setQuantity(item.quantity || 1); // Reset nếu lỗi
+      setQuantity(item.quantity || 1);
+      console.error("Lỗi khi cập nhật số lượng:", error.message);
     }
   };
 
@@ -47,10 +49,6 @@ const CartItem = ({ item, removeItem }) => {
           ? item.timeDepart
             ? new Date(item.timeDepart).toLocaleDateString("vi-VN")
             : "Không xác định"
-          : item.checkIn && item.checkOut
-          ? `Check-in: ${new Date(item.checkIn).toLocaleDateString("vi-VN")}, Check-out: ${new Date(
-              item.checkOut
-            ).toLocaleDateString("vi-VN")}`
           : "Không áp dụng"}
       </td>
       <td className="cart-item-price">{item.price ? item.price.toLocaleString() : "0"} VNĐ</td>

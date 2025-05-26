@@ -59,7 +59,7 @@ const HotelDetails = () => {
         let hasError = false;
         for (const room of response.data.rooms) {
           try {
-            const reviewsResponse = await api.get(`/reviews/get/${hotelId}/${room._id}`); // Cập nhật URL
+            const reviewsResponse = await api.get(`/reviews/get/${hotelId}/${room._id}`);
             if (reviewsResponse.data.code === 200) {
               reviewsData[room._id] = reviewsResponse.data.reviews || [];
             } else {
@@ -103,18 +103,32 @@ const HotelDetails = () => {
       return;
     }
 
-    if (new Date(checkIn) >= new Date(checkOut)) {
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const minCheckOutDate = new Date(checkInDate.getTime() + 86400000); // +1 ngày
+
+    if (checkInDate >= checkOutDate) {
       toast.error("Ngày check-out phải sau ngày check-in!");
       return;
     }
+
+    const numNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    if (numNights < 1) {
+      toast.error("Số đêm phải ít nhất là 1!");
+      return;
+    }
+
+    // Chuẩn hóa múi giờ +07 (Vietnam)
+    checkInDate.setHours(7, 0, 0, 0);
+    checkOutDate.setHours(7, 0, 0, 0);
 
     try {
       await addToCart("room", {
         hotelId,
         roomId,
         quantity,
-        checkIn,
-        checkOut,
+        checkIn: checkInDate.toISOString().split("T")[0], // Gửi lại định dạng YYYY-MM-DD
+        checkOut: checkOutDate.toISOString().split("T")[0],
       });
       toast.success("Đã thêm phòng vào giỏ hàng!");
       navigate("/cart");
@@ -151,7 +165,7 @@ const HotelDetails = () => {
 
     setSubmittingReview(true);
     try {
-      const response = await api.post(`/reviews/${hotelId}/${roomId}`, { 
+      const response = await api.post(`/reviews/${hotelId}/${roomId}`, {
         rating: newRating,
         comment: newComment,
       });
@@ -160,7 +174,7 @@ const HotelDetails = () => {
         setNewComment("");
         setNewRating(5);
         setFetchReviewError(false);
-        fetchHotelDetails(); 
+        fetchHotelDetails();
       } else if (response.data.code === 400) {
         toast.error(response.data.message || "Đánh giá thất bại!");
       } else {
@@ -187,11 +201,11 @@ const HotelDetails = () => {
 
     setDeletingReview(reviewId);
     try {
-      const response = await api.delete(`/reviews/delete/${reviewId}`); // Cập nhật URL
+      const response = await api.delete(`/reviews/delete/${reviewId}`);
       if (response.data.code === 200) {
         toast.success("Xóa đánh giá thành công!");
         setFetchReviewError(false);
-        fetchHotelDetails(); // Cập nhật danh sách đánh giá
+        fetchHotelDetails();
       } else if (response.data.code === 404) {
         toast.error(response.data.message || "Xóa thất bại!");
       } else {
@@ -303,6 +317,11 @@ const HotelDetails = () => {
                               </Form.Group>
                             </Col>
                           </Row>
+                          {checkIn && checkOut && (
+                            <p className="hotel-date-info mt-3">
+                              Số đêm: {Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24))} đêm
+                            </p>
+                          )}
                         </Form>
 
                         {rooms.length === 0 ? (

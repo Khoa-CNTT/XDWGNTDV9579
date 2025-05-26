@@ -3,6 +3,8 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import "react-toastify/dist/ReactToastify.css";
 @import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Quicksand:wght@300..700&display=swap');
 
 :root {
 	--primaryClr: #fe4e37;
@@ -16,7 +18,7 @@
 	--bodyText: 14px;
 	--subTitle: 18px;
 	--heading: 26px;
-	--fontFamily: "Lato", sans-serif;
+	--fontFamily: "Open Sans", sans-serif;
 	--fontFamily1: "Libre Baskerville", serif;
 }
 

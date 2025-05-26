@@ -3,17 +3,43 @@ import { Container, Navbar, Offcanvas, Nav, NavDropdown } from "react-bootstrap"
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { useCart } from "../../../context/CartContext";
+import api from "../../../utils/api";
 import "../Header/header.css";
 
 const Header = () => {
   const [open, setOpen] = useState(false);
   const [showServicesDropdown, setShowServicesDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
   const servicesDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
   const { user, logout } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get("/api/v1/setting");
+        console.log("API Response:", response);
+        if (response.data) {
+          console.log("Settings Data:", response.data);
+          setSettings(response.data);
+        } else {
+          console.warn("No data returned from API");
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải thông tin cài đặt:", err.message);
+        if (err.response) {
+          console.error("Response Error:", err.response.data);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -52,12 +78,27 @@ const Header = () => {
     setShowUserDropdown(false);
   };
 
+  if (loading) {
+    return <div className="text-center my-3">Đang tải...</div>;
+  }
+
   return (
     <header className="header-section">
       <Container>
         <Navbar expand="lg" className="p-0">
           <Navbar.Brand>
-            <NavLink to="/">GoTravel</NavLink>
+            <NavLink to="/" className="d-flex align-items-center">
+              {settings?.logo && (
+                <img
+                  src={settings.logo}
+                  alt={settings.websiteName || "GoTravel"}
+                  style={{ height: "60px", marginRight: "10px" }} // Thêm margin để cách websiteName
+                />
+              )}
+              <span className="website-name">
+                {settings?.websiteName || "GoTravel"}
+              </span>
+            </NavLink>
           </Navbar.Brand>
 
           <Navbar.Offcanvas
@@ -68,7 +109,18 @@ const Header = () => {
             onHide={() => setOpen(false)}
           >
             <Offcanvas.Header>
-              <h1 className="logo">GoTravel</h1>
+              <h1 className="logo d-flex align-items-center">
+                {settings?.logo && (
+                  <img
+                    src={settings.logo}
+                    alt={settings.websiteName || "GoTravel"}
+                    style={{ height: "60px", marginRight: "10px" }}
+                  />
+                )}
+                <span className="website-name">
+                  {settings?.websiteName || "GoTravel"}
+                </span>
+              </h1>
               <span className="navbar-toggler ms-auto" onClick={toggleMenu}>
                 <i className="bi bi-x-lg"></i>
               </span>
@@ -176,9 +228,6 @@ const Header = () => {
                 <span className="login-text">Đăng nhập</span>
               </NavLink>
             )}
-            {/* <NavLink className="primaryBtn d-none d-sm-inline-block" to="/booking">
-              Đặt vé ngay
-            </NavLink> */}
             <li className="d-inline-block d-lg-none ms-3 toggle_btn">
               <i className={open ? "bi bi-x-lg" : "bi bi-list"} onClick={toggleMenu}></i>
             </li>

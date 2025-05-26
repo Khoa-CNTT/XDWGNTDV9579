@@ -24,74 +24,82 @@ const Home = () => {
     fetchData();
   }, []);
 
- const fetchData = async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const response = await api.get("/api/v1/");
-    const data = response.data; // Dữ liệu nằm trực tiếp trong response.data
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get("/api/v1/");
+      const data = response.data;
 
-    if (!data || !data.topSallers || !data.newTours || !data.topHotelSallers || !data.topRatedHotels) {
-      throw new Error("Không nhận được dữ liệu đầy đủ từ API!");
+      if (!data || !data.topSallers || !data.newTours || !data.topHotelSallers || !data.topRatedHotels) {
+        throw new Error("Không nhận được dữ liệu đầy đủ từ API!");
+      }
+
+      // Xử lý topSallers (Tour Phổ Biến)
+      const formattedTopSallers = (data.topSallers || []).map((tour) => ({
+        id: tour._id,
+        title: tour.title,
+        images: tour.images || [],
+        price: tour.price || 0,
+        discount: tour.discount || 0,
+        slug: tour.slug,
+        timeStarts: tour.timeStarts || [],
+      }));
+      setTopSallers(formattedTopSallers);
+
+      // Xử lý newTours (Tour Nổi Bật)
+      const formattedNewTours = (data.newTours || []).map((tour) => ({
+        id: tour._id,
+        title: tour.title,
+        images: tour.images || [],
+        price: tour.price || 0,
+        discount: tour.discount || 0,
+        slug: tour.slug,
+        timeStarts: tour.timeStarts || [],
+      }));
+      setNewTours(formattedNewTours);
+
+      // Xử lý topHotelSallers (Hotel Phổ Biến)
+      const formattedTopHotelSallers = (data.topHotelSallers || []).map((hotel) => ({
+        _id: hotel._id,
+        name: hotel.name,
+        images: hotel.images || [],
+        location: hotel.location || { city: "Không xác định", country: "Không xác định" },
+      }));
+      setTopHotelSallers(formattedTopHotelSallers);
+
+      // Xử lý topRatedHotels (Hotel Nổi Bật)
+      const formattedTopRatedHotels = (data.topRatedHotels || []).map((item) => ({
+        _id: item.hotel._id,
+        name: item.hotel.name,
+        images: item.hotel.images || [],
+        location: item.hotel.location || { city: "Không xác định", country: "Không xác định" },
+        averageRating: item.averageRating || null,
+      }));
+      setTopRatedHotels(formattedTopRatedHotels);
+
+      console.log("Dữ liệu thành công:", {
+        topSallers: formattedTopSallers,
+        newTours: formattedNewTours,
+        topHotelSallers: formattedTopHotelSallers,
+        topRatedHotels: formattedTopRatedHotels,
+      });
+    } catch (error) {
+      console.error("Lỗi khi lấy dữ liệu:", error);
+      setError("Không thể tải dữ liệu từ API. Vui lòng thử lại sau!");
+      toast.error("Không thể tải dữ liệu từ API!");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Xử lý topSallers (Tour Phổ Biến)
-    const formattedTopSallers = (data.topSallers || []).map((tour) => ({
-      id: tour._id,
-      title: tour.title,
-      images: tour.images || [],
-      price: tour.price || 0,
-      discount: tour.discount || 0,
-      slug: tour.slug,
-      timeStarts: tour.timeStarts || [],
-    }));
-    setTopSallers(formattedTopSallers);
-
-    // Xử lý newTours (Tour Nổi Bật)
-    const formattedNewTours = (data.newTours || []).map((tour) => ({
-      id: tour._id,
-      title: tour.title,
-      images: tour.images || [],
-      price: tour.price || 0,
-      discount: tour.discount || 0,
-      slug: tour.slug,
-      timeStarts: tour.timeStarts || [],
-    }));
-    setNewTours(formattedNewTours);
-
-    // Xử lý topHotelSallers (Hotel Phổ Biến)
-    const formattedTopHotelSallers = (data.topHotelSallers || []).map((hotel) => ({
-      _id: hotel._id,
-      name: hotel.name,
-      images: hotel.images || [],
-      location: hotel.location || { city: "Không xác định", country: "Không xác định" },
-    }));
-    setTopHotelSallers(formattedTopHotelSallers);
-
-    // Xử lý topRatedHotels (Hotel Nổi Bật)
-    const formattedTopRatedHotels = (data.topRatedHotels || []).map((item) => ({
-      _id: item.hotel._id,
-      name: item.hotel.name,
-      images: item.hotel.images || [],
-      location: item.hotel.location || { city: "Không xác định", country: "Không xác định" },
-      averageRating: item.averageRating || null,
-    }));
-    setTopRatedHotels(formattedTopRatedHotels);
-
-    console.log("Dữ liệu thành công:", {
-      topSallers: formattedTopSallers,
-      newTours: formattedNewTours,
-      topHotelSallers: formattedTopHotelSallers,
-      topRatedHotels: formattedTopRatedHotels,
-    });
-  } catch (error) {
-    console.error("Lỗi khi lấy dữ liệu:", error);
-    setError("Không thể tải dữ liệu từ API. Vui lòng thử lại sau!");
-    toast.error("Không thể tải dữ liệu từ API!");
-  } finally {
-    setLoading(false);
-  }
-};
+  // Lọc các tour hợp lệ (có ngày khởi hành sau ngày hiện tại)
+  const validTopSallers = topSallers.filter((tour) => {
+    const firstTimeStart = tour.timeStarts && tour.timeStarts.length > 0 ? tour.timeStarts[0].timeDepart : null;
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    return firstTimeStart && new Date(firstTimeStart) >= currentDate;
+  });
 
   return (
     <>
@@ -152,12 +160,12 @@ const Home = () => {
               <Col>
                 <p>{error}</p>
               </Col>
-            ) : topSallers.length === 0 ? (
+            ) : validTopSallers.length === 0 ? (
               <Col>
                 <p>Không có tour phổ biến nào.</p>
               </Col>
             ) : (
-              topSallers.map((val, inx) => (
+              validTopSallers.map((val, inx) => (
                 <Col md={3} sm={6} xs={12} className="mb-5" key={inx}>
                   <PopularCard val={val} />
                 </Col>

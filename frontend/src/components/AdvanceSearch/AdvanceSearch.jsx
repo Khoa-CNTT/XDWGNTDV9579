@@ -28,7 +28,7 @@ const AdvanceSearch = () => {
 
         if (response.data.code === 200) {
           const items = searchTab === "tour" ? response.data.tours : response.data.hotels;
-          // Chuẩn hóa dữ liệu để khớp với giao diện
+          
           const formattedSuggestions = items.map(item => ({
             _id: item._id,
             name: searchTab === "tour" ? item.title : item.name,
@@ -101,7 +101,7 @@ const AdvanceSearch = () => {
         toast.error("Không tìm thấy thông tin khách sạn!");
         return;
       }
-      navigate(`/hotels/${suggestion._id}`);
+      navigate(`/hotel-details/${suggestion._id}`); // Đã đúng, điều hướng đến /hotels/:hotelId
     }
   };
 

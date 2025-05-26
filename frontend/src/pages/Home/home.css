@@ -1,11 +1,9 @@
-/* src/pages/Home/home.css */
 
-/* Biến CSS (nếu chưa định nghĩa trong :root, bạn có thể thêm vào file global CSS) */
 :root {
-  --primaryClr: #007bff; /* Màu chính (thay đổi nếu cần) */
-  --secondaryClr: #f9f9f9; /* Màu nền thứ cấp */
+  --primaryClr: #007bff; 
+  --secondaryClr: #f9f9f9; 
   --white: #ffffff;
-  --subTitle: 1rem; /* Kích thước tiêu đề phụ */
+  --subTitle: 1rem; 
 }
 
 /* Định dạng chung cho các section */
